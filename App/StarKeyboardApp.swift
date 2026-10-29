@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var testText = ""
     @State private var photoItem: PhotosPickerItem?
     @State private var message: String?
+    @State private var latest: ReleaseInfo?
 
     private let pink = Color(red: 1.0, green: 0.5, blue: 0.65)
 
@@ -28,8 +29,27 @@ struct ContentView: View {
                         Text("注音、手寫、英文、表符、顏文字、剪貼簿，還有可愛的主題。")
                             .font(.system(.subheadline, design: .rounded))
                             .foregroundStyle(.secondary)
+                        Text(ReleaseChecker.currentBuild > 1 ? "目前是第 \(ReleaseChecker.currentBuild) 版" : "開發版")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 6)
+                }
+
+                if let latest = latest, latest.build > ReleaseChecker.currentBuild {
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("🎉 有新版：\(latest.title)")
+                                .font(.system(.headline, design: .rounded))
+                            Text(latest.notes)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            Text("更新方法：下載新的 StarKeyboard.ipa，接電腦用 Sideloadly 直接裝。不要先刪掉舊的，設定、剪貼簿、自製表符都會保留。")
+                                .font(.footnote)
+                        }
+                        .padding(.vertical, 4)
+                        Link("前往下載", destination: ReleaseChecker.downloadPage)
+                    }
                 }
 
                 Section("第一次使用：打開鍵盤") {
@@ -75,6 +95,9 @@ struct ContentView: View {
             .navigationTitle("星星鍵盤")
             .navigationBarTitleDisplayMode(.inline)
             .tint(pink)
+            .task {
+                ReleaseChecker.fetchLatest { info in latest = info }
+            }
             .onChange(of: photoItem) { item in
                 guard let item = item else { return }
                 Task { await copyPhoto(item) }

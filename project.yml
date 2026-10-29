@@ -16,6 +16,7 @@ targets:
     platform: iOS
     sources:
       - path: App
+      - path: Core/Sources/KeyboardCore/Release.swift
     info:
       path: App/Info.plist
       properties:

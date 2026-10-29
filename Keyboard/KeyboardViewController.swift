@@ -111,6 +111,7 @@ final class KeyboardViewController: UIInputViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         captureClipboard()
+        checkForUpdate()
         clipboardTimer?.invalidate()
         clipboardTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.captureClipboard()
@@ -1094,6 +1095,31 @@ final class KeyboardViewController: UIInputViewController {
             c.isActive = true
             heightConstraint = c
         }
+    }
+
+    // MARK: - 新版提醒
+
+    /// 每 6 小時最多問一次 GitHub；有新版就提醒一次
+    private func checkForUpdate() {
+        guard hasFullAccess else { return }
+        let now = Date().timeIntervalSince1970
+        guard now - settings.lastUpdateCheck > 6 * 3600 else {
+            showUpdateNoticeIfNeeded()
+            return
+        }
+        settings.lastUpdateCheck = now
+        ReleaseChecker.fetchLatest { [weak self] info in
+            guard let self = self, let info = info else { return }
+            self.settings.latestBuild = info.build
+            self.showUpdateNoticeIfNeeded()
+        }
+    }
+
+    private func showUpdateNoticeIfNeeded() {
+        let latest = settings.latestBuild
+        guard latest > ReleaseChecker.currentBuild, latest > settings.notifiedBuild else { return }
+        settings.notifiedBuild = latest
+        toast("有新版（第 \(latest) 版）！打開星星鍵盤 App 看更新內容")
     }
 
     // MARK: - 回饋

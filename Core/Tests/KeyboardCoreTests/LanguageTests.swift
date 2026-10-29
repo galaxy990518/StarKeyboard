@@ -74,3 +74,18 @@ final class RomajiTests: XCTestCase {
         XCTAssertEqual(Romaji.katakana(Romaji.finalize("ko-hi-")), "コーヒー")
     }
 }
+
+final class ReleaseTests: XCTestCase {
+    func testBuildNumber() {
+        XCTAssertEqual(ReleaseChecker.buildNumber(fromTag: "build-12"), 12)
+        XCTAssertNil(ReleaseChecker.buildNumber(fromTag: "v1.0"))
+    }
+
+    func testParse() {
+        let json = #"{"tag_name":"build-7","name":"星星鍵盤 第 7 版","body":"這次更新：\n- 修好按鍵","html_url":"https://github.com/z3332111-cloud/StarKeyboard/releases/tag/build-7"}"#
+        let info = ReleaseChecker.parse(Data(json.utf8))
+        XCTAssertEqual(info?.build, 7)
+        XCTAssertEqual(info?.title, "星星鍵盤 第 7 版")
+        XCTAssertTrue(info?.notes.contains("修好按鍵") ?? false)
+    }
+}

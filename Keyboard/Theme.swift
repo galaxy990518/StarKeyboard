@@ -248,6 +248,19 @@ final class KeyboardSettings {
         get { CGFloat(double("gapScale", 1)) }
         set { d.set(Double(newValue), forKey: "gapScale") }
     }
+    // 新版提醒
+    var lastUpdateCheck: Double {
+        get { d.double(forKey: "lastUpdateCheck") }
+        set { d.set(newValue, forKey: "lastUpdateCheck") }
+    }
+    var latestBuild: Int {
+        get { d.integer(forKey: "latestBuild") }
+        set { d.set(newValue, forKey: "latestBuild") }
+    }
+    var notifiedBuild: Int {
+        get { d.integer(forKey: "notifiedBuild") }
+        set { d.set(newValue, forKey: "notifiedBuild") }
+    }
     var translateTarget: String {
         get { d.string(forKey: "translateTarget") ?? "en" }
         set { d.set(newValue, forKey: "translateTarget") }
