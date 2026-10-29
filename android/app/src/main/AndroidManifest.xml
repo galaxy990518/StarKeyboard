@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
+        android:name=".StarApp"
         android:label="星星鍵盤"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"

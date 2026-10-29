@@ -31,6 +31,7 @@ import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
 import com.startown.starkeyboard.MainActivity
+import com.startown.starkeyboard.CrashLog
 import com.startown.starkeyboard.core.Bopomofo
 import com.startown.starkeyboard.core.ChineseConverter
 import com.startown.starkeyboard.core.Candidate
@@ -550,7 +551,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 listOf(hira, Romaji.katakana(hira), kanaBuffer).distinct().map { Candidate(it, 0, Candidate.Kind.PHRASE) }
             }
             composer.readings.isEmpty() -> emptyList()
-            else -> engine?.candidates(composer.readings)
+            else -> safely { engine?.candidates(composer.readings) }
                 ?: listOf(Candidate(ZhuyinEngine.display(composer.readings.joinToString("")), composer.readings.size, Candidate.Kind.LITERAL))
         }
         if (!isComposing) {
@@ -561,6 +562,14 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         candidatePanel?.setCandidates(candidates.map { it.text })
         refreshTopBar()
         refreshReturnTitle()
+    }
+
+    /** 選字出錯時不要讓整個鍵盤當掉：記下原因，這次就當成查不到 */
+    private fun <T> safely(block: () -> T?): T? = try {
+        block()
+    } catch (e: Exception) {
+        CrashLog.record(this, e)
+        null
     }
 
     private val compositionText: String
@@ -669,7 +678,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             text = Romaji.finalize(kanaBuffer)
             kanaBuffer = ""
         } else {
-            text = engine?.bestSegments(composer.readings)?.joinToString("") { it.text }
+            text = safely { engine?.bestSegments(composer.readings)?.joinToString("") { it.text } }
                 ?: ZhuyinEngine.display(composer.readings.joinToString(""))
             composer.clear()
         }

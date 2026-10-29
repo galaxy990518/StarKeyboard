@@ -101,6 +101,8 @@ class MainActivity : Activity() {
             }
         }
 
+        showCrashLog()
+
         title("第一次使用：打開鍵盤")
         text("1. 按下面的按鈕，在清單裡打開「星星鍵盤」（手機會提醒第三方鍵盤可能讀取你打的字，按確定）")
         button("① 打開鍵盤設定") { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) }
@@ -133,6 +135,28 @@ class MainActivity : Activity() {
         text("• 剪貼簿：星星鍵盤是目前的鍵盤時，複製的文字都會記下來。")
         text("• 大小、主題、按鍵造型都在鍵盤的 ⚙ 設定裡調。")
         text("• 所有版本：${ReleaseChecker.PAGE}")
+    }
+
+    /** 鍵盤當掉或出錯過：把紀錄顯示出來，可以複製傳給開發的人 */
+    private fun showCrashLog() {
+        val f = CrashLog.file(this)
+        if (!f.exists() || f.length() == 0L) return
+        val log = f.readText()
+        title("⚠️ 鍵盤出過問題")
+        text("請按「複製紀錄」貼給開發的人（或截圖這段），會比較快找到原因。")
+        col.addView(TextView(this).apply {
+            text = log.take(1500); textSize = 11f; setTextColor(Color.parseColor("#7A4A55")); setTextIsSelectable(true)
+            setBackgroundColor(Color.parseColor("#FFE9EE")); setPadding(px(10f), px(8f), px(10f), px(8f))
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = px(6f) })
+        button("複製紀錄") {
+            (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                .setPrimaryClip(android.content.ClipData.newPlainText("星星鍵盤紀錄", log))
+            toast("已複製")
+        }
+        button("清除紀錄") {
+            f.delete()
+            toast("已清除，重新打開 App 就不會顯示")
+        }
     }
 
     private fun pick(what: Int) {
