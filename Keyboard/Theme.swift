@@ -483,6 +483,11 @@ final class KeyboardSettings {
         get { bool("pinyinSimplified", false) }
         set { d.set(newValue, forKey: "pinyinSimplified") }
     }
+    /// 中文符號頁用全形（＃＊）還是半形（# *）；預設半形，Discord 語法才能用
+    var fullWidthSymbols: Bool {
+        get { bool("fullWidthSymbols", false) }
+        set { d.set(newValue, forKey: "fullWidthSymbols") }
+    }
     var translateTarget: String {
         get { d.string(forKey: "translateTarget") ?? "en" }
         set { d.set(newValue, forKey: "translateTarget") }

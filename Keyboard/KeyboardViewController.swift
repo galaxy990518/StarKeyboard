@@ -298,6 +298,10 @@ final class KeyboardViewController: UIInputViewController {
         case .clearCanvas:
             handwritingView?.clear()
             clearSuggestions()
+        case .toggleWidth:
+            settings.fullWidthSymbols.toggle()
+            toast(settings.fullWidthSymbols ? "換成全形符號（中文排版用）" : "換成半形符號（Discord 語法用）")
+            rebuildKeys()
         }
     }
 
@@ -1411,7 +1415,8 @@ final class KeyboardViewController: UIInputViewController {
         guard grid != nil else { return }
         lastReturnTitle = returnTitle
         let context = KeyLayouts.Context(mode: mode, layer: layer, shift: shift, needsGlobe: needsInputModeSwitchKey,
-                                         returnTitle: returnTitle, spaceTitle: spaceTitle, nextModeTitle: nextModeTitle)
+                                         returnTitle: returnTitle, spaceTitle: spaceTitle, nextModeTitle: nextModeTitle,
+                                         fullWidthSymbols: settings.fullWidthSymbols)
         grid.setLayout(KeyLayouts.layout(context))
         grid.glideEnabled = mode == .english && layer == .letters && settings.glideTyping
 

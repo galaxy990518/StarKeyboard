@@ -343,6 +343,10 @@ class KeyboardSettings(context: Context) {
     var pinyinSimplified: Boolean
         get() = p.getBoolean("pinyinSimplified", false)
         set(v) = p.edit().putBoolean("pinyinSimplified", v).apply()
+    /** 中文符號頁用全形（＃＊）還是半形（# *）；預設半形，Discord 語法才能用 */
+    var fullWidthSymbols: Boolean
+        get() = p.getBoolean("fullWidthSymbols", false)
+        set(v) = p.edit().putBoolean("fullWidthSymbols", v).apply()
     var translateTarget: String
         get() = p.getString("translateTarget", "en")!!
         set(v) = p.edit().putString("translateTarget", v).apply()

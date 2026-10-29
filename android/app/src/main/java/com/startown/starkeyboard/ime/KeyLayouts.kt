@@ -20,6 +20,7 @@ sealed class KeyAction {
     object Shift : KeyAction()
     object NextMode : KeyAction()
     object ClearCanvas : KeyAction()
+    object ToggleWidth : KeyAction()   // 中文符號頁切換全形／半形
 
     /** 一般打字的鍵：可以滑動修正、快速連打 */
     val isCharacter get() = this is Text || this is Zhuyin || this is Jamo || this is Romaji || this is Pinyin
@@ -46,6 +47,7 @@ object KeyLayouts {
         val returnTitle: String,
         val spaceTitle: String,
         val nextModeTitle: String,
+        val fullWidthSymbols: Boolean = false,
     )
 
     fun layout(c: Context): KeyboardLayout {
@@ -157,8 +159,11 @@ object KeyLayouts {
     }
 
     private fun chineseSymbols(c: Context): KeyboardLayout {
-        val row3 = listOf(KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.4f, KeyKind.SPECIAL, 16f)) + keys("♡☆‧→※～", 20f, 1.2f) + backspace()
-        // # * _ ~ ` | / \ > @ 用半形：Discord、LINE 等的標題、粗體、刪除線、劇透、@提及、/指令只認半形
-        return KeyboardLayout(listOf(keys("【】《》〈〉#@-+", 20f), keys("*_~`|/\\>%&", 20f), row3, bottomRow(c, 10f)), 10f)
+        // 全形／半形切換：鍵上寫的是現在用的那一種
+        val toggle = KeySpec(if (c.fullWidthSymbols) "全形" else "半形", KeyAction.ToggleWidth, 1.2f, KeyKind.SPECIAL, 14f)
+        val row3 = listOf(KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.4f, KeyKind.SPECIAL, 16f)) + keys("♡☆‧→※", 20f, 1.2f) + toggle + backspace()
+        // 半形：Discord、LINE 等的標題、粗體、刪除線、劇透、@提及、/指令只認半形；全形：中文排版用
+        val rows = if (c.fullWidthSymbols) listOf("【】《》〈〉＃＠－＋", "＊＿～｀｜／＼＞％＆") else listOf("【】《》〈〉#@-+", "*_~`|/\\>%&")
+        return KeyboardLayout(listOf(keys(rows[0], 20f), keys(rows[1], 20f), row3, bottomRow(c, 10f)), 10f)
     }
 }

@@ -327,6 +327,11 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             KeyAction.Shift -> toggleShift()
             KeyAction.NextMode -> switchMode()
             KeyAction.ClearCanvas -> { handwriting?.clear(); clearSuggestions() }
+            KeyAction.ToggleWidth -> {
+                settings.fullWidthSymbols = !settings.fullWidthSymbols
+                toast(if (settings.fullWidthSymbols) "換成全形符號（中文排版用）" else "換成半形符號（Discord 語法用）")
+                rebuildKeys()
+            }
         }
     }
 
@@ -1345,7 +1350,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun rebuildKeys() {
         if (root == null) return
         lastReturnTitle = returnTitle
-        val ctx = KeyLayouts.Context(mode, layer, shift, returnTitle, spaceTitle, nextModeTitle)
+        val ctx = KeyLayouts.Context(mode, layer, shift, returnTitle, spaceTitle, nextModeTitle, settings.fullWidthSymbols)
         keyboard.setLayout(KeyLayouts.layout(ctx))
         keyboard.glideEnabled = mode == InputMode.ENGLISH && layer == KeyboardLayer.LETTERS && settings.glideTyping
         val showHandwriting = mode == InputMode.HANDWRITING && layer == KeyboardLayer.LETTERS

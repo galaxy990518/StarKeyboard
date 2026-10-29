@@ -37,6 +37,7 @@ enum KeyAction: Equatable {
     case romaji(Character)   // 日文羅馬拼音
     case pinyin(Character)   // 漢語拼音
     case backspace, space, returnKey, shift, globe, nextMode, clearCanvas
+    case toggleWidth   // 中文符號頁切換全形／半形
     case layer(KeyboardLayer)
     case panel(PanelKind)
 
@@ -79,6 +80,7 @@ enum KeyLayouts {
         var returnTitle: String
         var spaceTitle: String
         var nextModeTitle: String
+        var fullWidthSymbols = false
     }
 
     static func layout(_ c: Context) -> KeyboardLayout {
@@ -246,10 +248,13 @@ enum KeyLayouts {
 
     private static func chineseSymbols(_ c: Context) -> KeyboardLayout {
         var row3 = [KeySpec(face: .text("123"), action: .layer(.numbers), width: 1.4, kind: .special, fontSize: 16)]
-        row3 += keys("♡☆‧→※～", size: 20, width: 1.2)
+        row3 += keys("♡☆‧→※", size: 20, width: 1.2)
+        // 全形／半形切換：鍵上寫的是現在用的那一種
+        row3.append(KeySpec(face: .text(c.fullWidthSymbols ? "全形" : "半形"), action: .toggleWidth, width: 1.2, kind: .special, fontSize: 14))
         row3.append(backspace())
-        // # * _ ~ ` | / \ > @ 用半形：Discord、LINE 等的標題、粗體、刪除線、劇透、@提及、/指令只認半形
-        return KeyboardLayout(rows: [keys("【】《》〈〉#@-+", size: 20), keys("*_~`|/\\>%&", size: 20), row3,
+        // 半形：Discord、LINE 等的標題、粗體、刪除線、劇透、@提及、/指令只認半形；全形：中文排版用
+        let rows = c.fullWidthSymbols ? ["【】《》〈〉＃＠－＋", "＊＿～｀｜／＼＞％＆"] : ["【】《》〈〉#@-+", "*_~`|/\\>%&"]
+        return KeyboardLayout(rows: [keys(rows[0], size: 20), keys(rows[1], size: 20), row3,
                                      bottomRow(c, columns: 10)],
                               columns: 10)
     }
