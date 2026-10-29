@@ -164,6 +164,49 @@ struct KeyboardStyle {
     var fontScale: CGFloat = 1   // 按鍵上的字放大縮小
     var gapScale: CGFloat = 1    // 按鍵之間的空隙（越小按鍵越大）
     var fontID = KeyFont.system.rawValue
+    var keyEffect = KeyEffect.none.rawValue
+}
+
+/// 按下按鍵時冒出來的小圖案
+enum KeyEffect: String, CaseIterable {
+    case none, stars, hearts, sparkles, flowers, bubbles
+
+    var title: String {
+        switch self {
+        case .none: return "無"
+        case .stars: return "星星"
+        case .hearts: return "愛心"
+        case .sparkles: return "閃亮"
+        case .flowers: return "花花"
+        case .bubbles: return "泡泡"
+        }
+    }
+
+    var glyphs: [String] {
+        switch self {
+        case .none: return []
+        case .stars: return ["★", "☆", "✦"]
+        case .hearts: return ["♥\u{FE0E}", "♡", "❤\u{FE0E}"]
+        case .sparkles: return ["✧", "✦", "⋆"]
+        case .flowers: return ["✿", "❀", "❁"]
+        case .bubbles: return ["○", "◦", "°"]
+        }
+    }
+}
+
+/// 按鍵音：系統的喀喀聲，或 App 附的合成音（tools/make_sounds.js）
+enum KeySound: String, CaseIterable {
+    case system, bubble, marimba, bell, pop
+
+    var title: String {
+        switch self {
+        case .system: return "系統"
+        case .bubble: return "泡泡"
+        case .marimba: return "木琴"
+        case .bell: return "叮鈴"
+        case .pop: return "啵啵"
+        }
+    }
 }
 
 /// 按鍵和候選字用的字體（App 裡附的免費字體，SIL OFL 1.1）
@@ -234,23 +277,134 @@ final class KeyboardSettings {
         get { CGFloat(double("backgroundFade", 0.25)) }
         set { d.set(Double(newValue), forKey: "backgroundFade") }
     }
-    /// 照片裁切時盡量放在中間的點（0～1）；貼上照片時有找到臉就是臉的位置
+    // MARK: 背景照片（可以放好幾張輪流換，每張記住自己的位置和大小）
+
+    /// 照片裁切時盡量放在中間的點（0～1，貼上時有找到臉就是臉的位置）、放大倍數（1 = 剛好蓋滿鍵盤）
+    struct BgPhoto: Codable, Equatable {
+        var file: String
+        var fx: Double = 0.5
+        var fy: Double = 0.3
+        var zoom: Double = 1
+    }
+
+    static let photoDirectory: URL = {
+        let dir = Storage.directory.appendingPathComponent("backgrounds", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
+    var photos: [BgPhoto] {
+        get {
+            guard let data = d.data(forKey: "photos") else { return migrateOldBackground() }
+            return (try? JSONDecoder().decode([BgPhoto].self, from: data)) ?? []
+        }
+        set { d.set(try? JSONEncoder().encode(newValue), forKey: "photos") }
+    }
+
+    /// 舊版只有一張 background.jpg：搬進照片清單
+    private func migrateOldBackground() -> [BgPhoto] {
+        var list: [BgPhoto] = []
+        let old = Storage.url("background.jpg")
+        if bool("hasBackground", false), FileManager.default.fileExists(atPath: old.path) {
+            let name = "bg-old.jpg"
+            if (try? FileManager.default.moveItem(at: old, to: Self.photoDirectory.appendingPathComponent(name))) != nil {
+                list.append(BgPhoto(file: name, fx: double("backgroundFocusX", 0.5), fy: double("backgroundFocusY", 0.3),
+                                    zoom: double("backgroundZoom", 1)))
+            }
+        }
+        photos = list
+        return list
+    }
+
+    var photoIndex: Int {
+        get { d.integer(forKey: "photoIndex") }
+        set { d.set(newValue, forKey: "photoIndex") }
+    }
+
+    /// 照片怎麼換：fixed 固定、open 每次打開鍵盤換、daily 每天換
+    var photoRotation: String {
+        get { d.string(forKey: "photoRotation") ?? "fixed" }
+        set { d.set(newValue, forKey: "photoRotation") }
+    }
+
+    private func wrapped(_ i: Int, _ n: Int) -> Int { ((i % n) + n) % n }
+
+    var currentPhoto: BgPhoto? {
+        let list = photos
+        return list.isEmpty ? nil : list[wrapped(photoIndex, list.count)]
+    }
+
+    var currentPhotoURL: URL? { currentPhoto.map { Self.photoDirectory.appendingPathComponent($0.file) } }
+    var hasBackground: Bool { currentPhotoURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false }
+
+    private func updateCurrent(_ change: (inout BgPhoto) -> Void) {
+        var list = photos
+        guard !list.isEmpty else { return }
+        change(&list[wrapped(photoIndex, list.count)])
+        photos = list
+    }
+
     var backgroundFocusX: Double {
-        get { double("backgroundFocusX", 0.5) }
-        set { d.set(newValue, forKey: "backgroundFocusX") }
+        get { currentPhoto?.fx ?? 0.5 }
+        set { updateCurrent { $0.fx = newValue } }
     }
     var backgroundFocusY: Double {
-        get { double("backgroundFocusY", 0.5) }
-        set { d.set(newValue, forKey: "backgroundFocusY") }
+        get { currentPhoto?.fy ?? 0.3 }
+        set { updateCurrent { $0.fy = newValue } }
     }
-    /// 照片放大倍數（1 = 剛好蓋滿鍵盤）
     var backgroundZoom: Double {
-        get { double("backgroundZoom", 1) }
-        set { d.set(min(max(newValue, 1), 5), forKey: "backgroundZoom") }
+        get { currentPhoto?.zoom ?? 1 }
+        set { updateCurrent { $0.zoom = min(max(newValue, 1), 5) } }
     }
-    var hasBackground: Bool {
-        get { bool("hasBackground", false) }
-        set { d.set(newValue, forKey: "hasBackground") }
+
+    /// 新增一張照片，並換成這張
+    func addPhoto(_ data: Data, fx: Double, fy: Double) throws {
+        let name = "bg-\(Int(Date().timeIntervalSince1970 * 1000)).jpg"
+        try data.write(to: Self.photoDirectory.appendingPathComponent(name), options: .atomic)
+        let list = photos + [BgPhoto(file: name, fx: fx, fy: fy, zoom: 1)]
+        photos = list
+        photoIndex = list.count - 1
+    }
+
+    func removePhoto(at index: Int) {
+        var list = photos
+        guard list.indices.contains(index) else { return }
+        try? FileManager.default.removeItem(at: Self.photoDirectory.appendingPathComponent(list.remove(at: index).file))
+        photos = list
+        photoIndex = list.isEmpty ? 0 : min(wrapped(photoIndex, list.count), list.count - 1)
+    }
+
+    func clearPhotos() {
+        for p in photos { try? FileManager.default.removeItem(at: Self.photoDirectory.appendingPathComponent(p.file)) }
+        photos = []
+        photoIndex = 0
+    }
+
+    /// 打開鍵盤時依設定換照片
+    func rotatePhoto() {
+        let n = photos.count
+        guard n >= 2 else { return }
+        switch photoRotation {
+        case "open": photoIndex = (wrapped(photoIndex, n) + 1) % n
+        case "daily":
+            let day = Calendar.current.ordinality(of: .day, in: .era, for: Date()) ?? 0
+            photoIndex = day % n
+        default: break
+        }
+    }
+
+    /// 照片的小縮圖（設定面板用）
+    func thumbnail(_ p: BgPhoto) -> UIImage? {
+        UIImage(contentsOfFile: Self.photoDirectory.appendingPathComponent(p.file).path)?
+            .preparingThumbnail(of: CGSize(width: 120, height: 120))
+    }
+    var keyEffect: String {
+        get { d.string(forKey: "keyEffect") ?? KeyEffect.none.rawValue }
+        set { d.set(newValue, forKey: "keyEffect") }
+    }
+    var keySoundStyle: String {
+        get { d.string(forKey: "keySoundStyle") ?? KeySound.system.rawValue }
+        set { d.set(newValue, forKey: "keySoundStyle") }
     }
     var keySound: Bool {
         get { bool("keySound", true) }

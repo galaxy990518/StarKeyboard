@@ -116,7 +116,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private lateinit var tint: Backdrop
     private lateinit var column: LinearLayout
     private var photoAdjust: PhotoAdjustOverlay? = null
-    private var backgroundStamp = 0L
+    private var backgroundStamp = ""
     private lateinit var topBar: TopBar
     private lateinit var content: FrameLayout
     private lateinit var keyboard: KeyboardView
@@ -140,6 +140,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         clipStore = ClipboardStore(File(filesDir, "clipboard.json"), settings.clipLimit)
         emoStore = EmoticonStore(filesDir)
         shortcuts = ShortcutStore(File(filesDir, "shortcuts.json"))
+        lastSoundStyle = settings.keySoundStyle
         mode = settings.lastMode.takeIf { it in settings.enabledModes } ?: settings.enabledModes.first()
         Thread {
             val source = SQLitePhraseSource.open(this)
@@ -164,6 +165,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     override fun onDestroy() {
+        soundPool?.release()
+        soundPool = null
         (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).removePrimaryClipChangedListener(clipListener)
         spellSession?.close()
         ink.close()
@@ -180,9 +183,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         tint = Backdrop(this)
         r.addView(bgImage, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         r.addView(tint, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; clipChildren = false }
         topBar = TopBar(this, style)
-        content = FrameLayout(this)
+        content = FrameLayout(this).apply { clipChildren = false }
         keyboard = KeyboardView(this, style)
         content.addView(keyboard, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         column.addView(topBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (46 * dp).toInt()))
@@ -213,6 +216,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         clipStore.load()
         if (mode !in settings.enabledModes) mode = settings.enabledModes.first()
         resetComposition()
+        // 背景照片輪播（剛挑好照片要調整時不換）
+        if (!settings.adjustPhotoPending) settings.rotatePhoto()
         applyStyle()
         captureClipboard()
         checkForUpdate()
@@ -1000,6 +1005,11 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun settingsChanged() {
         clipStore.limit = settings.clipLimit
+        // 換了按鍵音：播一下讓你聽聽看
+        if (settings.keySoundStyle != lastSoundStyle) {
+            lastSoundStyle = settings.keySoundStyle
+            if (settings.keySound) playKeySound()
+        }
         engine?.fuzzy = fuzzyOptions()
         if (mode !in settings.enabledModes) {
             mode = settings.enabledModes.first()
@@ -1203,9 +1213,10 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         r.background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(s.theme.top, s.theme.bottom))
         if (settings.hasBackground) {
             // 拖滑桿時也會跑這裡：照片沒換就不用重新讀檔
-            val stamp = settings.backgroundFile.lastModified()
+            val file = settings.backgroundFile
+            val stamp = file.path + ":" + file.lastModified()
             if (stamp != backgroundStamp || bgImage.drawable == null) {
-                bgImage.setImageBitmap(BitmapFactory.decodeFile(settings.backgroundFile.path))
+                bgImage.setImageBitmap(BitmapFactory.decodeFile(file.path))
                 backgroundStamp = stamp
             }
             if (photoAdjust == null) {
@@ -1218,7 +1229,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             tint.visibility = View.VISIBLE
         } else {
             bgImage.setImageDrawable(null)
-            backgroundStamp = 0L
+            backgroundStamp = ""
             bgImage.visibility = View.GONE
             tint.visibility = View.GONE
         }
@@ -1306,8 +1317,36 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     // ===== 回饋、提醒 =====
 
+    // 可愛按鍵音：第一次用到時才載入
+    private var soundPool: android.media.SoundPool? = null
+    private val soundIds = HashMap<String, Int>()
+    private var lastSoundStyle = ""
+
+    private fun playKeySound() {
+        val style = KeySound.from(settings.keySoundStyle)
+        if (style == KeySound.SYSTEM) {
+            (getSystemService(Context.AUDIO_SERVICE) as AudioManager).playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, -1f)
+            return
+        }
+        val pool = soundPool ?: android.media.SoundPool.Builder().setMaxStreams(4).setAudioAttributes(
+            android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build(),
+        ).build().also { p ->
+            soundPool = p
+            for (s in KeySound.values()) {
+                if (s == KeySound.SYSTEM) continue
+                val res = resources.getIdentifier("key_" + s.id, "raw", packageName)
+                if (res != 0) soundIds[s.id] = p.load(this, res, 1)
+            }
+        }
+        val id = soundIds[style.id] ?: return
+        // 每次音高差一點點，連打時比較不單調
+        pool.play(id, 0.6f, 0.6f, 1, 0, 0.94f + Math.random().toFloat() * 0.12f)
+    }
+
     private fun feedback() {
-        if (settings.keySound) (getSystemService(Context.AUDIO_SERVICE) as AudioManager).playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, -1f)
+        if (settings.keySound) playKeySound()
         if (settings.haptics) root?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING)
     }
 

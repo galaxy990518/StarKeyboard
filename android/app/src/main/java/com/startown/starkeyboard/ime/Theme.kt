@@ -104,7 +104,31 @@ data class KeyboardStyle(
     val fontScale: Float,
     val gapScale: Float,
     val fontId: String = "system",
+    val keyEffect: String = "none",
 )
+
+/** 按下按鍵時冒出來的小圖案 */
+enum class KeyEffect(val id: String, val title: String, val glyphs: List<String>) {
+    NONE("none", "無", emptyList()),
+    STARS("stars", "星星", listOf("★", "☆", "✦")),
+    HEARTS("hearts", "愛心", listOf("♥︎", "♡", "❤︎")),
+    SPARKLES("sparkles", "閃亮", listOf("✧", "✦", "⋆")),
+    FLOWERS("flowers", "花花", listOf("✿", "❀", "❁")),
+    BUBBLES("bubbles", "泡泡", listOf("○", "◦", "°"));
+
+    companion object {
+        fun from(id: String) = values().firstOrNull { it.id == id } ?: NONE
+    }
+}
+
+/** 按鍵音：系統的喀喀聲，或 App 附的合成音（tools/make_sounds.js） */
+enum class KeySound(val id: String, val title: String) {
+    SYSTEM("system", "系統"), BUBBLE("bubble", "泡泡"), MARIMBA("marimba", "木琴"), BELL("bell", "叮鈴"), POP("pop", "啵啵");
+
+    companion object {
+        fun from(id: String) = values().firstOrNull { it.id == id } ?: SYSTEM
+    }
+}
 
 /** 按鍵和候選字用的字體（App 裡附的免費字體，SIL OFL 1.1） */
 enum class KeyFont(val id: String, val title: String) {
@@ -146,17 +170,120 @@ class KeyboardSettings(context: Context) {
     var backgroundFade: Float
         get() = p.getFloat("backgroundFade", 0.25f)
         set(v) = p.edit().putFloat("backgroundFade", v).apply()
-    /** 照片裁切時盡量放在中間的點（0～1）；挑照片時有找到臉就是臉的位置 */
+    // ===== 背景照片（可以放好幾張輪流換，每張記住自己的位置和大小） =====
+
+    /** 照片裁切時盡量放在中間的點（0～1，挑照片時有找到臉就是臉的位置）、放大倍數（1 = 剛好蓋滿鍵盤） */
+    data class BgPhoto(val file: String, var fx: Float = 0.5f, var fy: Float = 0.3f, var zoom: Float = 1f)
+
+    val photoDir: File get() = File(dir, "backgrounds").also { it.mkdirs() }
+
+    var photos: List<BgPhoto>
+        get() {
+            val raw = p.getString("photos", null) ?: return migrateOldBackground()
+            return runCatching {
+                val arr = org.json.JSONArray(raw)
+                (0 until arr.length()).map { i ->
+                    val o = arr.getJSONObject(i)
+                    BgPhoto(o.getString("file"), o.optDouble("fx", 0.5).toFloat(), o.optDouble("fy", 0.3).toFloat(), o.optDouble("zoom", 1.0).toFloat())
+                }
+            }.getOrDefault(emptyList())
+        }
+        set(v) {
+            val arr = org.json.JSONArray()
+            for (ph in v) arr.put(org.json.JSONObject().put("file", ph.file).put("fx", ph.fx.toDouble()).put("fy", ph.fy.toDouble()).put("zoom", ph.zoom.toDouble()))
+            p.edit().putString("photos", arr.toString()).apply()
+        }
+
+    /** 舊版只有一張 background.jpg：搬進照片清單 */
+    private fun migrateOldBackground(): List<BgPhoto> {
+        val old = File(dir, "background.jpg")
+        val list = ArrayList<BgPhoto>()
+        if (p.getBoolean("hasBackground", false) && old.exists()) {
+            val name = "bg-old.jpg"
+            if (old.renameTo(File(photoDir, name))) {
+                list.add(BgPhoto(name, p.getFloat("backgroundFocusX", 0.5f), p.getFloat("backgroundFocusY", 0.3f), p.getFloat("backgroundZoom", 1f)))
+            }
+        }
+        photos = list
+        return list
+    }
+
+    var photoIndex: Int
+        get() = p.getInt("photoIndex", 0)
+        set(v) = p.edit().putInt("photoIndex", v).apply()
+
+    /** 照片怎麼換：fixed 固定、open 每次打開鍵盤換、daily 每天換 */
+    var photoRotation: String
+        get() = p.getString("photoRotation", "fixed") ?: "fixed"
+        set(v) = p.edit().putString("photoRotation", v).apply()
+
+    val currentPhoto: BgPhoto?
+        get() {
+            val list = photos
+            return if (list.isEmpty()) null else list[Math.floorMod(photoIndex, list.size)]
+        }
+
+    val backgroundFile: File get() = File(photoDir, currentPhoto?.file ?: "none.jpg")
+    val hasBackground: Boolean get() = currentPhoto != null && backgroundFile.exists()
+
+    private fun updateCurrent(change: (BgPhoto) -> Unit) {
+        val list = photos
+        if (list.isEmpty()) return
+        change(list[Math.floorMod(photoIndex, list.size)])
+        photos = list
+    }
+
     var backgroundFocusX: Float
-        get() = p.getFloat("backgroundFocusX", 0.5f)
-        set(v) = p.edit().putFloat("backgroundFocusX", v).apply()
+        get() = currentPhoto?.fx ?: 0.5f
+        set(v) = updateCurrent { it.fx = v }
     var backgroundFocusY: Float
-        get() = p.getFloat("backgroundFocusY", 0.5f)
-        set(v) = p.edit().putFloat("backgroundFocusY", v).apply()
-    /** 照片放大倍數（1 = 剛好蓋滿鍵盤） */
+        get() = currentPhoto?.fy ?: 0.3f
+        set(v) = updateCurrent { it.fy = v }
     var backgroundZoom: Float
-        get() = p.getFloat("backgroundZoom", 1f)
-        set(v) = p.edit().putFloat("backgroundZoom", v).apply()
+        get() = currentPhoto?.zoom ?: 1f
+        set(v) = updateCurrent { it.zoom = v }
+
+    /** 新增一張照片（write 把圖片寫進檔案），並換成這張 */
+    fun addPhoto(fx: Float, fy: Float, write: (File) -> Unit) {
+        val name = "bg-" + System.currentTimeMillis() + ".jpg"
+        write(File(photoDir, name))
+        val list = photos + BgPhoto(name, fx, fy, 1f)
+        photos = list
+        photoIndex = list.size - 1
+    }
+
+    fun removePhoto(index: Int) {
+        val list = photos.toMutableList()
+        if (index !in list.indices) return
+        File(photoDir, list.removeAt(index).file).delete()
+        photos = list
+        photoIndex = if (list.isEmpty()) 0 else Math.floorMod(minOf(photoIndex, list.size - 1), list.size)
+    }
+
+    fun clearPhotos() {
+        photos.forEach { File(photoDir, it.file).delete() }
+        photos = emptyList()
+        photoIndex = 0
+    }
+
+    /** 打開鍵盤時依設定換照片 */
+    fun rotatePhoto() {
+        val n = photos.size
+        if (n < 2) return
+        when (photoRotation) {
+            "open" -> photoIndex = (Math.floorMod(photoIndex, n) + 1) % n
+            "daily" -> {
+                val now = System.currentTimeMillis()
+                val day = (now + java.util.TimeZone.getDefault().getOffset(now)) / 86_400_000L
+                photoIndex = (day % n).toInt()
+            }
+        }
+    }
+
+    /** 照片的小縮圖（設定面板用） */
+    fun thumbnail(ph: BgPhoto): android.graphics.Bitmap? = runCatching {
+        android.graphics.BitmapFactory.decodeFile(File(photoDir, ph.file).path, android.graphics.BitmapFactory.Options().apply { inSampleSize = 8 })
+    }.getOrNull()
     /** 剛在 App 挑了照片：下次打開鍵盤直接進入調整照片 */
     var adjustPhotoPending: Boolean
         get() = p.getBoolean("adjustPhotoPending", false)
@@ -170,6 +297,12 @@ class KeyboardSettings(context: Context) {
     var gapScale: Float
         get() = p.getFloat("gapScale", 1f)
         set(v) = p.edit().putFloat("gapScale", v).apply()
+    var keyEffect: String
+        get() = p.getString("keyEffect", KeyEffect.NONE.id) ?: KeyEffect.NONE.id
+        set(v) = p.edit().putString("keyEffect", v).apply()
+    var keySoundStyle: String
+        get() = p.getString("keySoundStyle", KeySound.SYSTEM.id) ?: KeySound.SYSTEM.id
+        set(v) = p.edit().putString("keySoundStyle", v).apply()
     var keySound: Boolean
         get() = p.getBoolean("keySound", true)
         set(v) = p.edit().putBoolean("keySound", v).apply()
@@ -220,14 +353,10 @@ class KeyboardSettings(context: Context) {
         get() = p.getInt("notifiedBuild", 0)
         set(v) = p.edit().putInt("notifiedBuild", v).apply()
 
-    val backgroundFile get() = File(dir, "background.jpg")
-    var hasBackground: Boolean
-        get() = p.getBoolean("hasBackground", false) && backgroundFile.exists()
-        set(v) = p.edit().putBoolean("hasBackground", v).apply()
 
     var fontId: String
         get() = p.getString("fontId", KeyFont.SYSTEM.id) ?: KeyFont.SYSTEM.id
         set(v) = p.edit().putString("fontId", v).apply()
 
-    val style get() = KeyboardStyle(KeyboardTheme.named(themeId), shape, keyAlpha, fontScale, gapScale, fontId)
+    val style get() = KeyboardStyle(KeyboardTheme.named(themeId), shape, keyAlpha, fontScale, gapScale, fontId, keyEffect)
 }

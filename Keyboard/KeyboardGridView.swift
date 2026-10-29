@@ -219,6 +219,30 @@ final class KeyboardGridView: UIView {
         return dx * dx + dy * dy
     }
 
+    /// 按鍵特效：從按鍵往上飄、慢慢變透明的小圖案
+    private func spawnEffect(from key: KeyButton) {
+        let glyphs = (KeyEffect(rawValue: style.keyEffect) ?? .none).glyphs
+        guard !glyphs.isEmpty, !UIAccessibility.isReduceMotionEnabled else { return }
+        for i in 0..<3 {
+            let l = UILabel()
+            l.text = glyphs.randomElement()
+            l.font = .systemFont(ofSize: CGFloat.random(in: 11...18))
+            l.textColor = i == 0 ? style.theme.accent : style.theme.keyText
+            l.isUserInteractionEnabled = false
+            l.sizeToFit()
+            l.center = key.center
+            addSubview(l)
+            let dx = CGFloat.random(in: -22...22)
+            let dy = CGFloat.random(in: -48 ... -26)
+            let turn = CGFloat.random(in: -0.6...0.6)
+            UIView.animate(withDuration: 0.55, delay: 0, options: [.curveEaseOut, .allowUserInteraction], animations: {
+                l.center = CGPoint(x: l.center.x + dx, y: l.center.y + dy)
+                l.alpha = 0
+                l.transform = CGAffineTransform(scaleX: 1.3, y: 1.3).rotated(by: turn)
+            }, completion: { _ in l.removeFromSuperview() })
+        }
+    }
+
     private func fire(_ key: KeyButton) {
         onKey?(key.spec)
     }
@@ -237,6 +261,7 @@ final class KeyboardGridView: UIView {
             guard let key = key(at: p) else { continue }
             var track = Track(key: key, action: key.spec.action, origin: p)
             key.isPressed = true
+            spawnEffect(from: key)
             tracks[touch] = track
             switch key.spec.action {
             case .backspace:

@@ -118,12 +118,11 @@ class MainActivity : Activity() {
         col.addView(tryBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = px(6f) })
 
         title("背景照片與自製貼圖")
-        button("挑一張照片當鍵盤背景") { pick(PICK_BACKGROUND) }
-        button("拿掉背景照片") {
-            val s = KeyboardSettings(this)
-            s.backgroundFile.delete()
-            s.hasBackground = false
-            toast("已拿掉背景照片")
+        button("新增一張背景照片") { pick(PICK_BACKGROUND) }
+        text("可以放好幾張，在鍵盤的 ⚙ 設定裡選要用哪張，或設定每天、每次打開自動換。")
+        button("拿掉全部背景照片") {
+            KeyboardSettings(this).clearPhotos()
+            toast("已拿掉全部背景照片")
         }
         button("挑一張照片做成貼圖") { pick(PICK_STICKER) }
         text("貼圖會出現在鍵盤的 ☺ 表符 › ⭐ 我的。支援傳圖片的 App（像 LINE、Messenger）會直接送出圖片，不支援的會先複製，再長按貼上。")
@@ -180,13 +179,11 @@ class MainActivity : Activity() {
         when (requestCode) {
             PICK_BACKGROUND -> {
                 val s = KeyboardSettings(this)
-                s.backgroundFile.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
                 // 對準臉；找不到臉就偏上面一點（人像的頭通常在上面）
                 val face = faceCenter(bitmap)
-                s.backgroundFocusX = face?.first ?: 0.5f
-                s.backgroundFocusY = face?.second ?: 0.3f
-                s.backgroundZoom = 1f
-                s.hasBackground = true
+                s.addPhoto(face?.first ?: 0.5f, face?.second ?: 0.3f) { f ->
+                    f.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+                }
                 // 接著叫出鍵盤，直接在鍵盤上拖拉、縮放照片
                 s.adjustPhotoPending = true
                 tryBox.requestFocus()

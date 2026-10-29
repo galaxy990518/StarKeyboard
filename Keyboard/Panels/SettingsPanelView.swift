@@ -74,6 +74,13 @@ final class SettingsPanelView: UIView {
         stack.addArrangedSubview(header("按鍵造型"))
         stack.addArrangedSubview(shapeRow())
 
+        stack.addArrangedSubview(header("按鍵特效（按下去冒出小圖案）"))
+        stack.addArrangedSubview(choiceRow(KeyEffect.allCases.map { $0.title },
+                                           selected: KeyEffect.allCases.firstIndex { $0.rawValue == settings.keyEffect } ?? 0) { [weak self] i in
+            self?.settings.keyEffect = KeyEffect.allCases[i].rawValue
+            self?.onChange?()
+        })
+
         stack.addArrangedSubview(header("字體（按鍵和候選字）"))
         stack.addArrangedSubview(fontRow())
         stack.addArrangedSubview(note("字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。"))
@@ -106,9 +113,18 @@ final class SettingsPanelView: UIView {
         stack.addArrangedSubview(header("背景圖片"))
         stack.addArrangedSubview(note("先在相簿把照片「拷貝」，再按下面的按鈕。也可以用「星星鍵盤」App 挑照片。"))
         stack.addArrangedSubview(buttonRow([
-            ("從剪貼簿貼上圖片", { [weak self] in self?.onPasteBackground?() }),
-            ("清除背景", { [weak self] in self?.onClearBackground?() }),
+            ("＋ 從剪貼簿新增照片", { [weak self] in self?.onPasteBackground?() }),
+            ("全部拿掉", { [weak self] in self?.onClearBackground?() }),
         ]))
+        if !settings.photos.isEmpty {
+            stack.addArrangedSubview(photoRow())
+        }
+        if settings.photos.count >= 2 {
+            let modes = [("fixed", "固定這張"), ("open", "每次打開換"), ("daily", "每天換")]
+            stack.addArrangedSubview(choiceRow(modes.map { $0.1 }, selected: modes.firstIndex { $0.0 == settings.photoRotation } ?? 0) { [weak self] i in
+                self?.settings.photoRotation = modes[i].0
+            })
+        }
         if settings.hasBackground {
             stack.addArrangedSubview(buttonRow([
                 ("調整照片位置和大小（拖拉、兩指縮放）", { [weak self] in self?.onAdjustPhoto?() }),
@@ -177,6 +193,13 @@ final class SettingsPanelView: UIView {
         stack.addArrangedSubview(switchRow("按鍵聲音", on: settings.keySound) { [weak self] on in
             self?.settings.keySound = on
         })
+        stack.addArrangedSubview(choiceRow(KeySound.allCases.map { $0.title },
+                                           selected: KeySound.allCases.firstIndex { $0.rawValue == settings.keySoundStyle } ?? 0) { [weak self] i in
+            self?.settings.keySoundStyle = KeySound.allCases[i].rawValue
+            self?.settings.keySound = true
+            self?.onChange?()
+        })
+        stack.addArrangedSubview(note("點一下就會播放聽聽看（要打開「允許完整取用」）。"))
         stack.addArrangedSubview(switchRow("按鍵震動", on: settings.haptics) { [weak self] on in
             self?.settings.haptics = on
         })
@@ -308,6 +331,116 @@ final class SettingsPanelView: UIView {
         }, for: .touchUpInside)
         row.addArrangedSubview(delete)
         return row
+    }
+
+    /// 背景照片的縮圖：點一下換成那張，選中的有框；右邊的 ✕ 拿掉目前這張
+    private func photoRow() -> UIView {
+        let scroll = UIScrollView()
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.heightAnchor.constraint(equalToConstant: 58).isActive = true
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = 6
+        row.alignment = .center
+        row.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
+            row.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
+            row.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
+            row.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor),
+        ])
+        var thumbs: [UIButton] = []
+        func paint() {
+            let n = self.settings.photos.count
+            let cur = n == 0 ? -1 : ((self.settings.photoIndex % n) + n) % n
+            for (i, b) in thumbs.enumerated() {
+                b.layer.borderWidth = i == cur ? 3 : 0
+                b.layer.borderColor = self.style.theme.accent.cgColor
+            }
+        }
+        for p in settings.photos {
+            let b = UIButton(type: .custom)
+            b.setImage(settings.thumbnail(p), for: .normal)
+            b.imageView?.contentMode = .scaleAspectFill
+            b.contentHorizontalAlignment = .fill
+            b.contentVerticalAlignment = .fill
+            b.layer.cornerRadius = 12
+            b.clipsToBounds = true
+            b.widthAnchor.constraint(equalToConstant: 56).isActive = true
+            b.heightAnchor.constraint(equalToConstant: 56).isActive = true
+            b.addAction(UIAction { [weak self, weak b] _ in
+                guard let self = self, let b = b, let i = thumbs.firstIndex(of: b) else { return }
+                self.settings.photoIndex = i
+                paint()
+                self.onChange?()
+            }, for: .touchUpInside)
+            thumbs.append(b)
+            row.addArrangedSubview(b)
+        }
+        let remove = UIButton(type: .system)
+        remove.setTitle("✕ 拿掉這張", for: .normal)
+        remove.titleLabel?.font = .rounded(13, .bold)
+        remove.setTitleColor(style.theme.specialText, for: .normal)
+        remove.backgroundColor = style.theme.specialKey
+        remove.layer.cornerRadius = 12
+        remove.contentEdgeInsets = UIEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
+        remove.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            let n = self.settings.photos.count
+            guard n > 0 else { return }
+            let cur = ((self.settings.photoIndex % n) + n) % n
+            self.settings.removePhoto(at: cur)
+            thumbs.remove(at: cur).removeFromSuperview()
+            paint()
+            self.onChange?()
+        }, for: .touchUpInside)
+        row.addArrangedSubview(remove)
+        paint()
+        return scroll
+    }
+
+    /// 一排可以左右滑的選項，選中的那個是主題色
+    private func choiceRow(_ titles: [String], selected: Int, onSelect: @escaping (Int) -> Void) -> UIView {
+        let scroll = UIScrollView()
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = 6
+        row.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
+            row.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
+            row.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
+            row.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor),
+        ])
+        var buttons: [UIButton] = []
+        func paint(_ sel: Int) {
+            for (j, b) in buttons.enumerated() {
+                let on = j == sel
+                b.backgroundColor = on ? self.style.theme.accent : self.style.theme.key.withAlphaComponent(0.6)
+                b.setTitleColor(on ? self.style.theme.accentText : self.style.theme.keyText, for: .normal)
+                b.titleLabel?.font = .rounded(14, on ? .bold : .regular)
+            }
+        }
+        for (i, title) in titles.enumerated() {
+            let b = UIButton(type: .custom)
+            b.setTitle(title, for: .normal)
+            b.layer.cornerRadius = 12
+            b.contentEdgeInsets = UIEdgeInsets(top: 0, left: 14, bottom: 0, right: 14)
+            b.addAction(UIAction { _ in
+                paint(i)
+                onSelect(i)
+            }, for: .touchUpInside)
+            buttons.append(b)
+            row.addArrangedSubview(b)
+        }
+        paint(selected)
+        return scroll
     }
 
     private func fontRow() -> UIView {

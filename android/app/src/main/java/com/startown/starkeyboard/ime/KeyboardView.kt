@@ -54,6 +54,14 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     private var repeatRunnable: Runnable? = null
     private var longPressRunnable: Runnable? = null
 
+    /** 按鍵特效：從按鍵往上飄、慢慢變透明的小圖案 */
+    private class Particle(
+        val glyph: String, val x: Float, val y: Float, val dx: Float, val dy: Float,
+        val rotation: Float, val size: Float, val color: Int, val start: Long,
+    )
+    private val particles = ArrayList<Particle>()
+    private val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
 
@@ -138,6 +146,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             drawLabel(canvas, k, text)
             canvas.restore()
         }
+        drawParticles(canvas)
     }
 
     private fun drawLabel(canvas: Canvas, k: Key, color: Int) {
@@ -168,9 +177,47 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         }
     }
 
+    private fun spawnEffect(k: Key) {
+        val glyphs = KeyEffect.from(style.keyEffect).glyphs
+        if (glyphs.isEmpty() || particles.size > 60) return
+        val now = android.os.SystemClock.uptimeMillis()
+        val t = style.theme
+        repeat(3) { i ->
+            particles.add(Particle(
+                glyphs.random(), k.frame.centerX(), k.frame.centerY(),
+                (Math.random().toFloat() - 0.5f) * 44 * dp, -(26 + Math.random().toFloat() * 22) * dp,
+                (Math.random().toFloat() - 0.5f) * 70f, (11 + Math.random().toFloat() * 7) * dp,
+                if (i == 0) t.accent else t.keyText, now,
+            ))
+        }
+        invalidate()
+    }
+
+    private fun drawParticles(canvas: Canvas) {
+        if (particles.isEmpty()) return
+        val now = android.os.SystemClock.uptimeMillis()
+        val it = particles.iterator()
+        while (it.hasNext()) {
+            val p = it.next()
+            val t = (now - p.start) / 550f
+            if (t >= 1f) { it.remove(); continue }
+            val ease = 1 - (1 - t) * (1 - t)
+            val x = p.x + p.dx * ease
+            val y = p.y + p.dy * ease
+            particlePaint.color = p.color.withAlpha(1 - t)
+            particlePaint.textSize = p.size * (1 + 0.3f * ease)
+            canvas.save()
+            canvas.rotate(p.rotation * ease, x, y)
+            canvas.drawText(p.glyph, x, y, particlePaint)
+            canvas.restore()
+        }
+        if (particles.isNotEmpty()) postInvalidateOnAnimation()
+    }
+
     private fun setPressed(k: Key, pressed: Boolean) {
         if (k.pressed == pressed) return
         k.pressed = pressed
+        if (pressed) spawnEffect(k)
         k.animator?.cancel()
         val anim = if (pressed) {
             ValueAnimator.ofFloat(k.scale, 0.9f).setDuration(50)

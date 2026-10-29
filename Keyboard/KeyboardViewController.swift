@@ -107,7 +107,8 @@ final class KeyboardViewController: UIInputViewController {
 
     private var style: KeyboardStyle {
         KeyboardStyle(theme: KeyboardTheme.named(settings.themeID), shape: settings.keyShape, keyAlpha: settings.keyAlpha,
-                      fontScale: settings.fontScale, gapScale: settings.gapScale, fontID: settings.fontID)
+                      fontScale: settings.fontScale, gapScale: settings.gapScale, fontID: settings.fontID,
+                      keyEffect: settings.keyEffect)
     }
 
     /// 注音或日文正在組字
@@ -150,6 +151,10 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        // 背景照片輪播
+        settings.rotatePhoto()
+        loadBackground()
+        applyStyle()
         captureClipboard()
         checkForUpdate()
         clipboardTimer?.invalidate()
@@ -922,6 +927,12 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func settingsChanged() {
+        loadBackground()   // 可能在設定裡換了照片
+        // 換了按鍵音：播一下讓你聽聽看
+        if settings.keySoundStyle != lastSoundStyle {
+            lastSoundStyle = settings.keySoundStyle
+            if settings.keySound && hasFullAccess { playKeySound() }
+        }
         engine?.fuzzy = fuzzyOptions
         clipStore.limit = settings.clipLimit
         let modes = settings.enabledModes
@@ -1218,8 +1229,14 @@ final class KeyboardViewController: UIInputViewController {
         CATransaction.commit()
     }
 
+    /// 目前載入的是哪一張（沒換就不用重新讀檔）
+    private var loadedPhoto: String?
+
     private func loadBackground() {
-        backgroundImage = settings.hasBackground ? UIImage(contentsOfFile: Storage.url("background.jpg").path) : nil
+        let url = settings.hasBackground ? settings.currentPhotoURL : nil
+        guard url?.path != loadedPhoto || (url != nil && backgroundImage == nil) else { return }
+        loadedPhoto = url?.path
+        backgroundImage = url.flatMap { UIImage(contentsOfFile: $0.path) }
     }
 
     private func pasteBackground() {
@@ -1234,13 +1251,9 @@ final class KeyboardViewController: UIInputViewController {
         let small = img.resized(maxSide: 1000)
         guard let data = small.jpegData(compressionQuality: 0.85) else { return }
         do {
-            try data.write(to: Storage.url("background.jpg"), options: .atomic)
             // 對準臉；找不到臉就偏上面一點（人像的頭通常在上面）
             let face = faceCenter(in: small)
-            settings.backgroundFocusX = Double(face?.x ?? 0.5)
-            settings.backgroundFocusY = Double(face?.y ?? 0.3)
-            settings.backgroundZoom = 1
-            settings.hasBackground = true
+            try settings.addPhoto(data, fx: Double(face?.x ?? 0.5), fy: Double(face?.y ?? 0.3))
             loadBackground()
             applyStyle()
             // 貼上後直接在鍵盤上拖拉、縮放照片
@@ -1251,8 +1264,8 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func clearBackground() {
-        try? FileManager.default.removeItem(at: Storage.url("background.jpg"))
-        settings.hasBackground = false
+        settings.clearPhotos()
+        loadedPhoto = nil
         backgroundImage = nil
         applyStyle()
     }
@@ -1411,9 +1424,28 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: - 回饋
 
+    // 可愛按鍵音：第一次用到時才載入
+    private var soundIDs: [String: SystemSoundID] = [:]
+    private lazy var lastSoundStyle = settings.keySoundStyle
+
+    private func playKeySound() {
+        let style = KeySound(rawValue: settings.keySoundStyle) ?? .system
+        guard style != .system else {
+            AudioServicesPlaySystemSound(1104)
+            return
+        }
+        if soundIDs[style.rawValue] == nil,
+           let url = Bundle.main.url(forResource: "key_" + style.rawValue, withExtension: "wav")
+               ?? Bundle.main.url(forResource: "key_" + style.rawValue, withExtension: "wav", subdirectory: "Sounds") {
+            var id: SystemSoundID = 0
+            if AudioServicesCreateSystemSoundID(url as CFURL, &id) == noErr { soundIDs[style.rawValue] = id }
+        }
+        if let id = soundIDs[style.rawValue] { AudioServicesPlaySystemSound(id) } else { AudioServicesPlaySystemSound(1104) }
+    }
+
     private func feedback() {
         guard hasFullAccess else { return }
-        if settings.keySound { AudioServicesPlaySystemSound(1104) }
+        if settings.keySound { playKeySound() }
         if settings.haptics { haptic.impactOccurred() }
     }
 

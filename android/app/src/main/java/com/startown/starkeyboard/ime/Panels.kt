@@ -298,6 +298,73 @@ class SettingsPanel(
         background = roundRect(t.special, dp(10f))
     }, LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)).apply { topMargin = dpi(4f) })
 
+    /** 背景照片的縮圖：點一下換成那張，選中的有框；右邊的 ✕ 拿掉目前這張 */
+    private fun photoRow() {
+        val scroll = HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false }
+        val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val thumbs = ArrayList<android.widget.ImageView>()
+        fun paint() {
+            val list = settings.photos
+            val cur = if (list.isEmpty()) -1 else Math.floorMod(settings.photoIndex, list.size)
+            for ((i, v) in thumbs.withIndex()) {
+                v.background = roundRect(if (i == cur) t.accent else t.key.withAlpha(0.6f), dp(12f))
+            }
+        }
+        for (ph in settings.photos) {
+            val v = android.widget.ImageView(context).apply {
+                scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                setImageBitmap(settings.thumbnail(ph))
+                setPadding(dpi(3f), dpi(3f), dpi(3f), dpi(3f))
+                clipToOutline = true
+            }
+            v.setOnClickListener {
+                settings.photoIndex = thumbs.indexOf(v)
+                paint()
+                onChange()
+            }
+            thumbs.add(v)
+            row.addView(v, LayoutParams(dpi(58f), dpi(58f)).apply { rightMargin = dpi(6f) })
+        }
+        row.addView(Tap(context, "✕ 拿掉這張", 13f, t.specialText, true) {
+            val list = settings.photos
+            if (list.isNotEmpty()) {
+                val cur = Math.floorMod(settings.photoIndex, list.size)
+                settings.removePhoto(cur)
+                row.removeView(thumbs.removeAt(cur))
+                paint()
+                onChange()
+            }
+        }.apply { background = roundRect(t.special, dp(12f)); setPadding(dpi(12f), 0, dpi(12f), 0) },
+            LayoutParams(LayoutParams.WRAP_CONTENT, dpi(40f)))
+        paint()
+        scroll.addView(row)
+        col.addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dpi(6f) })
+    }
+
+    /** 一排選項，選中的那個是主題色 */
+    private fun choices(titles: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+        val scroll = HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false }
+        val row = LinearLayout(context).apply { orientation = HORIZONTAL }
+        for ((i, title) in titles.withIndex()) {
+            val on = i == selected
+            row.addView(Tap(context, title, 14f, if (on) t.accentText else t.keyText, on) {
+                onSelect(i)
+                for (j in 0 until row.childCount) {
+                    val v = row.getChildAt(j) as TextView
+                    val sel = j == i
+                    v.setTextColor(if (sel) t.accentText else t.keyText)
+                    v.typeface = if (sel) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+                    v.background = roundRect(if (sel) t.accent else t.key.withAlpha(0.6f), dp(12f))
+                }
+            }.apply {
+                background = roundRect(if (on) t.accent else t.key.withAlpha(0.6f), dp(12f))
+                setPadding(dpi(14f), 0, dpi(14f), 0)
+            }, LayoutParams(LayoutParams.WRAP_CONTENT, dpi(38f)).apply { rightMargin = dpi(6f) })
+        }
+        scroll.addView(row)
+        col.addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dpi(2f) })
+    }
+
     private fun slider(title: String, value: Float, lo: Float, hi: Float, set: (Float) -> Unit) {
         val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         row.addView(TextView(context).apply { text = title; textSize = 14f; setTextColor(t.keyText) }, LayoutParams(dpi(86f), LayoutParams.WRAP_CONTENT))
@@ -352,6 +419,11 @@ class SettingsPanel(
         }
         col.addView(shapes)
 
+        header("按鍵特效（按下去冒出小圖案）")
+        choices(KeyEffect.values().map { it.title }, KeyEffect.values().indexOfFirst { it.id == settings.keyEffect }) {
+            settings.keyEffect = KeyEffect.values()[it].id; onChange()
+        }
+
         header("字體（按鍵和候選字）")
         val fonts = LinearLayout(context).apply { orientation = HORIZONTAL }
         for (font in KeyFont.values()) {
@@ -376,7 +448,14 @@ class SettingsPanel(
         }
 
         header("背景照片")
-        button("打開星星鍵盤 App 挑照片") { onOpenApp() }
+        button("＋ 新增照片（打開星星鍵盤 App 挑）") { onOpenApp() }
+        if (settings.photos.isNotEmpty()) photoRow()
+        if (settings.photos.size >= 2) {
+            val modes = listOf("fixed" to "固定這張", "open" to "每次打開換", "daily" to "每天換")
+            choices(modes.map { it.second }, modes.indexOfFirst { it.first == settings.photoRotation }) {
+                settings.photoRotation = modes[it].first
+            }
+        }
         if (settings.hasBackground) {
             button("調整照片位置和大小（拖拉、兩指縮放）") { onAdjustPhoto() }
         }
@@ -425,6 +504,10 @@ class SettingsPanel(
 
         header("聲音與震動")
         toggle("按鍵聲音", settings.keySound) { settings.keySound = it }
+        choices(KeySound.values().map { it.title }, KeySound.values().indexOfFirst { it.id == settings.keySoundStyle }) {
+            settings.keySoundStyle = KeySound.values()[it].id; settings.keySound = true; onChange()
+        }
+        note("點一下就會播放聽聽看。")
         toggle("按鍵震動", settings.haptics) { settings.haptics = it }
 
         header("剪貼簿最多記幾筆")
