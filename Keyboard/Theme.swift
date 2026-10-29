@@ -322,7 +322,7 @@ final class KeyboardSettings {
     }
     /// 拼音模式輸出簡體字（馬來西亞、中國用簡體）
     var pinyinSimplified: Bool {
-        get { bool("pinyinSimplified", true) }
+        get { bool("pinyinSimplified", false) }
         set { d.set(newValue, forKey: "pinyinSimplified") }
     }
     var translateTarget: String {

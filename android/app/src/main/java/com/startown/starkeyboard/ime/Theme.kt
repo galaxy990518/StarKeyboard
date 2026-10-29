@@ -205,7 +205,7 @@ class KeyboardSettings(context: Context) {
         set(v) = p.edit().putInt("clipLimit", v).apply()
     /** 拼音模式輸出簡體字（馬來西亞、中國用簡體） */
     var pinyinSimplified: Boolean
-        get() = p.getBoolean("pinyinSimplified", true)
+        get() = p.getBoolean("pinyinSimplified", false)
         set(v) = p.edit().putBoolean("pinyinSimplified", v).apply()
     var translateTarget: String
         get() = p.getString("translateTarget", "en")!!
