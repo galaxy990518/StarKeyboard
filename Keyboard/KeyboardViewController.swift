@@ -92,6 +92,8 @@ final class KeyboardViewController: UIInputViewController {
     private var backgroundImage: UIImage?
     private var clipboardTimer: Timer?
     private var heightConstraint: NSLayoutConstraint?
+    /// 看不見的「量高度用的尺」：上下貼齊鍵盤，iOS 照它決定鍵盤多高
+    private let heightRuler = UIView()
     private var toastToken = 0
     private lazy var haptic = UIImpactFeedbackGenerator(style: .light)
 
@@ -123,6 +125,15 @@ final class KeyboardViewController: UIInputViewController {
         super.viewDidLoad()
         // 讓 iOS 照我們自己設的高度（不然「鍵盤高度」滑桿會被系統的預設高度蓋掉）
         (view as? UIInputView)?.allowsSelfSizing = true
+        heightRuler.isUserInteractionEnabled = false
+        heightRuler.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(heightRuler, at: 0)
+        NSLayoutConstraint.activate([
+            heightRuler.topAnchor.constraint(equalTo: view.topAnchor),
+            heightRuler.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            heightRuler.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            heightRuler.widthAnchor.constraint(equalToConstant: 1),
+        ])
         let modes = settings.enabledModes
         mode = modes.contains(settings.lastMode) ? settings.lastMode : modes[0]
 
@@ -1462,7 +1473,7 @@ final class KeyboardViewController: UIInputViewController {
         if let c = heightConstraint {
             if c.constant != h { c.constant = h }
         } else {
-            let c = view.heightAnchor.constraint(equalToConstant: h)
+            let c = heightRuler.heightAnchor.constraint(equalToConstant: h)
             c.priority = UILayoutPriority(999)
             c.isActive = true
             heightConstraint = c
