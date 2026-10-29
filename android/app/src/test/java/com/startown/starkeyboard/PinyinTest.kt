@@ -1,6 +1,8 @@
 package com.startown.starkeyboard
 
 import com.startown.starkeyboard.core.ChineseConverter
+import com.startown.starkeyboard.core.GlideDecoder
+import com.startown.starkeyboard.core.Pt
 import com.startown.starkeyboard.core.MemoryPhraseSource
 import com.startown.starkeyboard.core.PinyinEngine
 import com.startown.starkeyboard.core.UserPhraseModel
@@ -38,6 +40,28 @@ class PinyinTest {
         assertEquals(listOf("ni"), half.pieces.map { it.pinyin })
         assertEquals("h", half.partial)
         assertEquals("ni h", p.display("nih"))
+    }
+
+    @Test fun glide() {
+        // 假的 QWERTY：一個鍵寬 1，第二排往右半格，第三排往右一格半
+        val centers = HashMap<Char, Pt>()
+        for ((r, row) in listOf("qwertyuiop", "asdfghjkl", "zxcvbnm").withIndex()) {
+            for ((c, ch) in row.withIndex()) centers[ch] = Pt(c + r * 0.5f + (if (r == 2) 0.5f else 0f), r.toFloat())
+        }
+        val g = GlideDecoder(listOf("hello" to 1_000_000, "help" to 500_000, "hell" to 100_000, "the" to 10_000_000, "tie" to 100_000))
+        fun swipe(word: String): List<Pt> {
+            val keys = GlideDecoder.squeeze(word).map { centers[it]!! }
+            val out = ArrayList<Pt>()
+            for (i in 0 until keys.size - 1) for (k in 0..9) {
+                val t = k / 10f
+                out.add(Pt(keys[i].x + (keys[i + 1].x - keys[i].x) * t + 0.1f, keys[i].y + (keys[i + 1].y - keys[i].y) * t - 0.1f))
+            }
+            out.add(keys.last())
+            return out
+        }
+        assertEquals("hello", g.decode(swipe("hello"), centers, 1f).first())
+        assertEquals("help", g.decode(swipe("help"), centers, 1f).first())
+        assertEquals("the", g.decode(swipe("the"), centers, 1f).first())
     }
 
     @Test fun abbreviation() {

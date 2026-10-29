@@ -7,7 +7,7 @@ final class KeyboardViewController: UIInputViewController {
         static let barHeight: CGFloat = 46
     }
 
-    private enum SuggestionSource { case association, handwriting, spelling }
+    private enum SuggestionSource { case association, handwriting, spelling, glide }
 
     /// 上面那條編輯框的用途：新增表符，或是先打中文再翻譯
     private enum EditorPurpose { case emoticon, translate, fancy, shortcutPhrase, shortcutCode }
@@ -84,6 +84,9 @@ final class KeyboardViewController: UIInputViewController {
     /// 新增快捷片語：先打片語內容，再打縮寫
     private var pendingPhrase = ""
     private lazy var shortcutStore = ShortcutStore(fileURL: Storage.url("shortcuts.json"))
+    /// 英文滑行輸入（字表在背景載入）
+    private var glide: GlideDecoder?
+    private var lastGlide: String?
     private var translating = false
     private var lastReturnTitle = ""
     private var backgroundImage: UIImage?
@@ -151,6 +154,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        loadGlideWords()
         // 背景照片輪播
         settings.rotatePhoto()
         loadBackground()
@@ -216,6 +220,7 @@ final class KeyboardViewController: UIInputViewController {
             guard let event = event else { return }
             self?.handleInputModeList(from: view, with: event)
         }
+        grid.onGlide = { [weak self] path, centers, kw in self?.glideTyped(path: path, centers: centers, keyWidth: kw) }
         grid.onCursorMove = { [weak self] steps in
             guard let self = self, !self.isComposing else { return }
             self.finishHangul()
@@ -718,6 +723,15 @@ final class KeyboardViewController: UIInputViewController {
                 showAssociations(after: c.text)
                 refreshReturnTitle()
             }
+        } else if suggestionSource == .glide, i < suggestions.count {
+            // 滑行輸入認錯了：換成點的那個字
+            let choice = suggestions[i]
+            if let last = lastGlide, choice != last, textDocumentProxy.documentContextBeforeInput?.hasSuffix(last) == true {
+                for _ in last { textDocumentProxy.deleteBackward() }
+                textDocumentProxy.insertText(choice)
+                lastGlide = choice
+            }
+            clearSuggestions()
         } else if suggestionSource == .spelling, i < suggestions.count {
             // 換掉正在打的英文字，後面補一個空白
             let word = currentWord
@@ -735,6 +749,50 @@ final class KeyboardViewController: UIInputViewController {
             if suggestionSource == .handwriting { handwritingView?.clear() }
             showAssociations(after: s)
         }
+    }
+
+    // MARK: - 英文滑行輸入
+
+    private func loadGlideWords() {
+        guard glide == nil, let url = Bundle.main.url(forResource: "glide_words", withExtension: "txt") else { return }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+            let decoder = GlideDecoder(text: text)
+            DispatchQueue.main.async { self?.glide = decoder }
+        }
+    }
+
+    private func glideTyped(path: [CGPoint], centers: [Character: CGPoint], keyWidth: CGFloat) {
+        guard let decoder = glide else {
+            loadGlideWords()
+            toast("英文字表還在載入，等一下再試")
+            return
+        }
+        let words = decoder.decode(path: path, centers: centers, keyWidth: keyWidth)
+        guard !words.isEmpty else {
+            toast("沒認出來，再滑一次看看")
+            return
+        }
+        let shaped = words.map { w -> String in
+            switch shift {
+            case .locked: return w.uppercased()
+            case .on: return w.prefix(1).uppercased() + w.dropFirst()
+            case .off: return w
+            }
+        }
+        // 前面是字的話先補一個空白
+        let before = editorText ?? textDocumentProxy.documentContextBeforeInput ?? ""
+        let needSpace = before.last.map { !$0.isWhitespace && !"([{\"'".contains($0) } ?? false
+        output((needSpace ? " " : "") + shaped[0])
+        if shift == .on {
+            shift = .off
+            rebuildKeys()
+        }
+        guard editorText == nil else { return }
+        lastGlide = shaped[0]
+        suggestions = shaped
+        suggestionSource = .glide
+        refreshTopBar()
     }
 
     private func commitAll() {
@@ -1331,6 +1389,7 @@ final class KeyboardViewController: UIInputViewController {
         let context = KeyLayouts.Context(mode: mode, layer: layer, shift: shift, needsGlobe: needsInputModeSwitchKey,
                                          returnTitle: returnTitle, spaceTitle: spaceTitle, nextModeTitle: nextModeTitle)
         grid.setLayout(KeyLayouts.layout(context))
+        grid.glideEnabled = mode == .english && layer == .letters && settings.glideTyping
 
         let showHandwriting = mode == .handwriting && layer == .letters
         if showHandwriting {

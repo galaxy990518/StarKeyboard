@@ -495,6 +495,7 @@ class SettingsPanel(
 
         header("打錯字修正")
         toggle("英文自動修正（按空白時修正，馬上按刪除可以復原）", settings.autocorrect) { settings.autocorrect = it }
+        toggle("英文滑行輸入（手指不放開，滑過字母就打出整個字）", settings.glideTyping) { settings.glideTyping = it; onChange() }
         toggle("注音：按到旁邊的鍵也猜得到", settings.fuzzyKeys) { settings.fuzzyKeys = it; onChange() }
         toggle("注音：聲調打錯或忘了打", settings.fuzzyTones) { settings.fuzzyTones = it; onChange() }
         toggle("注音模糊音：ㄣㄥ、ㄓㄗ、ㄔㄘ、ㄕㄙ 分不清", settings.fuzzyPhonetic) { settings.fuzzyPhonetic = it; onChange() }

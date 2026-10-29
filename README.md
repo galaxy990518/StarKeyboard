@@ -60,3 +60,4 @@ project.yml  XcodeGen 專案設定（雲端打包時產生 Xcode 專案）
 - 字體（打包時下載、只留常用字）：jf open 粉圓（justfont）、芫荽 Iansui（But Ko）、霞鶩文楷 TC（LXGW），都是 SIL Open Font License 1.1。
 - 繁簡對照：OpenCC，Apache 2.0。
 - 按鍵音：tools/make_sounds.js 用程式合成，原創。
+- 英文滑行輸入的字表：hermitdave/FrequencyWords（OpenSubtitles 2018），CC BY-SA 4.0，打包時下載。

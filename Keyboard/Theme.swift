@@ -430,6 +430,10 @@ final class KeyboardSettings {
         get { InputMode(rawValue: d.string(forKey: "lastMode") ?? "") ?? .zhuyin }
         set { d.set(newValue.rawValue, forKey: "lastMode") }
     }
+    var glideTyping: Bool {
+        get { bool("glideTyping", true) }
+        set { d.set(newValue, forKey: "glideTyping") }
+    }
     var autocorrect: Bool {
         get { bool("autocorrect", true) }
         set { d.set(newValue, forKey: "autocorrect") }

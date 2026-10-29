@@ -7,6 +7,7 @@ on:
       - "android/**"
       - "tools/build_dict.py"
       - "tools/build_fonts.py"
+      - "tools/build_words.py"
       - ".github/workflows/android.yml"
   workflow_dispatch:
 
@@ -44,6 +45,11 @@ jobs:
           IANSUI=$(find "$RUNNER_TEMP/iansui" \( -iname "*.ttf" -o -iname "*.otf" \) | head -1)
           curl -sSfL -o "$RUNNER_TEMP/wenkai.ttf" https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.530/LXGWWenKaiTC-Regular.ttf
           "$RUNNER_TEMP/venv/bin/python" tools/build_fonts.py android/app/src/main/assets/zhuyin.sqlite android/app/src/main/assets/fonts huninn="$RUNNER_TEMP/huninn.ttf" iansui="$IANSUI" wenkai="$RUNNER_TEMP/wenkai.ttf"
+
+      - name: 下載英文常用字表（滑行輸入用；FrequencyWords，CC BY-SA 4.0）
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/en_50k.txt" https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/en/en_50k.txt
+          python3 tools/build_words.py "$RUNNER_TEMP/en_50k.txt" android/app/src/main/assets/glide_words.txt
 
       - uses: actions/setup-java@v4
         with:

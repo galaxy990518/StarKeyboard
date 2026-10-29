@@ -44,6 +44,11 @@ jobs:
           curl -sSfL -o "$RUNNER_TEMP/wenkai.ttf" https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.530/LXGWWenKaiTC-Regular.ttf
           "$RUNNER_TEMP/venv/bin/python" tools/build_fonts.py Keyboard/Resources/zhuyin.sqlite Keyboard/Resources/Fonts huninn="$RUNNER_TEMP/huninn.ttf" iansui="$IANSUI" wenkai="$RUNNER_TEMP/wenkai.ttf"
 
+      - name: 下載英文常用字表（滑行輸入用；FrequencyWords，CC BY-SA 4.0）
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/en_50k.txt" https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/en/en_50k.txt
+          python3 tools/build_words.py "$RUNNER_TEMP/en_50k.txt" Keyboard/Resources/glide_words.txt
+
       - name: 核心邏輯測試（注音組字、選字、剪貼簿）
         run: swift test --package-path Core
 

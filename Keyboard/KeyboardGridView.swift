@@ -136,6 +136,10 @@ final class KeyboardGridView: UIView {
     var onKey: ((KeySpec) -> Void)?
     var onGlobe: ((UIView, UIEvent?) -> Void)?
     var onCursorMove: ((Int) -> Void)?
+    /// 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去
+    var glideEnabled = false
+    var onGlide: (([CGPoint], [Character: CGPoint], CGFloat) -> Void)?
+    private let trail = CAShapeLayer()
     var style: KeyboardStyle {
         didSet { keys.forEach { $0.style = style } }
     }
@@ -152,6 +156,40 @@ final class KeyboardGridView: UIView {
         var origin: CGPoint
         var cursorX: CGFloat = 0
         var cursorMode = false
+        var points: [CGPoint] = []   // 滑行輸入：手指經過的點
+        var visited = 1              // 經過幾個不同的鍵
+        var gliding = false
+    }
+
+    private func isLetter(_ k: KeyButton) -> Bool {
+        guard case .text = k.spec.action, case .text(let s) = k.spec.face, s.count == 1,
+              let c = s.lowercased().first else { return false }
+        return ("a"..."z").contains(c)
+    }
+
+    /// 每個字母鍵的中心（滑行輸入用）
+    private func letterCenters() -> [Character: CGPoint] {
+        var map: [Character: CGPoint] = [:]
+        for k in keys where isLetter(k) {
+            if case .text(let s) = k.spec.face, let c = s.lowercased().first { map[c] = k.center }
+        }
+        return map
+    }
+
+    private func drawTrail() {
+        let gliding = tracks.values.first { $0.gliding }
+        guard let pts = gliding?.points.suffix(40), pts.count > 1 else {
+            trail.path = nil
+            return
+        }
+        let path = UIBezierPath()
+        path.move(to: pts.first!)
+        for p in pts.dropFirst() { path.addLine(to: p) }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        trail.strokeColor = style.theme.accent.withAlphaComponent(0.55).cgColor
+        trail.path = path.cgPath
+        CATransaction.commit()
     }
 
     init(style: KeyboardStyle) {
@@ -159,6 +197,12 @@ final class KeyboardGridView: UIView {
         super.init(frame: .zero)
         isMultipleTouchEnabled = true
         backgroundColor = .clear
+        trail.fillColor = nil
+        trail.lineWidth = 5
+        trail.lineCap = .round
+        trail.lineJoin = .round
+        trail.zPosition = 10
+        layer.addSublayer(trail)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -250,7 +294,7 @@ final class KeyboardGridView: UIView {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches {
             // 打很快時，新的手指按下就先送出前一個還沒放開的字
-            for (other, var track) in tracks where !track.fired && !track.cursorMode
+            for (other, var track) in tracks where !track.fired && !track.cursorMode && !track.gliding
                 && (track.key.spec.action.isCharacter || track.key.spec.action == .space) {
                 track.fired = true
                 track.key.isPressed = false
@@ -260,6 +304,7 @@ final class KeyboardGridView: UIView {
             let p = touch.location(in: self)
             guard let key = key(at: p) else { continue }
             var track = Track(key: key, action: key.spec.action, origin: p)
+            if glideEnabled && isLetter(key) { track.points.append(p) }
             key.isPressed = true
             spawnEffect(from: key)
             tracks[touch] = track
@@ -297,12 +342,20 @@ final class KeyboardGridView: UIView {
                         track.cursorX += CGFloat(steps) * 9
                     }
                 }
-            } else if track.key.spec.action.isCharacter, let k = key(at: p), k !== track.key, k.spec.action.isCharacter {
-                track.key.isPressed = false
-                k.isPressed = true
-                track.key = k
+            } else if track.key.spec.action.isCharacter {
+                if !track.points.isEmpty { track.points.append(p) }
+                if let k = key(at: p), k !== track.key, k.spec.action.isCharacter {
+                    track.key.isPressed = false
+                    k.isPressed = true
+                    track.key = k
+                    if !track.points.isEmpty {
+                        track.visited += 1
+                        if track.visited >= 3 { track.gliding = true }
+                    }
+                }
             }
             tracks[touch] = track
+            if track.gliding { drawTrail() }
         }
     }
 
@@ -316,7 +369,13 @@ final class KeyboardGridView: UIView {
             case .globe:
                 onGlobe?(self, event)
             default:
-                if !track.fired && !track.cursorMode { fire(track.key) }
+                if track.gliding {
+                    let kw = keys.first(where: isLetter)?.bounds.width ?? 30
+                    onGlide?(track.points + [touch.location(in: self)], letterCenters(), kw)
+                    drawTrail()
+                } else if !track.fired && !track.cursorMode {
+                    fire(track.key)
+                }
             }
         }
     }

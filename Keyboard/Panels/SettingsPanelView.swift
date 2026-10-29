@@ -173,6 +173,10 @@ final class SettingsPanelView: UIView {
         stack.addArrangedSubview(switchRow("英文自動修正（按空白時修正，馬上按刪除可以復原）", on: settings.autocorrect) { [weak self] on in
             self?.settings.autocorrect = on
         })
+        stack.addArrangedSubview(switchRow("英文滑行輸入（手指不放開，滑過字母就打出整個字）", on: settings.glideTyping) { [weak self] on in
+            self?.settings.glideTyping = on
+            self?.onChange?()
+        })
         stack.addArrangedSubview(switchRow("注音：按到旁邊的鍵也猜得到", on: settings.fuzzyKeys) { [weak self] on in
             self?.settings.fuzzyKeys = on
             self?.onChange?()

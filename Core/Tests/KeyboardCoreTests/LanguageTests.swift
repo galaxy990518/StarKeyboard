@@ -90,6 +90,34 @@ final class ReleaseTests: XCTestCase {
     }
 }
 
+final class GlideTests: XCTestCase {
+    func testGlide() {
+        // 假的 QWERTY：一個鍵寬 1，第二排往右半格，第三排往右一格半
+        var centers: [Character: CGPoint] = [:]
+        for (r, row) in ["qwertyuiop", "asdfghjkl", "zxcvbnm"].enumerated() {
+            for (c, ch) in row.enumerated() {
+                centers[ch] = CGPoint(x: CGFloat(c) + CGFloat(r) * 0.5 + (r == 2 ? 0.5 : 0), y: CGFloat(r))
+            }
+        }
+        let g = GlideDecoder(words: [("hello", 1_000_000), ("help", 500_000), ("hell", 100_000), ("the", 10_000_000), ("tie", 100_000)])
+        func swipe(_ word: String) -> [CGPoint] {
+            let keys = GlideDecoder.squeeze(word).map { centers[$0]! }
+            var out: [CGPoint] = []
+            for i in 0..<(keys.count - 1) {
+                for k in 0..<10 {
+                    let t = CGFloat(k) / 10
+                    out.append(CGPoint(x: keys[i].x + (keys[i + 1].x - keys[i].x) * t + 0.1, y: keys[i].y + (keys[i + 1].y - keys[i].y) * t - 0.1))
+                }
+            }
+            out.append(keys.last!)
+            return out
+        }
+        XCTAssertEqual(g.decode(path: swipe("hello"), centers: centers, keyWidth: 1).first, "hello")
+        XCTAssertEqual(g.decode(path: swipe("help"), centers: centers, keyWidth: 1).first, "help")
+        XCTAssertEqual(g.decode(path: swipe("the"), centers: centers, keyWidth: 1).first, "the")
+    }
+}
+
 final class PinyinTests: XCTestCase {
     private func makePinyin() -> PinyinEngine {
         let db = SQLiteDB.inMemory()!

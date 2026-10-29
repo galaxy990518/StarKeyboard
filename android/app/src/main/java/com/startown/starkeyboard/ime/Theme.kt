@@ -312,6 +312,9 @@ class KeyboardSettings(context: Context) {
     var associations: Boolean
         get() = p.getBoolean("associations", true)
         set(v) = p.edit().putBoolean("associations", v).apply()
+    var glideTyping: Boolean
+        get() = p.getBoolean("glideTyping", true)
+        set(v) = p.edit().putBoolean("glideTyping", v).apply()
     var autocorrect: Boolean
         get() = p.getBoolean("autocorrect", true)
         set(v) = p.edit().putBoolean("autocorrect", v).apply()

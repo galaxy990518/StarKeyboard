@@ -38,6 +38,8 @@ import com.startown.starkeyboard.core.Candidate
 import com.startown.starkeyboard.core.ClipboardStore
 import com.startown.starkeyboard.core.EmoticonStore
 import com.startown.starkeyboard.core.FancyText
+import com.startown.starkeyboard.core.GlideDecoder
+import com.startown.starkeyboard.core.Pt
 import com.startown.starkeyboard.core.ShortcutStore
 import com.startown.starkeyboard.core.HangulComposer
 import com.startown.starkeyboard.core.PinyinEngine
@@ -50,7 +52,7 @@ import java.io.File
 import java.util.Locale
 
 class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheckerSessionListener {
-    private enum class SuggestionSource { ASSOCIATION, HANDWRITING, SPELLING }
+    private enum class SuggestionSource { ASSOCIATION, HANDWRITING, SPELLING, GLIDE }
     private enum class EditorPurpose { EMOTICON, TRANSLATE, FANCY, SHORTCUT_PHRASE, SHORTCUT_CODE }
 
     private fun editorLabel(p: EditorPurpose) = when (p) {
@@ -72,6 +74,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private lateinit var clipStore: ClipboardStore
     private lateinit var emoStore: EmoticonStore
     private lateinit var shortcuts: ShortcutStore
+    private var glide: GlideDecoder? = null
+    private var lastGlide: String? = null
     private var engine: ZhuyinEngine? = null
     private var pinyinEngine: PinyinEngine? = null
     private var converter: ChineseConverter? = null
@@ -143,6 +147,17 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         lastSoundStyle = settings.keySoundStyle
         mode = settings.lastMode.takeIf { it in settings.enabledModes } ?: settings.enabledModes.first()
         Thread {
+            // 英文滑行輸入的字表
+            val words = runCatching {
+                assets.open("glide_words.txt").bufferedReader().readLines().mapNotNull { line ->
+                    val parts = line.split(' ')
+                    parts.getOrNull(1)?.toIntOrNull()?.let { parts[0] to it }
+                }
+            }.getOrNull()
+            if (words != null) {
+                val decoder = GlideDecoder(words)
+                mainHandler.post { glide = decoder }
+            }
             val source = SQLitePhraseSource.open(this)
             val plain = SQLitePhraseSource.open(this, "plain")
             val prefixes = source?.let { Bopomofo.prefixes(it.syllables()) }?.takeIf { it.isNotEmpty() }
@@ -257,6 +272,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         keyboard.onKey = { handle(it) }
         keyboard.onLongPress = { showImePicker() }
         keyboard.onCursorMove = { steps -> if (!isComposing) moveCursor(steps) }
+        keyboard.onGlide = { path, centers, kw -> glideTyped(path, centers, kw) }
         topBar.onToolbar = { toolbarTapped(it) }
         topBar.onCandidate = { selectCandidate(it, true) }
         topBar.onTrailing = { trailing ->
@@ -608,6 +624,41 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         refreshReturnTitle()
     }
 
+    // ===== 英文滑行輸入 =====
+
+    private fun glideTyped(path: List<Pt>, centers: Map<Char, Pt>, keyWidth: Float) {
+        val decoder = glide
+        if (decoder == null) {
+            toast("英文字表還在載入，等一下再試")
+            return
+        }
+        val words = safely { decoder.decode(path, centers, keyWidth) } ?: emptyList()
+        if (words.isEmpty()) {
+            toast("沒認出來，再滑一次看看")
+            return
+        }
+        val shaped = words.map { w ->
+            when (shift) {
+                ShiftState.LOCKED -> w.uppercase()
+                ShiftState.ON -> w.replaceFirstChar { it.uppercase() }
+                else -> w
+            }
+        }
+        // 前面是字的話先補一個空白
+        val before = if (editorText != null) editorText!!.takeLast(1) else currentInputConnection?.getTextBeforeCursor(1, 0)?.toString() ?: ""
+        val prefix = if (before.isNotEmpty() && !before.last().isWhitespace() && before.last() !in "([{\"'") " " else ""
+        output(prefix + shaped[0])
+        if (shift == ShiftState.ON) {
+            shift = ShiftState.OFF
+            rebuildKeys()
+        }
+        if (editorText != null) return
+        lastGlide = shaped[0]
+        suggestions = shaped
+        suggestionSource = SuggestionSource.GLIDE
+        refreshTopBar()
+    }
+
     /** 選字出錯時不要讓整個鍵盤當掉：記下原因，這次就當成查不到 */
     private fun <T> safely(block: () -> T?): T? = try {
         block()
@@ -699,6 +750,19 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 showAssociations(c.text)
                 refreshReturnTitle()
             }
+            return
+        }
+        if (suggestionSource == SuggestionSource.GLIDE) {
+            // 滑行輸入認錯了：換成點的那個字
+            val choice = suggestions.getOrNull(i) ?: return
+            val last = lastGlide
+            val ic = currentInputConnection
+            if (last != null && choice != last && ic?.getTextBeforeCursor(last.length, 0)?.toString() == last) {
+                ic.deleteSurroundingText(last.length, 0)
+                ic.commitText(choice, 1)
+                lastGlide = choice
+            }
+            clearSuggestions()
             return
         }
         if (suggestionSource == SuggestionSource.SPELLING) {
@@ -1280,6 +1344,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         lastReturnTitle = returnTitle
         val ctx = KeyLayouts.Context(mode, layer, shift, returnTitle, spaceTitle, nextModeTitle)
         keyboard.setLayout(KeyLayouts.layout(ctx))
+        keyboard.glideEnabled = mode == InputMode.ENGLISH && layer == KeyboardLayer.LETTERS && settings.glideTyping
         val showHandwriting = mode == InputMode.HANDWRITING && layer == KeyboardLayer.LETTERS
         if (showHandwriting) {
             val hw = handwriting ?: HandwritingPanel(this, style, ink).also { hw ->

@@ -1,5 +1,6 @@
 package com.startown.starkeyboard.ime
 
+import com.startown.starkeyboard.core.Pt
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
@@ -21,6 +22,9 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     var onKey: ((KeySpec) -> Unit)? = null
     var onLongPress: ((KeySpec) -> Unit)? = null
     var onCursorMove: ((Int) -> Unit)? = null
+    /** 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去 */
+    var glideEnabled = false
+    var onGlide: ((List<Pt>, Map<Char, Pt>, Float) -> Unit)? = null
 
     var style: KeyboardStyle = style
         set(value) {
@@ -45,6 +49,9 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
 
     private class Track(var key: Key, val action: KeyAction, val startX: Float) {
         var fired = false
+        val points = ArrayList<Pt>()   // 滑行輸入：手指經過的點
+        var visited = 1                // 經過幾個不同的鍵
+        var gliding = false
         var cursorMode = false
         var cursorX = 0f
     }
@@ -61,6 +68,29 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     )
     private val particles = ArrayList<Particle>()
     private val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+
+    private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+    }
+
+    private val Key.isLetter get() = spec.action is KeyAction.Text && spec.label.length == 1 && spec.label[0].lowercaseChar() in 'a'..'z'
+
+    /** 每個字母鍵的中心（滑行輸入用） */
+    private fun letterCenters(): Map<Char, Pt> =
+        keys.filter { it.isLetter }.associate { it.spec.label[0].lowercaseChar() to Pt(it.frame.centerX(), it.frame.centerY()) }
+
+    private fun drawTrail(canvas: Canvas) {
+        for (t in tracks.values) {
+            if (!t.gliding || t.points.size < 2) continue
+            val pts = t.points.takeLast(40)
+            val path = Path()
+            path.moveTo(pts[0].x, pts[0].y)
+            for (p in pts.drop(1)) path.lineTo(p.x, p.y)
+            trailPaint.color = style.theme.accent.withAlpha(0.55f)
+            trailPaint.strokeWidth = 5 * dp
+            canvas.drawPath(path, trailPaint)
+        }
+    }
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
@@ -146,6 +176,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             drawLabel(canvas, k, text)
             canvas.restore()
         }
+        drawTrail(canvas)
         drawParticles(canvas)
     }
 
@@ -240,7 +271,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 // 打很快時，新的手指按下就先送出前一個還沒放開的字
                 for (t in tracks.values) {
-                    if (!t.fired && !t.cursorMode && (t.action.isCharacter || t.action == KeyAction.Space)) {
+                    if (!t.fired && !t.cursorMode && !t.gliding && (t.action.isCharacter || t.action == KeyAction.Space)) {
                         t.fired = true
                         setPressed(t.key, false)
                         fire(t.key)
@@ -249,6 +280,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 val i = e.actionIndex
                 val key = keyAt(e.getX(i), e.getY(i)) ?: return true
                 val track = Track(key, key.spec.action, e.getX(i))
+                if (glideEnabled && key.isLetter) track.points.add(Pt(e.getX(i), e.getY(i)))
                 tracks[e.getPointerId(i)] = track
                 setPressed(key, true)
                 when (key.spec.action) {
@@ -293,11 +325,16 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                             }
                         }
                     } else if (t.action.isCharacter) {
+                        if (t.points.isNotEmpty()) {
+                            t.points.add(Pt(x, e.getY(i)))
+                            if (t.gliding) invalidate()
+                        }
                         val k = keyAt(x, e.getY(i))
                         if (k != null && k !== t.key && k.spec.action.isCharacter) {
                             setPressed(t.key, false)
                             setPressed(k, true)
                             t.key = k
+                            if (t.points.isNotEmpty() && ++t.visited >= 3) t.gliding = true
                         }
                     }
                 }
@@ -307,7 +344,12 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 setPressed(t.key, false)
                 if (t.action == KeyAction.Backspace) stopRepeat()
                 if (t.action == KeyAction.NextMode) longPressRunnable?.let { mainHandler.removeCallbacks(it) }
-                if (!t.fired && !t.cursorMode && t.action != KeyAction.Backspace && t.action != KeyAction.Shift) fire(t.key)
+                if (t.gliding) {
+                    t.points.add(Pt(e.getX(e.actionIndex), e.getY(e.actionIndex)))
+                    val kw = keys.firstOrNull { it.isLetter }?.frame?.width() ?: (30 * dp)
+                    onGlide?.invoke(t.points, letterCenters(), kw)
+                    invalidate()
+                } else if (!t.fired && !t.cursorMode && t.action != KeyAction.Backspace && t.action != KeyAction.Shift) fire(t.key)
             }
             MotionEvent.ACTION_CANCEL -> {
                 for (t in tracks.values) setPressed(t.key, false)

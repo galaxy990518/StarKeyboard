@@ -3,3 +3,4 @@ build/
 local.properties
 app/src/main/assets/zhuyin.sqlite
 app/src/main/assets/fonts/
+app/src/main/assets/glide_words.txt
