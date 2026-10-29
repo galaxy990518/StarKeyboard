@@ -26,11 +26,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 下載並轉換注音字典（小麥注音，MIT 授權）
+      - name: 下載並轉換字典（小麥注音 MIT、OpenCC 繁簡 Apache 2.0）
         run: |
           git clone --depth 1 https://github.com/openvanilla/McBopomofo.git "$RUNNER_TEMP/McBopomofo"
           make -C "$RUNNER_TEMP/McBopomofo/Source/Data" data.txt
-          python3 tools/build_dict.py "$RUNNER_TEMP/McBopomofo/Source/Data/data.txt" android/app/src/main/assets/zhuyin.sqlite
+          for f in TSCharacters TSPhrases; do curl -sSfL -o "$RUNNER_TEMP/$f.txt" "https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/$f.txt"; done
+          python3 tools/build_dict.py "$RUNNER_TEMP/McBopomofo/Source/Data/data.txt" android/app/src/main/assets/zhuyin.sqlite "$RUNNER_TEMP/TSCharacters.txt" "$RUNNER_TEMP/TSPhrases.txt"
 
       - uses: actions/setup-java@v4
         with:
