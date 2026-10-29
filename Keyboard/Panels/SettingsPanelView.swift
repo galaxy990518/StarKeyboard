@@ -26,6 +26,9 @@ final class SettingsPanelView: UIView {
     private let scroll = UIScrollView()
     private let stack = UIStackView()
     private let bar: PanelBottomBar
+    // 換主題或造型會重建，要記住這兩排橫向捲到哪
+    private weak var themeScroll: UIScrollView?
+    private weak var shapeScroll: UIScrollView?
 
     init(settings: KeyboardSettings, hasFullAccess: Bool, style: KeyboardStyle, shortcuts: ShortcutStore) {
         self.settings = settings
@@ -66,6 +69,8 @@ final class SettingsPanelView: UIView {
     private func rebuild() {
         bar.style = style
         let offset = scroll.contentOffset
+        let themeX = themeScroll?.contentOffset.x ?? 0
+        let shapeX = shapeScroll?.contentOffset.x ?? 0
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         stack.addArrangedSubview(header("主題"))
@@ -227,6 +232,10 @@ final class SettingsPanelView: UIView {
         setNeedsLayout()
         layoutIfNeeded()
         scroll.contentOffset = CGPoint(x: 0, y: min(offset.y, max(0, scroll.contentSize.height - scroll.bounds.height)))
+        for (s, x) in [(themeScroll, themeX), (shapeScroll, shapeX)] {
+            guard let s = s else { continue }
+            s.contentOffset = CGPoint(x: min(x, max(0, s.contentSize.width - s.bounds.width)), y: 0)
+        }
     }
 
     private static func modeName(_ mode: InputMode) -> String {
@@ -281,14 +290,29 @@ final class SettingsPanelView: UIView {
             swatch.layer.cornerRadius = 24
             swatch.layer.borderWidth = selected ? 3 : 1
             swatch.layer.borderColor = (selected ? theme.accent : theme.shadow).cgColor
-            let dot = UIView(frame: CGRect(x: 12, y: 14, width: 24, height: 20))
-            dot.backgroundColor = theme.key
-            dot.layer.cornerRadius = 7
-            let accent = UIView(frame: CGRect(x: 30, y: 30, width: 12, height: 10))
-            accent.backgroundColor = theme.accent
-            accent.layer.cornerRadius = 4
-            swatch.addSubview(dot)
-            swatch.addSubview(accent)
+            if let shape = theme.shape {
+                // 成套的主題直接畫出那個造型
+                let frame = CGRect(x: 12, y: 12, width: 24, height: 24)
+                let icon = CAShapeLayer()
+                icon.path = shape.path(in: frame)
+                icon.fillColor = theme.key.cgColor
+                icon.strokeColor = theme.shadow.cgColor
+                icon.lineWidth = 1
+                let decor = CAShapeLayer()
+                decor.path = shape.decorPath(in: frame)
+                decor.fillColor = shape.decorColor?.cgColor
+                swatch.layer.addSublayer(icon)
+                swatch.layer.addSublayer(decor)
+            } else {
+                let dot = UIView(frame: CGRect(x: 12, y: 14, width: 24, height: 20))
+                dot.backgroundColor = theme.key
+                dot.layer.cornerRadius = 7
+                let accent = UIView(frame: CGRect(x: 30, y: 30, width: 12, height: 10))
+                accent.backgroundColor = theme.accent
+                accent.layer.cornerRadius = 4
+                swatch.addSubview(dot)
+                swatch.addSubview(accent)
+            }
             b.addSubview(swatch)
             let name = UILabel(frame: CGRect(x: 0, y: 54, width: 64, height: 18))
             name.text = theme.name
@@ -298,12 +322,14 @@ final class SettingsPanelView: UIView {
             b.addSubview(name)
             b.addAction(UIAction { [weak self] _ in
                 self?.settings.themeID = theme.id
+                if let shape = theme.shape { self?.settings.keyShape = shape }
                 self?.onChange?()
             }, for: .touchUpInside)
             scrollRow.addSubview(b)
             x += 68
         }
         scrollRow.contentSize = CGSize(width: x, height: 76)
+        themeScroll = scrollRow
         return scrollRow
     }
 
@@ -470,50 +496,48 @@ final class SettingsPanelView: UIView {
         return row
     }
 
+    /// 造型很多，跟主題一樣做成可以左右滑的一排
     private func shapeRow() -> UIView {
-        let row = UIStackView()
-        row.axis = .horizontal
-        row.distribution = .fillEqually
-        row.spacing = 8
-        row.heightAnchor.constraint(equalToConstant: 64).isActive = true
+        let scrollRow = UIScrollView()
+        scrollRow.showsHorizontalScrollIndicator = false
+        scrollRow.heightAnchor.constraint(equalToConstant: 64).isActive = true
+        var x: CGFloat = 0
         for shape in KeyShape.allCases {
             let selected = shape == settings.keyShape
             let b = UIButton(type: .custom)
+            b.frame = CGRect(x: x, y: 0, width: 56, height: 64)
             b.layer.cornerRadius = 12
             b.backgroundColor = selected ? style.theme.specialKey.withAlphaComponent(0.8) : .clear
+            let frame = CGRect(x: 0, y: 0, width: 40, height: 34)
             let preview = CAShapeLayer()
-            preview.path = shape.path(in: CGRect(x: 0, y: 0, width: 40, height: 34))
+            preview.path = shape.path(in: frame)
             preview.fillColor = style.theme.key.cgColor
             preview.strokeColor = style.theme.shadow.cgColor
             preview.lineWidth = 1
-            let holder = UIView(frame: CGRect(x: 0, y: 0, width: 40, height: 34))
+            let decor = CAShapeLayer()
+            decor.path = shape.decorPath(in: frame)
+            decor.fillColor = shape.decorColor?.cgColor
+            let holder = UIView(frame: CGRect(x: 8, y: 4, width: 40, height: 34))
             holder.isUserInteractionEnabled = false
             holder.layer.addSublayer(preview)
-            holder.translatesAutoresizingMaskIntoConstraints = false
+            holder.layer.addSublayer(decor)
             b.addSubview(holder)
-            NSLayoutConstraint.activate([
-                holder.centerXAnchor.constraint(equalTo: b.centerXAnchor),
-                holder.topAnchor.constraint(equalTo: b.topAnchor, constant: 4),
-                holder.widthAnchor.constraint(equalToConstant: 40),
-                holder.heightAnchor.constraint(equalToConstant: 34),
-            ])
-            let name = UILabel()
+            let name = UILabel(frame: CGRect(x: 0, y: 42, width: 56, height: 18))
             name.text = shape.title
             name.font = .rounded(12, selected ? .bold : .regular)
+            name.textAlignment = .center
             name.textColor = textColor
-            name.translatesAutoresizingMaskIntoConstraints = false
             b.addSubview(name)
-            NSLayoutConstraint.activate([
-                name.centerXAnchor.constraint(equalTo: b.centerXAnchor),
-                name.bottomAnchor.constraint(equalTo: b.bottomAnchor, constant: -4),
-            ])
             b.addAction(UIAction { [weak self] _ in
                 self?.settings.keyShape = shape
                 self?.onChange?()
             }, for: .touchUpInside)
-            row.addArrangedSubview(b)
+            scrollRow.addSubview(b)
+            x += 60
         }
-        return row
+        scrollRow.contentSize = CGSize(width: x, height: 64)
+        shapeScroll = scrollRow
+        return scrollRow
     }
 
     private func buttonRow(_ buttons: [(String, () -> Void)]) -> UIView {
