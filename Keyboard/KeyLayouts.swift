@@ -249,7 +249,7 @@ enum KeyLayouts {
         row3 += keys("♡☆‧→※～", size: 20, width: 1.2)
         row3.append(backspace())
         // # * _ ~ ` | / \ > @ 用半形：Discord、LINE 等的標題、粗體、刪除線、劇透、@提及、/指令只認半形
-        return KeyboardLayout(rows: [keys("【】《》〈〉#@%&", size: 20), keys("*_~`|/\\>+=", size: 20), row3,
+        return KeyboardLayout(rows: [keys("【】《》〈〉#@-+", size: 20), keys("*_~`|/\\>%&", size: 20), row3,
                                      bottomRow(c, columns: 10)],
                               columns: 10)
     }

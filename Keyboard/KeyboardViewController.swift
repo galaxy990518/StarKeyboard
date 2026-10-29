@@ -4,7 +4,7 @@ import Vision
 
 final class KeyboardViewController: UIInputViewController {
     private enum Metrics {
-        static let barHeight: CGFloat = 46
+        static let barHeight: CGFloat = 50
     }
 
     private enum SuggestionSource { case association, handwriting, spelling, glide }

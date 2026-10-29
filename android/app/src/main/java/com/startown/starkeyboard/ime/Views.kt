@@ -228,21 +228,21 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
                 })
             }
             is Content.Candidates -> {
-                val top = if (c.composition.isNotEmpty()) dpi(15f) else 0
+                val top = if (c.composition.isNotEmpty()) dpi(18f) else 0
                 if (c.composition.isNotEmpty()) {
                     addView(TextView(context).apply {
                         text = c.composition
-                        textSize = 12f
+                        textSize = 14f
                         setTextColor(t.keyText.withAlpha(0.75f))
                         maxLines = 1
                         ellipsize = TextUtils.TruncateAt.START
-                    }, LayoutParams(LayoutParams.MATCH_PARENT, dpi(15f)).apply { leftMargin = dpi(12f); rightMargin = dpi(48f) })
+                    }, LayoutParams(LayoutParams.MATCH_PARENT, dpi(18f)).apply { leftMargin = dpi(12f); rightMargin = dpi(48f) })
                 }
                 val scroll = HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false }
                 val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
                 val first = if (t.accent == t.key) t.keyText else t.accent
                 for ((i, s) in c.items.take(60).withIndex()) {
-                    row.addView(Tap(context, s, 19f, if (i == 0) first else t.keyText, i == 0) { onCandidate?.invoke(i) }.apply {
+                    row.addView(Tap(context, s, 23f, if (i == 0) first else t.keyText, i == 0) { onCandidate?.invoke(i) }.apply {
                         setPadding(dpi(11f), 0, dpi(11f), 0)
                         KeyFonts.get(context, style.fontId)?.let { typeface = it }
                     }, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))

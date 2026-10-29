@@ -203,7 +203,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         content = FrameLayout(this).apply { clipChildren = false }
         keyboard = KeyboardView(this, style)
         content.addView(keyboard, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        column.addView(topBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (46 * dp).toInt()))
+        column.addView(topBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (50 * dp).toInt()))
         column.addView(content, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, contentHeight()))
         r.addView(column, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
         toastView = TextView(this).apply {

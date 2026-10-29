@@ -63,7 +63,7 @@ final class TopBarView: UIView {
         }
         addSubview(toolbar)
 
-        compositionLabel.font = .rounded(13, .medium)
+        compositionLabel.font = .rounded(15, .medium)
         addSubview(compositionLabel)
         candidateScroll.showsHorizontalScrollIndicator = false
         candidateScroll.alwaysBounceHorizontal = true
@@ -140,7 +140,7 @@ final class TopBarView: UIView {
         candidateButtons = items.enumerated().map { (i, text) in
             let b = UIButton(type: .system)
             b.setTitle(text, for: .normal)
-            b.titleLabel?.font = KeyFonts.font(style.fontID, size: 20, weight: i == 0 ? .bold : .regular)
+            b.titleLabel?.font = KeyFonts.font(style.fontID, size: 24, weight: i == 0 ? .bold : .regular)
             b.setTitleColor(i == 0 ? style.theme.accent : style.theme.keyText, for: .normal)
             if style.theme.accent == style.theme.key { b.setTitleColor(style.theme.keyText, for: .normal) }
             b.tag = i
@@ -158,8 +158,8 @@ final class TopBarView: UIView {
         separator.frame = CGRect(x: 0, y: h - 0.5, width: w, height: 0.5)
 
         let hasComposition = !compositionLabel.isHidden
-        let top: CGFloat = hasComposition ? 15 : 0
-        compositionLabel.frame = CGRect(x: 12, y: 1, width: w - 60, height: 14)
+        let top: CGFloat = hasComposition ? 18 : 0
+        compositionLabel.frame = CGRect(x: 12, y: 1, width: w - 60, height: 17)
         let trailingW: CGFloat = trailingButton.isHidden ? 0 : 44
         trailingButton.frame = CGRect(x: w - 44, y: 0, width: 44, height: h)
         candidateScroll.frame = CGRect(x: 0, y: top, width: w - trailingW, height: h - top)
