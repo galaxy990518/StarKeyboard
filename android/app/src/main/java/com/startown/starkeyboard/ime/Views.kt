@@ -27,6 +27,14 @@ fun roundRect(color: Int, radius: Float) = GradientDrawable().apply {
     cornerRadius = radius
 }
 
+/** 鍵盤後面的照片和淡化層：量大小時當作 0，不會把鍵盤撐高；鍵盤量好之後才照鍵盤的大小填滿 */
+class Backdrop(context: Context) : ImageView(context) {
+    init { scaleType = ScaleType.CENTER_CROP }
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        setMeasuredDimension(resolveSize(0, widthMeasureSpec), resolveSize(0, heightMeasureSpec))
+    }
+}
+
 /** 一個可以點的文字（工具列、候選字、按鈕都用這個） */
 @SuppressLint("ViewConstructor")
 class Tap(context: Context, text: String, sizeSp: Float, color: Int, bold: Boolean = false, onTap: () -> Unit) : TextView(context) {

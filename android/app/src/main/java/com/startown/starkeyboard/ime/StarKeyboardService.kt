@@ -24,7 +24,6 @@ import android.view.textservice.SuggestionsInfo
 import android.view.textservice.TextInfo
 import android.view.textservice.TextServicesManager
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.FileProvider
@@ -89,8 +88,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     // 畫面
     private var root: FrameLayout? = null
-    private lateinit var bgImage: ImageView
-    private lateinit var tint: View
+    private lateinit var bgImage: Backdrop
+    private lateinit var tint: Backdrop
     private lateinit var topBar: TopBar
     private lateinit var content: FrameLayout
     private lateinit var keyboard: KeyboardView
@@ -147,8 +146,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     override fun onCreateInputView(): View {
         val r = FrameLayout(this)
-        bgImage = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
-        tint = View(this)
+        bgImage = Backdrop(this)
+        tint = Backdrop(this)
         r.addView(bgImage, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         r.addView(tint, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
