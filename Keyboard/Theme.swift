@@ -205,7 +205,7 @@ final class KeyboardSettings {
     }
     var enabledModes: [InputMode] {
         get {
-            let raw = d.stringArray(forKey: "modes") ?? InputMode.allCases.map { $0.rawValue }
+            let raw = d.stringArray(forKey: "modes") ?? [InputMode.zhuyin, .english, .handwriting].map { $0.rawValue }
             let modes = InputMode.allCases.filter { raw.contains($0.rawValue) }
             return modes.isEmpty ? [.zhuyin] : modes
         }
@@ -214,6 +214,10 @@ final class KeyboardSettings {
     var lastMode: InputMode {
         get { InputMode(rawValue: d.string(forKey: "lastMode") ?? "") ?? .zhuyin }
         set { d.set(newValue.rawValue, forKey: "lastMode") }
+    }
+    var translateTarget: String {
+        get { d.string(forKey: "translateTarget") ?? "en" }
+        set { d.set(newValue, forKey: "translateTarget") }
     }
     var clipLimit: Int {
         get { d.object(forKey: "clipLimit") as? Int ?? 200 }

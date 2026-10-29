@@ -27,6 +27,7 @@ jobs:
 
       - name: 產生 Xcode 專案
         run: |
+          xcodebuild -version
           brew install xcodegen
           xcodegen generate
 

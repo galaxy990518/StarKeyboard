@@ -87,7 +87,7 @@ final class SettingsPanelView: UIView {
 
         stack.addArrangedSubview(header("輸入法（按「中／英」鍵輪流切換）"))
         for mode in InputMode.allCases {
-            stack.addArrangedSubview(switchRow(mode.title, on: settings.enabledModes.contains(mode)) { [weak self] on in
+            stack.addArrangedSubview(switchRow(Self.modeName(mode), on: settings.enabledModes.contains(mode)) { [weak self] on in
                 guard let self = self else { return }
                 var modes = self.settings.enabledModes
                 if on {
@@ -102,6 +102,9 @@ final class SettingsPanelView: UIView {
         stack.addArrangedSubview(switchRow("聯想詞（打完字後推薦下一個字）", on: settings.associations) { [weak self] on in
             self?.settings.associations = on
         })
+
+        stack.addArrangedSubview(header("翻譯"))
+        stack.addArrangedSubview(note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。iOS 26 以上且已下載語言時用 iPhone 內建翻譯，不然會用網路翻譯服務 MyMemory（你打的句子會傳到那邊）。"))
 
         stack.addArrangedSubview(header("聲音與震動"))
         stack.addArrangedSubview(switchRow("按鍵聲音", on: settings.keySound) { [weak self] on in
@@ -126,6 +129,16 @@ final class SettingsPanelView: UIView {
         setNeedsLayout()
         layoutIfNeeded()
         scroll.contentOffset = CGPoint(x: 0, y: min(offset.y, max(0, scroll.contentSize.height - scroll.bounds.height)))
+    }
+
+    private static func modeName(_ mode: InputMode) -> String {
+        switch mode {
+        case .zhuyin: return "注音"
+        case .english: return "英文"
+        case .handwriting: return "手寫"
+        case .korean: return "韓文（한국어）"
+        case .japanese: return "日文（羅馬拼音→假名）"
+        }
     }
 
     private var textColor: UIColor { style.theme.keyText }

@@ -8,6 +8,9 @@ final class KeyboardViewController: UIInputViewController {
 
     private enum SuggestionSource { case association, handwriting }
 
+    /// 上面那條編輯框的用途：新增表符，或是先打中文再翻譯
+    private enum EditorPurpose { case emoticon, translate }
+
     private let settings = KeyboardSettings.shared
     private lazy var clipStore = ClipboardStore(fileURL: Storage.url("clipboard.json"), limit: settings.clipLimit)
     private lazy var emoStore = EmoticonStore(directory: Storage.directory)
@@ -23,11 +26,18 @@ final class KeyboardViewController: UIInputViewController {
     private var lastShiftTap = Date.distantPast
     private var lastSpaceTime = Date.distantPast
     private var composer = ZhuyinComposer()
+    private var kanaBuffer = ""              // 日文：還沒送出的羅馬拼音
+    private var hangul = HangulComposer()
+    private var hangulShown = ""             // 韓文：已經放進輸入框、還在拼的那個字
     private var candidates: [Candidate] = []
     private var suggestions: [String] = []
     private var suggestionSource: SuggestionSource = .association
     private var panel: PanelKind?
-    private var editorText: String?          // 正在新增表符
+    private var editorText: String?          // 編輯框裡的字（nil = 沒在用編輯框）
+    private var editorPurpose: EditorPurpose = .emoticon
+    private var editorReturnPanel: PanelKind?
+    private var translation: (source: String, result: String)?
+    private var translating = false
     private var lastReturnTitle = ""
     private var backgroundImage: UIImage?
     private var clipboardTimer: Timer?
@@ -50,6 +60,9 @@ final class KeyboardViewController: UIInputViewController {
     private var style: KeyboardStyle {
         KeyboardStyle(theme: KeyboardTheme.named(settings.themeID), shape: settings.keyShape, keyAlpha: settings.keyAlpha)
     }
+
+    /// 注音或日文正在組字
+    private var isComposing: Bool { composer.isComposing || !kanaBuffer.isEmpty }
 
     // MARK: - 生命週期
 
@@ -100,6 +113,7 @@ final class KeyboardViewController: UIInputViewController {
         super.viewWillDisappear(animated)
         clipboardTimer?.invalidate()
         clipboardTimer = nil
+        finishHangul()
     }
 
     override func viewDidLayoutSubviews() {
@@ -128,6 +142,10 @@ final class KeyboardViewController: UIInputViewController {
 
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
+        // 使用者自己點到別的地方：韓文正在拼的字就算拼完了
+        if !hangulShown.isEmpty && !(textDocumentProxy.documentContextBeforeInput ?? "").hasSuffix(hangulShown) {
+            finishHangul()
+        }
         refreshReturnTitle()
         updateAutoShift()
     }
@@ -141,7 +159,8 @@ final class KeyboardViewController: UIInputViewController {
             self?.handleInputModeList(from: view, with: event)
         }
         grid.onCursorMove = { [weak self] steps in
-            guard let self = self, !self.composer.isComposing else { return }
+            guard let self = self, !self.isComposing else { return }
+            self.finishHangul()
             self.textDocumentProxy.adjustTextPosition(byCharacterOffset: steps)
         }
         topBar.onToolbar = { [weak self] item in self?.toolbarTapped(item) }
@@ -152,23 +171,32 @@ final class KeyboardViewController: UIInputViewController {
             case .expand:
                 self.toggleCandidatePanel()
             case .close:
+                if self.translation != nil {
+                    self.endEditor()
+                    return
+                }
                 self.clearSuggestions()
                 if self.suggestionSource == .handwriting { self.handwritingView?.clear() }
             }
         }
-        topBar.onEditor = { [weak self] save in
-            if save { self?.saveEditor() } else { self?.cancelEditor() }
+        topBar.onEditor = { [weak self] confirm in
+            if confirm { self?.confirmEditor() } else { self?.endEditor() }
         }
-        topBar.onEditorPanel = { [weak self] in self?.togglePanel(.kaomoji) }
+        topBar.onEditorExtra = { [weak self] in self?.editorExtraTapped() }
     }
 
     // MARK: - 按鍵
 
     private func handle(_ spec: KeySpec) {
         feedback()
+        if case .jamo = spec.action {} else if spec.action != .backspace && spec.action != .shift {
+            finishHangul()
+        }
         switch spec.action {
         case .text(let s): typeText(s)
         case .zhuyin(let c): typeZhuyin(c)
+        case .jamo(let c): typeJamo(c)
+        case .romaji(let c): typeRomaji(c)
         case .backspace: backspace()
         case .space: space()
         case .returnKey: returnKey()
@@ -186,7 +214,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func typeText(_ s: String) {
-        if composer.isComposing { commitAll() }
+        if isComposing { commitAll() }
         clearSuggestions()
         output(s)
         if shift == .on {
@@ -209,12 +237,54 @@ final class KeyboardViewController: UIInputViewController {
         updateCandidates()
     }
 
+    private func typeRomaji(_ c: Character) {
+        clearSuggestions(refresh: false)
+        kanaBuffer.append(c)
+        if kanaBuffer.count >= 60 {
+            commitAll()
+            return
+        }
+        updateCandidates()
+    }
+
+    private func typeJamo(_ c: Character) {
+        clearSuggestions()
+        let out = hangul.input(c)
+        showHangul(out.commit + out.composing, composing: out.composing)
+        if shift == .on {
+            shift = .off
+            rebuildKeys()
+        }
+    }
+
+    /// 韓文：把上次放進去、還在拼的字刪掉，換成新的
+    private func showHangul(_ text: String, composing: String) {
+        for _ in hangulShown { deleteOutput() }
+        output(text)
+        hangulShown = composing
+    }
+
+    private func finishHangul() {
+        hangul.reset()
+        hangulShown = ""
+    }
+
     private func backspace() {
+        if !kanaBuffer.isEmpty {
+            kanaBuffer.removeLast()
+            updateCandidates()
+            return
+        }
         if composer.isComposing {
             composer.backspace()
             updateCandidates()
             return
         }
+        if !hangulShown.isEmpty && hangul.backspace() {
+            showHangul(hangul.composing, composing: hangul.composing)
+            return
+        }
+        finishHangul()
         clearSuggestions()
         deleteOutput()
         updateAutoShift()
@@ -225,7 +295,7 @@ final class KeyboardViewController: UIInputViewController {
             if composer.confirmSyllable() { updateCandidates() }
             return
         }
-        if composer.isComposing {
+        if isComposing {
             if candidates.isEmpty { commitAll() } else { selectCandidate(at: 0, learn: false) }
             return
         }
@@ -250,12 +320,12 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func returnKey() {
-        if composer.isComposing {
+        if isComposing {
             commitAll()
             return
         }
         if editorText != nil {
-            saveEditor()
+            confirmEditor()
             return
         }
         clearSuggestions()
@@ -301,6 +371,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func switchMode() {
         commitAll()
+        finishHangul()
         clearSuggestions()
         let modes = settings.enabledModes
         if let i = modes.firstIndex(of: mode) {
@@ -322,11 +393,11 @@ final class KeyboardViewController: UIInputViewController {
         return modes[(i + 1) % modes.count].shortTitle
     }
 
-    // MARK: - 輸出（新增表符時打到編輯框，平常打到 App）
+    // MARK: - 輸出（用編輯框時打到編輯框，平常打到 App）
 
     private func output(_ s: String) {
         guard !s.isEmpty else { return }
-        if editorText != nil {
+        if editorText != nil && translation == nil {
             editorText! += s
             refreshTopBar()
             return
@@ -335,7 +406,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func deleteOutput() {
-        if var t = editorText {
+        if var t = editorText, translation == nil {
             if !t.isEmpty { t.removeLast() }
             editorText = t
             refreshTopBar()
@@ -344,28 +415,62 @@ final class KeyboardViewController: UIInputViewController {
         textDocumentProxy.deleteBackward()
     }
 
-    // MARK: - 注音選字
+    // MARK: - 選字（注音、日文）
 
     private func updateCandidates() {
-        if composer.syllables.isEmpty {
+        if !kanaBuffer.isEmpty {
+            let hiragana = Romaji.finalize(kanaBuffer)
+            var texts = [hiragana, Romaji.katakana(hiragana), kanaBuffer]
+            var seen = Set<String>()
+            texts = texts.filter { seen.insert($0).inserted }
+            candidates = texts.map { Candidate(text: $0, span: 0, kind: .phrase) }
+        } else if composer.syllables.isEmpty {
             candidates = []
         } else if let engine = engine {
             candidates = engine.candidates(for: composer.readings)
         } else {
             candidates = [Candidate(text: composer.readings.joined(), span: composer.syllables.count, kind: .literal)]
         }
-        if !composer.isComposing { closeCandidatePanel() }
+        if !isComposing { closeCandidatePanel() }
         candidatePanel?.setCandidates(candidates.map { $0.text })
         refreshTopBar()
         refreshReturnTitle()
     }
 
     private var compositionText: String {
+        if !kanaBuffer.isEmpty {
+            let r = Romaji.convert(kanaBuffer)
+            return r.kana + r.rest
+        }
         let head = composer.syllables.isEmpty ? "" : (candidates.first?.text ?? composer.readings.joined())
         return head + composer.current.reading
     }
 
     private func selectCandidate(at i: Int, learn: Bool) {
+        if let t = translation {
+            if i == 0 {
+                editorText = nil
+                translation = nil
+                textDocumentProxy.insertText(t.result)
+                refreshTopBar()
+                rebuildKeys()
+            } else {
+                translation = nil
+                refreshTopBar()
+            }
+            return
+        }
+        if !kanaBuffer.isEmpty {
+            guard i < candidates.count else { return }
+            let text = candidates[i].text
+            kanaBuffer = ""
+            candidates = []
+            closeCandidatePanel()
+            output(text)
+            refreshTopBar()
+            refreshReturnTitle()
+            return
+        }
         if composer.isComposing {
             guard i < candidates.count else { return }
             let c = candidates[i]
@@ -391,13 +496,18 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func commitAll() {
-        guard composer.isComposing else { return }
+        guard isComposing else { return }
         var text = ""
-        if !composer.syllables.isEmpty {
-            text = engine?.bestSegments(composer.readings).map { $0.text }.joined() ?? composer.readings.joined()
+        if !kanaBuffer.isEmpty {
+            text = Romaji.finalize(kanaBuffer)
+            kanaBuffer = ""
+        } else {
+            if !composer.syllables.isEmpty {
+                text = engine?.bestSegments(composer.readings).map { $0.text }.joined() ?? composer.readings.joined()
+            }
+            text += composer.current.reading
+            composer.clear()
         }
-        text += composer.current.reading
-        composer.clear()
         candidates = []
         closeCandidatePanel()
         output(text)
@@ -406,7 +516,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func showAssociations(after text: String) {
-        if settings.associations, mode != .english, let engine = engine {
+        if settings.associations, editorText == nil, mode == .zhuyin || mode == .handwriting, let engine = engine {
             suggestions = engine.associations(after: text)
         } else {
             suggestions = []
@@ -423,10 +533,23 @@ final class KeyboardViewController: UIInputViewController {
 
     private func refreshTopBar() {
         guard topBar != nil else { return }
-        if let t = editorText {
-            topBar.show(.editor(text: t))
-        } else if composer.isComposing {
-            topBar.show(.candidates(composition: compositionText, items: candidates.map { $0.text }, trailing: .expand))
+        if let t = translation {
+            topBar.show(.candidates(composition: "點翻譯結果送出 ・ 原文：\(t.source)", items: [t.result, "✏️ 修改原文"],
+                                    trailing: .close))
+        } else if isComposing {
+            // 用編輯框時，前面也顯示已經打好的字
+            let prefix = editorText.map { (editorPurpose == .translate ? "翻譯：" : "表符：") + $0 + " ｜ " } ?? ""
+            topBar.show(.candidates(composition: prefix + compositionText, items: candidates.map { $0.text },
+                                    trailing: .expand))
+        } else if let text = editorText, suggestions.isEmpty || suggestionSource == .association {
+            switch editorPurpose {
+            case .emoticon:
+                topBar.show(.editor(prompt: "新增表符：", text: text, extra: "(•ᴗ•)", confirm: "儲存"))
+            case .translate:
+                let name = Translator.targets.first { $0.code == settings.translateTarget }?.name ?? "英文"
+                topBar.show(.editor(prompt: translating ? "翻譯中…" : "翻譯：", text: text, extra: "→\(name)",
+                                    confirm: "翻譯"))
+            }
         } else if !suggestions.isEmpty {
             topBar.show(.candidates(composition: "", items: suggestions, trailing: .close))
         } else {
@@ -458,12 +581,14 @@ final class KeyboardViewController: UIInputViewController {
 
     private func toolbarTapped(_ item: ToolbarItem) {
         feedback()
+        finishHangul()
         switch item {
         case .clipboard: togglePanel(.clipboard)
         case .emoji: togglePanel(.emoji)
         case .kaomoji: togglePanel(.kaomoji)
         case .symbols: togglePanel(.symbols)
         case .settings: togglePanel(.settings)
+        case .translate: beginEditor(.translate)
         case .handwriting:
             closePanel()
             if mode == .handwriting {
@@ -490,6 +615,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func openPanel(_ kind: PanelKind) {
         commitAll()
+        finishHangul()
         closePanel()
         panel = kind
         let v: UIView
@@ -582,22 +708,95 @@ final class KeyboardViewController: UIInputViewController {
         (panelView as? ClipboardPanelView)?.reload()
     }
 
+    // MARK: - 編輯框（新增表符、翻譯）
+
+    private func beginEditor(_ purpose: EditorPurpose) {
+        commitAll()
+        finishHangul()
+        clearSuggestions(refresh: false)
+        editorReturnPanel = purpose == .emoticon ? panel : nil
+        closePanel()
+        if purpose == .emoticon && mode == .handwriting {
+            mode = settings.enabledModes.first { $0 != .handwriting } ?? .zhuyin
+        }
+        layer = .letters
+        editorPurpose = purpose
+        editorText = ""
+        translation = nil
+        rebuildKeys()
+        refreshTopBar()
+        switch purpose {
+        case .emoticon: toast("用鍵盤打字，或按 (•ᴗ•) 挑顏文字零件")
+        case .translate: toast("先打要翻譯的話，按「→語言」換目標語言")
+        }
+    }
+
+    private func editorExtraTapped() {
+        switch editorPurpose {
+        case .emoticon:
+            togglePanel(.kaomoji)
+        case .translate:
+            let targets = Translator.targets
+            let i = targets.firstIndex { $0.code == settings.translateTarget } ?? 0
+            settings.translateTarget = targets[(i + 1) % targets.count].code
+            refreshTopBar()
+        }
+    }
+
+    private func confirmEditor() {
+        commitAll()
+        guard let text = editorText else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch editorPurpose {
+        case .emoticon:
+            if !trimmed.isEmpty {
+                emoStore.addCustom(trimmed)
+                toast("已加入我的表符")
+            }
+            let back = editorReturnPanel
+            endEditor()
+            if let p = back { openPanel(p) }
+        case .translate:
+            guard !trimmed.isEmpty else {
+                toast("先打要翻譯的話")
+                return
+            }
+            guard !translating else { return }
+            translating = true
+            refreshTopBar()
+            Translator.translate(trimmed, to: settings.translateTarget) { [weak self] result in
+                guard let self = self, self.editorText != nil else { return }
+                self.translating = false
+                switch result {
+                case .success(let translated):
+                    self.translation = (trimmed, translated)
+                case .failure(.message(let message)):
+                    self.toast(message)
+                }
+                self.refreshTopBar()
+                self.refreshReturnTitle()
+            }
+        }
+    }
+
+    private func endEditor() {
+        composer.clear()
+        kanaBuffer = ""
+        candidates = []
+        editorText = nil
+        editorReturnPanel = nil
+        translation = nil
+        translating = false
+        refreshTopBar()
+        rebuildKeys()
+    }
+
     // MARK: - 我的表符、貼圖
 
     private func addEmoticon(_ option: EmojiPanelView.AddOption) {
         switch option {
         case .type:
-            let returnTo = panel
-            closePanel()
-            if mode == .handwriting {
-                mode = settings.enabledModes.first { $0 != .handwriting } ?? .zhuyin
-            }
-            layer = .letters
-            editorReturnPanel = returnTo
-            editorText = ""
-            rebuildKeys()
-            refreshTopBar()
-            toast("用鍵盤打字，或按 (•ᴗ•) 挑顏文字零件")
+            beginEditor(.emoticon)
         case .clipboardText:
             guard hasFullAccess else {
                 toast("要先開啟「允許完整取用」")
@@ -623,30 +822,6 @@ final class KeyboardViewController: UIInputViewController {
             (panelView as? EmojiPanelView)?.reload()
             toast("已做成貼圖，點一下就能複製")
         }
-    }
-
-    private var editorReturnPanel: PanelKind?
-
-    private func saveEditor() {
-        commitAll()
-        if let t = editorText, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            emoStore.addCustom(t)
-            toast("已加入我的表符")
-        }
-        editorText = nil
-        refreshTopBar()
-        rebuildKeys()
-        if let p = editorReturnPanel { openPanel(p) }
-        editorReturnPanel = nil
-    }
-
-    private func cancelEditor() {
-        composer.clear()
-        candidates = []
-        editorText = nil
-        editorReturnPanel = nil
-        refreshTopBar()
-        rebuildKeys()
     }
 
     private func copySticker(_ image: UIImage) {
@@ -722,8 +897,9 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - 版面
 
     private var returnTitle: String {
-        if composer.isComposing { return "確認" }
-        if editorText != nil { return "儲存" }
+        if isComposing { return "確認" }
+        if translation != nil { return "送出" }
+        if editorText != nil { return editorPurpose == .translate ? "翻譯" : "儲存" }
         switch textDocumentProxy.returnKeyType ?? .default {
         case .go: return "前往"
         case .google, .yahoo, .search: return "搜尋"

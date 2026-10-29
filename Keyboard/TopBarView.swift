@@ -1,24 +1,24 @@
 import UIKit
 
 enum ToolbarItem: CaseIterable {
-    case clipboard, emoji, kaomoji, symbols, handwriting, settings, dismiss
+    case clipboard, emoji, kaomoji, symbols, translate, handwriting, settings, dismiss
 }
 
-/// 鍵盤最上面那一條：沒在打字時是工具列，打注音時是候選字，新增表符時是編輯框
+/// 鍵盤最上面那一條：沒在打字時是工具列，打注音時是候選字，新增表符或翻譯時是編輯框
 final class TopBarView: UIView {
     enum Trailing { case expand, close }
 
     enum Content {
         case toolbar
         case candidates(composition: String, items: [String], trailing: Trailing)
-        case editor(text: String)
+        case editor(prompt: String, text: String, extra: String, confirm: String)
     }
 
     var onToolbar: ((ToolbarItem) -> Void)?
     var onCandidate: ((Int) -> Void)?
     var onTrailing: ((Trailing) -> Void)?
     var onEditor: ((Bool) -> Void)?
-    var onEditorPanel: (() -> Void)?
+    var onEditorExtra: (() -> Void)?
     var style: KeyboardStyle {
         didSet { applyStyle() }
     }
@@ -34,7 +34,7 @@ final class TopBarView: UIView {
     private let editorLabel = UILabel()
     private let editorSave = UIButton(type: .system)
     private let editorCancel = UIButton(type: .system)
-    private let editorPanel = UIButton(type: .system)
+    private let editorExtra = UIButton(type: .system)
     private let separator = UIView()
 
     init(style: KeyboardStyle) {
@@ -50,6 +50,7 @@ final class TopBarView: UIView {
             case .emoji: b.setImage(Self.icon("face.smiling"), for: .normal)
             case .kaomoji: b.setTitle("(•ᴗ•)", for: .normal)
             case .symbols: b.setTitle("※", for: .normal)
+            case .translate: b.setImage(Self.icon("translate"), for: .normal)
             case .handwriting: b.setImage(Self.icon("hand.draw"), for: .normal)
             case .settings: b.setImage(Self.icon("gearshape"), for: .normal)
             case .dismiss: b.setImage(Self.icon("keyboard.chevron.compact.down"), for: .normal)
@@ -81,10 +82,12 @@ final class TopBarView: UIView {
         editorSave.titleLabel?.font = .rounded(16, .bold)
         editorCancel.addAction(UIAction { [weak self] _ in self?.onEditor?(false) }, for: .touchUpInside)
         editorSave.addAction(UIAction { [weak self] _ in self?.onEditor?(true) }, for: .touchUpInside)
-        editorPanel.setTitle("(•ᴗ•)", for: .normal)
-        editorPanel.titleLabel?.font = .rounded(14, .semibold)
-        editorPanel.addAction(UIAction { [weak self] _ in self?.onEditorPanel?() }, for: .touchUpInside)
-        addSubview(editorPanel)
+        editorExtra.setTitle("(•ᴗ•)", for: .normal)
+        editorExtra.titleLabel?.font = .rounded(14, .semibold)
+        editorExtra.titleLabel?.adjustsFontSizeToFitWidth = true
+        editorExtra.titleLabel?.minimumScaleFactor = 0.6
+        editorExtra.addAction(UIAction { [weak self] _ in self?.onEditorExtra?() }, for: .touchUpInside)
+        addSubview(editorExtra)
         addSubview(editorCancel)
         addSubview(editorSave)
 
@@ -112,9 +115,11 @@ final class TopBarView: UIView {
             trailingButton.setImage(Self.icon(trailing == .expand ? "chevron.down" : "xmark"), for: .normal)
             trailingButton.isHidden = items.isEmpty && trailing == .expand
             rebuildCandidates(Array(items.prefix(60)))
-        case .editor(let text):
+        case let .editor(prompt, text, extra, confirm):
             isEditor = true
-            editorLabel.text = "新增表符：" + text + "▏"
+            editorLabel.text = prompt + text + "▏"
+            editorExtra.setTitle(extra, for: .normal)
+            editorSave.setTitle(confirm, for: .normal)
         }
         toolbar.isHidden = !isToolbar
         compositionLabel.isHidden = !isCandidates || (compositionLabel.text ?? "").isEmpty
@@ -123,7 +128,7 @@ final class TopBarView: UIView {
         editorLabel.isHidden = !isEditor
         editorSave.isHidden = !isEditor
         editorCancel.isHidden = !isEditor
-        editorPanel.isHidden = !isEditor
+        editorExtra.isHidden = !isEditor
         setNeedsLayout()
     }
 
@@ -165,8 +170,8 @@ final class TopBarView: UIView {
         }
         candidateScroll.contentSize = CGSize(width: x + 6, height: candidateScroll.bounds.height)
 
-        editorLabel.frame = CGRect(x: 12, y: 0, width: w - 206, height: h)
-        editorPanel.frame = CGRect(x: w - 194, y: 0, width: 58, height: h)
+        editorLabel.frame = CGRect(x: 12, y: 0, width: w - 222, height: h)
+        editorExtra.frame = CGRect(x: w - 208, y: 0, width: 72, height: h)
         editorCancel.frame = CGRect(x: w - 136, y: 0, width: 64, height: h)
         editorSave.frame = CGRect(x: w - 70, y: 0, width: 64, height: h)
     }
@@ -182,7 +187,7 @@ final class TopBarView: UIView {
         trailingButton.tintColor = tint
         editorLabel.textColor = t.keyText
         editorCancel.tintColor = tint
-        editorPanel.tintColor = tint
+        editorExtra.tintColor = tint
         editorSave.tintColor = t.isDark ? t.accent : t.specialText
         separator.backgroundColor = t.shadow.withAlphaComponent(0.4)
         if case .candidates = content { show(content) }

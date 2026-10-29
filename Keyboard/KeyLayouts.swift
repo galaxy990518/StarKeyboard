@@ -1,13 +1,15 @@
 import UIKit
 
 enum InputMode: String, CaseIterable {
-    case zhuyin, english, handwriting
+    case zhuyin, english, handwriting, korean, japanese
 
     var title: String {
         switch self {
         case .zhuyin: return "注音"
         case .english: return "English"
         case .handwriting: return "手寫"
+        case .korean: return "한국어"
+        case .japanese: return "日本語"
         }
     }
 
@@ -16,6 +18,8 @@ enum InputMode: String, CaseIterable {
         case .zhuyin: return "中"
         case .english: return "英"
         case .handwriting: return "寫"
+        case .korean: return "한"
+        case .japanese: return "あ"
         }
     }
 }
@@ -27,6 +31,8 @@ enum PanelKind: String { case emoji, kaomoji, symbols, clipboard, settings }
 enum KeyAction: Equatable {
     case text(String)
     case zhuyin(Character)
+    case jamo(Character)     // 韓文字母
+    case romaji(Character)   // 日文羅馬拼音
     case backspace, space, returnKey, shift, globe, nextMode, clearCanvas
     case layer(KeyboardLayer)
     case panel(PanelKind)
@@ -34,7 +40,7 @@ enum KeyAction: Equatable {
     /// 一般打字的鍵：可以滑動修正、快速連打
     var isCharacter: Bool {
         switch self {
-        case .text, .zhuyin: return true
+        case .text, .zhuyin, .jamo, .romaji: return true
         default: return false
         }
     }
@@ -73,9 +79,16 @@ enum KeyLayouts {
     }
 
     static func layout(_ c: Context) -> KeyboardLayout {
-        let chinese = c.mode != .english
+        // 韓文用半形標點，中文、日文用全形
+        let chinese = c.mode != .english && c.mode != .korean
         switch c.layer {
-        case .letters: return c.mode == .zhuyin ? zhuyin(c) : english(c)
+        case .letters:
+            switch c.mode {
+            case .zhuyin: return zhuyin(c)
+            case .korean: return korean(c)
+            case .japanese: return japanese(c)
+            default: return english(c)
+            }
         case .numbers: return chinese ? chineseNumbers(c) : englishNumbers(c)
         case .symbols: return chinese ? chineseSymbols(c) : englishSymbols(c)
         }
@@ -112,6 +125,8 @@ enum KeyLayouts {
             case .zhuyin: title = "ㄅㄆㄇ"
             case .english: title = "ABC"
             case .handwriting: title = "手寫"
+            case .korean: title = "한글"
+            case .japanese: title = "かな"
             }
             layerKey = KeySpec(face: .text(title), action: .layer(.letters), width: 1.3 * k, kind: .special, fontSize: 14)
         }
@@ -147,6 +162,41 @@ enum KeyLayouts {
         case .locked: shiftIcon = "capslock.fill"
         }
         var row3 = [KeySpec(face: .symbol(shiftIcon), action: .shift, width: 1.4, kind: .special)]
+        row3 += letters("zxcvbnm")
+        row3.append(backspace())
+        return KeyboardLayout(rows: [letters("qwertyuiop"), letters("asdfghjkl"), row3, bottomRow(c, columns: 10)],
+                              columns: 10)
+    }
+
+    private static func shiftKey(_ shift: ShiftState) -> KeySpec {
+        let icon: String
+        switch shift {
+        case .off: icon = "shift"
+        case .on: icon = "shift.fill"
+        case .locked: icon = "capslock.fill"
+        }
+        return KeySpec(face: .symbol(icon), action: .shift, width: 1.4, kind: .special)
+    }
+
+    /// 韓文兩排式，Shift 打雙子音和 ㅒㅖ
+    private static func korean(_ c: Context) -> KeyboardLayout {
+        func jamo(_ s: String) -> [KeySpec] {
+            s.map { KeySpec(face: .text(String($0)), action: .jamo($0), fontSize: 21) }
+        }
+        let top = c.shift == .off ? "ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ" : "ㅃㅉㄸㄲㅆㅛㅕㅑㅒㅖ"
+        var row3 = [shiftKey(c.shift)]
+        row3 += jamo("ㅋㅌㅊㅍㅠㅜㅡ")
+        row3.append(backspace())
+        return KeyboardLayout(rows: [jamo(top), jamo("ㅁㄴㅇㄹㅎㅗㅓㅏㅣ"), row3, bottomRow(c, columns: 10)],
+                              columns: 10)
+    }
+
+    /// 日文：打羅馬拼音，左下角是長音「ー」
+    private static func japanese(_ c: Context) -> KeyboardLayout {
+        func letters(_ s: String) -> [KeySpec] {
+            s.map { KeySpec(face: .text(String($0)), action: .romaji($0), fontSize: 24) }
+        }
+        var row3 = [KeySpec(face: .text("ー"), action: .romaji("-"), width: 1.4, kind: .special, fontSize: 20)]
         row3 += letters("zxcvbnm")
         row3.append(backspace())
         return KeyboardLayout(rows: [letters("qwertyuiop"), letters("asdfghjkl"), row3, bottomRow(c, columns: 10)],
