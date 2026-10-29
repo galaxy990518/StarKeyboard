@@ -67,7 +67,7 @@ final class TopBarView: UIView {
         }
         addSubview(toolbar)
 
-        compositionLabel.font = .rounded(15, .medium)
+        compositionLabel.font = .rounded(15, .bold)
         addSubview(compositionLabel)
         candidateScroll.showsHorizontalScrollIndicator = false
         candidateScroll.alwaysBounceHorizontal = true
@@ -124,7 +124,7 @@ final class TopBarView: UIView {
             self.trailing = trailing
             trailingButton.setImage(Self.icon(trailing == .expand ? "chevron.down" : "xmark"), for: .normal)
             trailingButton.isHidden = items.isEmpty && trailing == .expand
-            rebuildCandidates(Array(items.prefix(60)))
+            rebuildCandidates(Array(items.prefix(40)))
         case let .editor(prompt, text, extra, confirm, source):
             isEditor = true
             editorSource.setTitle(source, for: .normal)
@@ -152,9 +152,18 @@ final class TopBarView: UIView {
         candidateButtons = items.enumerated().map { (i, text) in
             let b = UIButton(type: .system)
             b.setTitle(text, for: .normal)
-            b.titleLabel?.font = KeyFonts.font(style.fontID, size: 24, weight: i == 0 ? .bold : .regular)
-            b.setTitleColor(i == 0 ? style.theme.accent : style.theme.keyText, for: .normal)
-            if style.theme.accent == style.theme.key { b.setTitleColor(style.theme.keyText, for: .normal) }
+            // 字加粗；第一個（按空白會送出的）放在主題色的膠囊裡，一眼就看得到
+            b.titleLabel?.font = KeyFonts.font(style.fontID, size: 24, weight: i == 0 ? .heavy : .semibold)
+            if i == 0 {
+                b.backgroundColor = style.theme.accent
+                b.setTitleColor(style.theme.accentText, for: .normal)
+                b.layer.shadowColor = style.theme.shadow.cgColor
+                b.layer.shadowOpacity = 0.6
+                b.layer.shadowRadius = 2
+                b.layer.shadowOffset = CGSize(width: 0, height: 1.5)
+            } else {
+                b.setTitleColor(style.theme.keyText, for: .normal)
+            }
             b.tag = i
             b.addAction(UIAction { [weak self] _ in self?.onCandidate?(i) }, for: .touchUpInside)
             candidateScroll.addSubview(b)
@@ -176,12 +185,21 @@ final class TopBarView: UIView {
         trailingButton.frame = CGRect(x: w - 44, y: 0, width: 44, height: h)
         candidateScroll.frame = CGRect(x: 0, y: top, width: w - trailingW, height: h - top)
         var x: CGFloat = 6
-        for b in candidateButtons {
+        let ch = candidateScroll.bounds.height
+        for (i, b) in candidateButtons.enumerated() {
             let textW = ((b.title(for: .normal) ?? "") as NSString)
                 .size(withAttributes: [.font: b.titleLabel?.font ?? UIFont.systemFont(ofSize: 20)]).width
             let bw = max(40, ceil(textW) + 22)
-            b.frame = CGRect(x: x, y: 0, width: bw, height: candidateScroll.bounds.height)
-            x += bw
+            if i == 0 {
+                // 膠囊：上下留一點空，左右也留一點才不會跟下一個字黏在一起
+                let pill = CGRect(x: x, y: 4, width: bw, height: max(20, ch - 8))
+                b.frame = pill
+                b.layer.cornerRadius = pill.height / 2
+                x += bw + 4
+            } else {
+                b.frame = CGRect(x: x, y: 0, width: bw, height: ch)
+                x += bw
+            }
         }
         candidateScroll.contentSize = CGSize(width: x + 6, height: candidateScroll.bounds.height)
 
@@ -201,7 +219,7 @@ final class TopBarView: UIView {
             b.tintColor = tint
             b.setTitleColor(tint, for: .normal)
         }
-        compositionLabel.textColor = t.keyText.withAlphaComponent(0.75)
+        compositionLabel.textColor = t.keyText
         trailingButton.tintColor = tint
         editorLabel.textColor = t.keyText
         editorCancel.tintColor = tint

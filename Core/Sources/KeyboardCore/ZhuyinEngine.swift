@@ -117,7 +117,8 @@ final class ZhuyinEngine {
         let abbr = String(pattern.compactMap { $0.first })
         var best: [String: Double] = [:]
         let toneless = column == "plain"
-        db.run("SELECT reading, phrase, score FROM phrases WHERE abbr = ?1", [.text(abbr)]) { stmt in
+        // 只拿最常用的 400 筆來比（只打開頭注音時可能有上千筆，每打一個字都全部比會卡）
+        db.run("SELECT reading, phrase, score FROM phrases WHERE abbr = ?1 ORDER BY score DESC LIMIT 400", [.text(abbr)]) { stmt in
             guard let penalty = Self.matchPenalty(pattern, SQLiteDB.text(stmt, 0).split(separator: "-"), ignoreTones: toneless) else { return }
             let phrase = SQLiteDB.text(stmt, 1)
             let s = SQLiteDB.double(stmt, 2) + penalty

@@ -235,19 +235,28 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
                     addView(TextView(context).apply {
                         text = c.composition
                         textSize = 14f
-                        setTextColor(t.keyText.withAlpha(0.75f))
+                        setTextColor(t.keyText)
+                        paint.isFakeBoldText = true
                         maxLines = 1
                         ellipsize = TextUtils.TruncateAt.START
                     }, LayoutParams(LayoutParams.MATCH_PARENT, dpi(18f)).apply { leftMargin = dpi(12f); rightMargin = dpi(48f) })
                 }
                 val scroll = HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false }
                 val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-                val first = if (t.accent == t.key) t.keyText else t.accent
-                for ((i, s) in c.items.take(60).withIndex()) {
-                    row.addView(Tap(context, s, 23f, if (i == 0) first else t.keyText, i == 0) { onCandidate?.invoke(i) }.apply {
+                // 字加粗；第一個（按空白會送出的）放在主題色的膠囊裡，一眼就看得到
+                for ((i, s) in c.items.take(40).withIndex()) {
+                    val first = i == 0
+                    row.addView(Tap(context, s, 23f, if (first) t.accentText else t.keyText, true) { onCandidate?.invoke(i) }.apply {
                         setPadding(dpi(11f), 0, dpi(11f), 0)
-                        KeyFonts.get(context, style.fontId)?.let { typeface = it }
-                    }, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
+                        val base = KeyFonts.get(context, style.fontId) ?: android.graphics.Typeface.DEFAULT
+                        typeface = android.graphics.Typeface.create(base, android.graphics.Typeface.BOLD)
+                        if (first) {
+                            background = roundRect(t.accent, dp(999f))
+                            elevation = dp(2f)
+                        }
+                    }, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT).apply {
+                        if (first) { topMargin = dpi(4f); bottomMargin = dpi(4f); rightMargin = dpi(4f) }
+                    })
                 }
                 scroll.addView(row, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
                 addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT).apply {

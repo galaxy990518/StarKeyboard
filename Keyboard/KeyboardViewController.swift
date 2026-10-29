@@ -1543,7 +1543,10 @@ final class KeyboardViewController: UIInputViewController {
     private func feedback() {
         guard hasFullAccess else { return }
         if settings.keySound { playKeySound() }
-        if settings.haptics { haptic.impactOccurred() }
+        if settings.haptics {
+            haptic.impactOccurred()
+            haptic.prepare()   // 先暖機，下一次按才不會慢半拍
+        }
     }
 
     private func toast(_ text: String) {
