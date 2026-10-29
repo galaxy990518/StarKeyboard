@@ -1,4 +1,5 @@
 import UIKit
+import CoreText
 
 extension UIColor {
     convenience init(hex: UInt32, alpha: CGFloat = 1) {
@@ -162,6 +163,46 @@ struct KeyboardStyle {
     var keyAlpha: CGFloat
     var fontScale: CGFloat = 1   // 按鍵上的字放大縮小
     var gapScale: CGFloat = 1    // 按鍵之間的空隙（越小按鍵越大）
+    var fontID = KeyFont.system.rawValue
+}
+
+/// 按鍵和候選字用的字體（App 裡附的免費字體，SIL OFL 1.1）
+enum KeyFont: String, CaseIterable {
+    case system, huninn, iansui, wenkai
+
+    var title: String {
+        switch self {
+        case .system: return "系統"
+        case .huninn: return "粉圓"
+        case .iansui: return "芫荽"
+        case .wenkai: return "文楷"
+        }
+    }
+}
+
+enum KeyFonts {
+    private static var names: [String: String] = [:]
+
+    /// 選的字體；系統字體或讀不到時用圓體
+    static func font(_ id: String, size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
+        guard id != KeyFont.system.rawValue, let name = postScriptName(id), let f = UIFont(name: name, size: size) else {
+            return .rounded(size, weight)
+        }
+        return f
+    }
+
+    /// 第一次用時把字體檔註冊給系統，記住它的名字
+    private static func postScriptName(_ id: String) -> String? {
+        if let n = names[id] { return n }
+        guard let url = Bundle.main.url(forResource: id, withExtension: "ttf")
+                ?? Bundle.main.url(forResource: id, withExtension: "ttf", subdirectory: "Fonts"),
+              let provider = CGDataProvider(url: url as CFURL),
+              let cg = CGFont(provider),
+              let name = cg.postScriptName as String? else { return nil }
+        CTFontManagerRegisterGraphicsFont(cg, nil)
+        names[id] = name
+        return name
+    }
 }
 
 /// 鍵盤自己的設定（存在鍵盤擴充功能自己的空間，不需要 App Group）
@@ -175,6 +216,10 @@ final class KeyboardSettings {
     var themeID: String {
         get { d.string(forKey: "themeID") ?? "strawberry" }
         set { d.set(newValue, forKey: "themeID") }
+    }
+    var fontID: String {
+        get { d.string(forKey: "fontID") ?? KeyFont.system.rawValue }
+        set { d.set(newValue, forKey: "fontID") }
     }
     var keyShape: KeyShape {
         get { KeyShape(rawValue: d.string(forKey: "keyShape") ?? "") ?? .jelly }

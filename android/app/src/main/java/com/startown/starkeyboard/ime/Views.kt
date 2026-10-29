@@ -173,7 +173,7 @@ class Tap(context: Context, text: String, sizeSp: Float, color: Int, bold: Boole
 enum class Trailing { EXPAND, CLOSE }
 
 enum class ToolbarItem(val label: String) {
-    CLIPBOARD("剪貼"), EMOJI("☺︎"), KAOMOJI("(•ᴗ•)"), SYMBOLS("※"), TRANSLATE("譯"),
+    CLIPBOARD("剪貼"), EMOJI("☺︎"), KAOMOJI("(•ᴗ•)"), SYMBOLS("※"), FANCY("𝒜"), TRANSLATE("譯"),
     HANDWRITING("✍︎"), SETTINGS("⚙︎"), DISMISS("▾"),
 }
 
@@ -242,6 +242,7 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
                 for ((i, s) in c.items.take(60).withIndex()) {
                     row.addView(Tap(context, s, 19f, if (i == 0) first else t.keyText, i == 0) { onCandidate?.invoke(i) }.apply {
                         setPadding(dpi(11f), 0, dpi(11f), 0)
+                        KeyFonts.get(context, style.fontId)?.let { typeface = it }
                     }, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
                 }
                 scroll.addView(row, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))

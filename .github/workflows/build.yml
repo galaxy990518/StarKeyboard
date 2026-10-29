@@ -33,6 +33,17 @@ jobs:
           python3 tools/build_dict.py "$RUNNER_TEMP/McBopomofo/Source/Data/data.txt" Keyboard/Resources/zhuyin.sqlite "$RUNNER_TEMP/TSCharacters.txt" "$RUNNER_TEMP/TSPhrases.txt"
           cp "$RUNNER_TEMP/McBopomofo/LICENSE.txt" Keyboard/Resources/McBopomofo-LICENSE.txt
 
+      - name: 下載可愛字體並縮小（粉圓、芫荽、霞鶩文楷，都是 SIL OFL 1.1）
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q fonttools
+          curl -sSfL -o "$RUNNER_TEMP/huninn.ttf" https://github.com/justfont/open-huninn-font/releases/download/v2.1/jf-openhuninn-2.1.ttf
+          curl -sSfL -o "$RUNNER_TEMP/iansui.zip" https://github.com/ButTaiwan/iansui/releases/download/v1.020/iansui.zip
+          unzip -q -o "$RUNNER_TEMP/iansui.zip" -d "$RUNNER_TEMP/iansui"
+          IANSUI=$(find "$RUNNER_TEMP/iansui" \( -iname "*.ttf" -o -iname "*.otf" \) | head -1)
+          curl -sSfL -o "$RUNNER_TEMP/wenkai.ttf" https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.530/LXGWWenKaiTC-Regular.ttf
+          "$RUNNER_TEMP/venv/bin/python" tools/build_fonts.py Keyboard/Resources/zhuyin.sqlite Keyboard/Resources/Fonts huninn="$RUNNER_TEMP/huninn.ttf" iansui="$IANSUI" wenkai="$RUNNER_TEMP/wenkai.ttf"
+
       - name: 核心邏輯測試（注音組字、選字、剪貼簿）
         run: swift test --package-path Core
 

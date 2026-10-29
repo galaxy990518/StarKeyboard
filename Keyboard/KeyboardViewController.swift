@@ -10,7 +10,26 @@ final class KeyboardViewController: UIInputViewController {
     private enum SuggestionSource { case association, handwriting, spelling }
 
     /// 上面那條編輯框的用途：新增表符，或是先打中文再翻譯
-    private enum EditorPurpose { case emoticon, translate }
+    private enum EditorPurpose { case emoticon, translate, fancy, shortcutPhrase, shortcutCode }
+
+    private func editorLabel(_ p: EditorPurpose) -> String {
+        switch p {
+        case .emoticon: return "表符："
+        case .translate: return "翻譯："
+        case .fancy: return "花式文字："
+        case .shortcutPhrase: return "片語內容："
+        case .shortcutCode: return "縮寫："
+        }
+    }
+
+    private func editorConfirmTitle(_ p: EditorPurpose) -> String {
+        switch p {
+        case .translate: return "翻譯"
+        case .fancy: return "變花樣"
+        case .shortcutPhrase: return "下一步"
+        default: return "儲存"
+        }
+    }
 
     private let settings = KeyboardSettings.shared
     private lazy var clipStore = ClipboardStore(fileURL: Storage.url("clipboard.json"), limit: settings.clipLimit)
@@ -60,7 +79,11 @@ final class KeyboardViewController: UIInputViewController {
     private var editorText: String?          // 編輯框裡的字（nil = 沒在用編輯框）
     private var editorPurpose: EditorPurpose = .emoticon
     private var editorReturnPanel: PanelKind?
-    private var translation: (source: String, result: String)?
+    /// 編輯框打完後的結果（翻譯、花式文字）：點一個送出，最後一個「✏️ 修改」回去改
+    private var editorResult: (title: String, items: [String])?
+    /// 新增快捷片語：先打片語內容，再打縮寫
+    private var pendingPhrase = ""
+    private lazy var shortcutStore = ShortcutStore(fileURL: Storage.url("shortcuts.json"))
     private var translating = false
     private var lastReturnTitle = ""
     private var backgroundImage: UIImage?
@@ -84,7 +107,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private var style: KeyboardStyle {
         KeyboardStyle(theme: KeyboardTheme.named(settings.themeID), shape: settings.keyShape, keyAlpha: settings.keyAlpha,
-                      fontScale: settings.fontScale, gapScale: settings.gapScale)
+                      fontScale: settings.fontScale, gapScale: settings.gapScale, fontID: settings.fontID)
     }
 
     /// 注音或日文正在組字
@@ -201,7 +224,7 @@ final class KeyboardViewController: UIInputViewController {
             case .expand:
                 self.toggleCandidatePanel()
             case .close:
-                if self.translation != nil {
+                if self.editorResult != nil {
                     self.endEditor()
                     return
                 }
@@ -297,7 +320,7 @@ final class KeyboardViewController: UIInputViewController {
         let range = NSRange(location: 0, length: (word as NSString).length)
         list += (textChecker.completions(forPartialWordRange: range, in: word, language: "en_US") ?? []).prefix(5)
         var seen: Set<String> = [word]
-        let options = list.map { Spelling.matchCase($0, like: word) }.filter { seen.insert($0).inserted }
+        let options = (shortcutStore.matching(word) + list.map { Spelling.matchCase($0, like: word) }).filter { seen.insert($0).inserted }
         suggestions = options.isEmpty ? [] : [word] + options
         suggestionSource = .spelling
         refreshTopBar()
@@ -466,6 +489,10 @@ final class KeyboardViewController: UIInputViewController {
             commitAll()
             return
         }
+        if editorResult != nil {
+            selectCandidate(at: 0, learn: false)
+            return
+        }
         if editorText != nil {
             confirmEditor()
             return
@@ -539,7 +566,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func output(_ s: String) {
         guard !s.isEmpty else { return }
-        if editorText != nil && translation == nil {
+        if editorText != nil && editorResult == nil {
             editorText! += s
             refreshTopBar()
             return
@@ -548,7 +575,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func deleteOutput() {
-        if var t = editorText, translation == nil {
+        if var t = editorText, editorResult == nil {
             if !t.isEmpty { t.removeLast() }
             editorText = t
             refreshTopBar()
@@ -586,10 +613,25 @@ final class KeyboardViewController: UIInputViewController {
         } else {
             candidates = [Candidate(text: ZhuyinEngine.display(composer.readings.joined()), span: composer.readings.count, kind: .literal)]
         }
+        if !composer.readings.isEmpty && pinyinBuffer.isEmpty && kanaBuffer.isEmpty {
+            candidates = withShortcuts(candidates)
+        }
         if !isComposing { closeCandidatePanel() }
         candidatePanel?.setCandidates(candidates.map { $0.text })
         refreshTopBar()
         refreshReturnTitle()
+    }
+
+    /// 快捷片語：打的字（整句）或注音（例如 ㄉㄓ）和縮寫一樣，就把片語放在第二個
+    private func withShortcuts(_ list: [Candidate]) -> [Candidate] {
+        guard !shortcutStore.items.isEmpty else { return list }
+        let typed = composer.readings.map { r in String(r.filter { !Bopomofo.tones.contains($0) && $0 != "*" }) }.joined()
+        var seen = Set<String>()
+        let phrases = ([list.first?.text, typed].compactMap { $0 }).flatMap { shortcutStore.matching($0) }.filter { seen.insert($0).inserted }
+        guard !phrases.isEmpty else { return list }
+        let extra = phrases.map { Candidate(text: $0, span: composer.readings.count, kind: .literal) }
+        let at = min(1, list.count)
+        return Array(list.prefix(at)) + extra + Array(list.dropFirst(at))
     }
 
     private var compositionText: String {
@@ -606,17 +648,15 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func selectCandidate(at i: Int, learn: Bool) {
-        if let t = translation {
-            if i == 0 {
+        if let r = editorResult {
+            editorResult = nil
+            if i < r.items.count {
                 editorText = nil
-                translation = nil
-                textDocumentProxy.insertText(t.result)
-                refreshTopBar()
+                textDocumentProxy.insertText(r.items[i])
                 rebuildKeys()
-            } else {
-                translation = nil
-                refreshTopBar()
             }
+            refreshTopBar()
+            refreshReturnTitle()
             return
         }
         if !pinyinBuffer.isEmpty {
@@ -738,12 +778,11 @@ final class KeyboardViewController: UIInputViewController {
 
     private func refreshTopBar() {
         guard topBar != nil else { return }
-        if let t = translation {
-            topBar.show(.candidates(composition: "點翻譯結果送出 ・ 原文：\(t.source)", items: [t.result, "✏️ 修改原文"],
-                                    trailing: .close))
+        if let r = editorResult {
+            topBar.show(.candidates(composition: r.title, items: r.items + ["✏️ 修改"], trailing: .close))
         } else if isComposing {
             // 用編輯框時，前面也顯示已經打好的字
-            let prefix = editorText.map { (editorPurpose == .translate ? "翻譯：" : "表符：") + $0 + " ｜ " } ?? ""
+            let prefix = editorText.map { editorLabel(editorPurpose) + $0 + " ｜ " } ?? ""
             topBar.show(.candidates(composition: prefix + compositionText, items: candidates.map { $0.text },
                                     trailing: .expand))
         } else if let text = editorText, suggestions.isEmpty || suggestionSource == .association {
@@ -754,6 +793,8 @@ final class KeyboardViewController: UIInputViewController {
                 let name = Translator.targets.first { $0.code == settings.translateTarget }?.name ?? "英文"
                 topBar.show(.editor(prompt: translating ? "翻譯中…" : "翻譯：", text: text, extra: "→\(name)",
                                     confirm: "翻譯"))
+            default:
+                topBar.show(.editor(prompt: editorLabel(editorPurpose), text: text, extra: "", confirm: editorConfirmTitle(editorPurpose)))
             }
         } else if !suggestions.isEmpty {
             topBar.show(.candidates(composition: "", items: suggestions, trailing: .close))
@@ -794,6 +835,7 @@ final class KeyboardViewController: UIInputViewController {
         case .symbols: togglePanel(.symbols)
         case .settings: togglePanel(.settings)
         case .translate: beginEditor(.translate)
+        case .fancy: beginEditor(.fancy)
         case .handwriting:
             closePanel()
             if mode == .handwriting {
@@ -849,7 +891,9 @@ final class KeyboardViewController: UIInputViewController {
             p.onBackspace = { [weak self] in self?.deleteOutput() }
             v = p
         case .settings:
-            let p = SettingsPanelView(settings: settings, hasFullAccess: hasFullAccess, style: style)
+            shortcutStore.load()
+            let p = SettingsPanelView(settings: settings, hasFullAccess: hasFullAccess, style: style, shortcuts: shortcutStore)
+            p.onAddShortcut = { [weak self] in self?.beginEditor(.shortcutPhrase) }
             p.onChange = { [weak self] in self?.settingsChanged() }
             p.onPasteBackground = { [weak self] in self?.pasteBackground() }
             p.onClearBackground = { [weak self] in self?.clearBackground() }
@@ -921,20 +965,23 @@ final class KeyboardViewController: UIInputViewController {
         commitAll()
         finishHangul()
         clearSuggestions(refresh: false)
-        editorReturnPanel = purpose == .emoticon ? panel : nil
+        editorReturnPanel = purpose == .emoticon || purpose == .shortcutPhrase ? panel : nil
         closePanel()
-        if purpose == .emoticon && mode == .handwriting {
+        if purpose != .translate && mode == .handwriting {
             mode = settings.enabledModes.first { $0 != .handwriting } ?? .zhuyin
         }
         layer = .letters
         editorPurpose = purpose
         editorText = ""
-        translation = nil
+        editorResult = nil
         rebuildKeys()
         refreshTopBar()
         switch purpose {
         case .emoticon: toast("用鍵盤打字，或按 (•ᴗ•) 挑顏文字零件")
         case .translate: toast("先打要翻譯的話，按「→語言」換目標語言")
+        case .fancy: toast("打想變花樣的字（英文樣式最多），再按「變花樣」")
+        case .shortcutPhrase: toast("先打常用的整段話，例如地址、自我介紹")
+        case .shortcutCode: toast("再打縮寫")
         }
     }
 
@@ -947,6 +994,8 @@ final class KeyboardViewController: UIInputViewController {
             let i = targets.firstIndex { $0.code == settings.translateTarget } ?? 0
             settings.translateTarget = targets[(i + 1) % targets.count].code
             refreshTopBar()
+        default:
+            break
         }
     }
 
@@ -963,6 +1012,36 @@ final class KeyboardViewController: UIInputViewController {
             let back = editorReturnPanel
             endEditor()
             if let p = back { openPanel(p) }
+        case .fancy:
+            guard !trimmed.isEmpty else {
+                toast("先打想變花樣的字")
+                return
+            }
+            editorResult = ("點一個樣式送出（可以左右滑）", FancyText.variants(trimmed))
+            refreshTopBar()
+            refreshReturnTitle()
+        case .shortcutPhrase:
+            guard !trimmed.isEmpty else {
+                toast("先打片語內容")
+                return
+            }
+            pendingPhrase = text
+            editorPurpose = .shortcutCode
+            editorText = ""
+            refreshTopBar()
+            refreshReturnTitle()
+            toast("再打縮寫，例如「地址」或「addr」")
+        case .shortcutCode:
+            guard !trimmed.isEmpty else {
+                toast("先打縮寫")
+                return
+            }
+            shortcutStore.add(code: trimmed, phrase: pendingPhrase)
+            pendingPhrase = ""
+            toast("好了！打「\(trimmed)」就會出現這段話")
+            let back = editorReturnPanel
+            endEditor()
+            if let p = back { openPanel(p) }
         case .translate:
             guard !trimmed.isEmpty else {
                 toast("先打要翻譯的話")
@@ -976,7 +1055,7 @@ final class KeyboardViewController: UIInputViewController {
                 self.translating = false
                 switch result {
                 case .success(let translated):
-                    self.translation = (trimmed, translated)
+                    self.editorResult = ("點翻譯結果送出 ・ 原文：\(trimmed)", [translated])
                 case .failure(.message(let message)):
                     self.toast(message)
                 }
@@ -993,7 +1072,7 @@ final class KeyboardViewController: UIInputViewController {
         candidates = []
         editorText = nil
         editorReturnPanel = nil
-        translation = nil
+        editorResult = nil
         translating = false
         refreshTopBar()
         rebuildKeys()
@@ -1209,8 +1288,8 @@ final class KeyboardViewController: UIInputViewController {
 
     private var returnTitle: String {
         if isComposing { return "確認" }
-        if translation != nil { return "送出" }
-        if editorText != nil { return editorPurpose == .translate ? "翻譯" : "儲存" }
+        if editorResult != nil { return "送出" }
+        if editorText != nil { return editorConfirmTitle(editorPurpose) }
         switch textDocumentProxy.returnKeyType ?? .default {
         case .go: return "前往"
         case .google, .yahoo, .search: return "搜尋"

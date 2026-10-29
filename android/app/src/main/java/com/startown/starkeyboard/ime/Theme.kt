@@ -2,6 +2,7 @@ package com.startown.starkeyboard.ime
 
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.Path
 import android.graphics.RectF
 import java.io.File
@@ -102,7 +103,22 @@ data class KeyboardStyle(
     val keyAlpha: Float,
     val fontScale: Float,
     val gapScale: Float,
+    val fontId: String = "system",
 )
+
+/** 按鍵和候選字用的字體（App 裡附的免費字體，SIL OFL 1.1） */
+enum class KeyFont(val id: String, val title: String) {
+    SYSTEM("system", "系統"), HUNINN("huninn", "粉圓"), IANSUI("iansui", "芫荽"), WENKAI("wenkai", "文楷"),
+}
+
+object KeyFonts {
+    private val cache = HashMap<String, Typeface?>()
+
+    /** 系統字體或讀不到時回傳 null（用內建字體） */
+    fun get(context: Context, id: String): Typeface? = if (id == KeyFont.SYSTEM.id) null else cache.getOrPut(id) {
+        runCatching { Typeface.createFromAsset(context.assets, "fonts/$id.ttf") }.getOrNull()
+    }
+}
 
 enum class InputMode(val title: String, val short: String, val settingName: String) {
     ZHUYIN("注音", "中", "注音"),
@@ -209,5 +225,9 @@ class KeyboardSettings(context: Context) {
         get() = p.getBoolean("hasBackground", false) && backgroundFile.exists()
         set(v) = p.edit().putBoolean("hasBackground", v).apply()
 
-    val style get() = KeyboardStyle(KeyboardTheme.named(themeId), shape, keyAlpha, fontScale, gapScale)
+    var fontId: String
+        get() = p.getString("fontId", KeyFont.SYSTEM.id) ?: KeyFont.SYSTEM.id
+        set(v) = p.edit().putString("fontId", v).apply()
+
+    val style get() = KeyboardStyle(KeyboardTheme.named(themeId), shape, keyAlpha, fontScale, gapScale, fontId)
 }

@@ -148,6 +148,27 @@ final class ZhuyinEngineTests: XCTestCase {
     }
 }
 
+final class FancyTextTests: XCTestCase {
+    func testStyles() {
+        let v = FancyText.variants("Hi 1")
+        XCTAssertTrue(v.contains("\u{1D4D7}\u{1D4F2} 1"))   // 草寫 𝓗𝓲
+        XCTAssertTrue(v.contains("\u{24BD}\u{24D8} \u{2460}"))   // 圈圈 Ⓗⓘ ①
+        XCTAssertTrue(v.contains("H\u{0336}i\u{0336} 1\u{0336}"))   // 刪除線
+        let zh = FancyText.variants("星光")
+        XCTAssertTrue(zh.contains("♡ 星光 ♡"))
+        XCTAssertFalse(zh.contains("星光"))
+    }
+
+    func testShortcuts() {
+        let s = ShortcutStore(fileURL: nil)
+        s.add(code: "addr", phrase: "台北市")
+        s.add(code: "地址", phrase: "台北市")
+        XCTAssertEqual(s.matching("ADDR"), ["台北市"])
+        XCTAssertEqual(s.matching("地址"), ["台北市"])
+        XCTAssertTrue(s.matching("add").isEmpty)
+    }
+}
+
 final class StoreTests: XCTestCase {
     func testClipboardDedupeAndLimit() {
         let s = ClipboardStore(fileURL: nil, limit: 3)

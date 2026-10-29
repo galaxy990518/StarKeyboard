@@ -142,7 +142,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
 
     private fun drawLabel(canvas: Canvas, k: Key, color: Int) {
         textPaint.color = color
-        textPaint.typeface = if (k.spec.kind == KeyKind.NORMAL) Typeface.DEFAULT else Typeface.DEFAULT_BOLD
+        textPaint.typeface = KeyFonts.get(context, style.fontId)
+            ?: if (k.spec.kind == KeyKind.NORMAL) Typeface.DEFAULT else Typeface.DEFAULT_BOLD
         var size = k.spec.fontSize * dp * style.fontScale
         textPaint.textSize = size
         val maxW = k.body.width() - 4 * dp

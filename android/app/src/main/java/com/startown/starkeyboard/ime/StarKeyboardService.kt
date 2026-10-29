@@ -37,6 +37,8 @@ import com.startown.starkeyboard.core.ChineseConverter
 import com.startown.starkeyboard.core.Candidate
 import com.startown.starkeyboard.core.ClipboardStore
 import com.startown.starkeyboard.core.EmoticonStore
+import com.startown.starkeyboard.core.FancyText
+import com.startown.starkeyboard.core.ShortcutStore
 import com.startown.starkeyboard.core.HangulComposer
 import com.startown.starkeyboard.core.PinyinEngine
 import com.startown.starkeyboard.core.Romaji
@@ -49,11 +51,27 @@ import java.util.Locale
 
 class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheckerSessionListener {
     private enum class SuggestionSource { ASSOCIATION, HANDWRITING, SPELLING }
-    private enum class EditorPurpose { EMOTICON, TRANSLATE }
+    private enum class EditorPurpose { EMOTICON, TRANSLATE, FANCY, SHORTCUT_PHRASE, SHORTCUT_CODE }
+
+    private fun editorLabel(p: EditorPurpose) = when (p) {
+        EditorPurpose.EMOTICON -> "表符："
+        EditorPurpose.TRANSLATE -> "翻譯："
+        EditorPurpose.FANCY -> "花式文字："
+        EditorPurpose.SHORTCUT_PHRASE -> "片語內容："
+        EditorPurpose.SHORTCUT_CODE -> "縮寫："
+    }
+
+    private fun editorConfirmTitle(p: EditorPurpose) = when (p) {
+        EditorPurpose.TRANSLATE -> "翻譯"
+        EditorPurpose.FANCY -> "變花樣"
+        EditorPurpose.SHORTCUT_PHRASE -> "下一步"
+        else -> "儲存"
+    }
 
     private lateinit var settings: KeyboardSettings
     private lateinit var clipStore: ClipboardStore
     private lateinit var emoStore: EmoticonStore
+    private lateinit var shortcuts: ShortcutStore
     private var engine: ZhuyinEngine? = null
     private var pinyinEngine: PinyinEngine? = null
     private var converter: ChineseConverter? = null
@@ -78,7 +96,11 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private var editorText: String? = null
     private var editorPurpose = EditorPurpose.EMOTICON
     private var editorReturnPanel: PanelKind? = null
-    private var translation: Pair<String, String>? = null
+    /** 編輯框打完後的結果（翻譯、花式文字）：點一個送出，最後一個「✏️ 修改」回去改 */
+    private data class EditorResult(val title: String, val items: List<String>)
+    private var editorResult: EditorResult? = null
+    /** 新增快捷片語：先打片語內容，再打縮寫 */
+    private var pendingPhrase = ""
     private var translating = false
     private var lastAutocorrect: Pair<String, String>? = null
     private var styleKey = ""
@@ -117,6 +139,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         settings = KeyboardSettings(this)
         clipStore = ClipboardStore(File(filesDir, "clipboard.json"), settings.clipLimit)
         emoStore = EmoticonStore(filesDir)
+        shortcuts = ShortcutStore(File(filesDir, "shortcuts.json"))
         mode = settings.lastMode.takeIf { it in settings.enabledModes } ?: settings.enabledModes.first()
         Thread {
             val source = SQLitePhraseSource.open(this)
@@ -186,6 +209,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         emoStore.load()
+        shortcuts.load()
         clipStore.load()
         if (mode !in settings.enabledModes) mode = settings.enabledModes.first()
         resetComposition()
@@ -234,7 +258,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             when (trailing) {
                 Trailing.EXPAND -> toggleCandidatePanel()
                 Trailing.CLOSE -> {
-                    if (translation != null) endEditor() else {
+                    if (editorResult != null) endEditor() else {
                         if (suggestionSource == SuggestionSource.HANDWRITING) handwriting?.clear()
                         clearSuggestions()
                     }
@@ -439,6 +463,10 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             commitAll()
             return
         }
+        if (editorResult != null) {
+            selectCandidate(0, false)
+            return
+        }
         if (editorText != null) {
             confirmEditor()
             return
@@ -504,7 +532,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun output(s: String) {
         if (s.isEmpty()) return
-        if (editorText != null && translation == null) {
+        if (editorText != null && editorResult == null) {
             editorText = editorText + s
             refreshTopBar()
             return
@@ -514,7 +542,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun deleteOutput() {
         val t = editorText
-        if (t != null && translation == null) {
+        if (t != null && editorResult == null) {
             if (t.isNotEmpty()) editorText = t.substring(0, t.offsetByCodePoints(t.length, -1))
             refreshTopBar()
             return
@@ -562,6 +590,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             else -> safely { engine?.candidates(composer.readings) }
                 ?: listOf(Candidate(ZhuyinEngine.display(composer.readings.joinToString("")), composer.readings.size, Candidate.Kind.LITERAL))
         }
+        if (composer.readings.isNotEmpty() && pinyinBuffer.isEmpty() && kanaBuffer.isEmpty()) {
+            candidates = withShortcuts(candidates)
+        }
         if (!isComposing) {
             currentInputConnection?.setComposingText("", 1)
             closeCandidatePanel()
@@ -580,6 +611,17 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         null
     }
 
+    /** 快捷片語：打的字（整句）或注音（例如 ㄉㄓ）和縮寫一樣，就把片語放在第二個 */
+    private fun withShortcuts(list: List<Candidate>): List<Candidate> {
+        if (shortcuts.items.isEmpty()) return list
+        val typed = composer.readings.joinToString("") { r -> r.filter { Bopomofo.TONES.indexOf(it) < 0 && it != '*' } }
+        val phrases = listOfNotNull(list.firstOrNull()?.text, typed).flatMap { shortcuts.matching(it) }.distinct()
+        if (phrases.isEmpty()) return list
+        val extra = phrases.map { Candidate(it, composer.readings.size, Candidate.Kind.LITERAL) }
+        val at = minOf(1, list.size)
+        return list.take(at) + extra + list.drop(at)
+    }
+
     private val compositionText: String
         get() {
             if (pinyinBuffer.isNotEmpty()) return pinyinEngine?.display(pinyinBuffer) ?: pinyinBuffer
@@ -593,17 +635,16 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         }
 
     private fun selectCandidate(i: Int, learn: Boolean) {
-        translation?.let { t ->
-            if (i == 0) {
+        editorResult?.let { r ->
+            val chosen = r.items.getOrNull(i)
+            editorResult = null
+            if (chosen != null) {
                 editorText = null
-                translation = null
-                currentInputConnection?.commitText(t.second, 1)
-                refreshTopBar()
+                currentInputConnection?.commitText(chosen, 1)
                 rebuildKeys()
-            } else {
-                translation = null
-                refreshTopBar()
             }
+            refreshTopBar()
+            refreshReturnTitle()
             return
         }
         if (pinyinBuffer.isNotEmpty()) {
@@ -716,21 +757,23 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun refreshTopBar() {
         if (root == null) return
-        val tr = translation
+        val tr = editorResult
         val ed = editorText
         when {
-            tr != null -> topBar.showCandidates("點翻譯結果送出 ・ 原文：${tr.first}", listOf(tr.second, "✏️ 修改原文"), Trailing.CLOSE)
+            tr != null -> topBar.showCandidates(tr.title, tr.items + "✏️ 修改", Trailing.CLOSE)
             isComposing -> {
-                val prefix = if (ed != null) (if (editorPurpose == EditorPurpose.TRANSLATE) "翻譯：" else "表符：") + ed + " ｜ " else ""
+                val prefix = if (ed != null) editorLabel(editorPurpose) + ed + " ｜ " else ""
                 topBar.showCandidates(if (ed != null) prefix + compositionText else "", candidates.map { it.text }, Trailing.EXPAND)
             }
             ed != null && (suggestions.isEmpty() || suggestionSource == SuggestionSource.ASSOCIATION) -> {
                 val pending = if (hangulComposing) hangul.composing else ""
-                if (editorPurpose == EditorPurpose.EMOTICON) {
-                    topBar.showEditor("新增表符：", ed + pending, "(•ᴗ•)", "儲存")
-                } else {
-                    val name = Translator.targets.firstOrNull { it.code == settings.translateTarget }?.name ?: "英文"
-                    topBar.showEditor(if (translating) "翻譯中…" else "翻譯：", ed + pending, "→$name", "翻譯")
+                when (editorPurpose) {
+                    EditorPurpose.EMOTICON -> topBar.showEditor("新增表符：", ed + pending, "(•ᴗ•)", "儲存")
+                    EditorPurpose.TRANSLATE -> {
+                        val name = Translator.targets.firstOrNull { it.code == settings.translateTarget }?.name ?: "英文"
+                        topBar.showEditor(if (translating) "翻譯中…" else "翻譯：", ed + pending, "→$name", "翻譯")
+                    }
+                    else -> topBar.showEditor(editorLabel(editorPurpose), ed + pending, "", editorConfirmTitle(editorPurpose))
                 }
             }
             suggestions.isNotEmpty() -> topBar.showCandidates("", suggestions, Trailing.CLOSE)
@@ -782,7 +825,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun showSpelling(word: String, fixes: List<String>) {
         if (word != currentWord) return
-        val options = fixes.map { Spelling.matchCase(it, word) }.filter { it != word }.distinct()
+        val options = (shortcuts.matching(word) + fixes.map { Spelling.matchCase(it, word) }).filter { it != word }.distinct()
         if (options.isEmpty()) {
             if (suggestionSource == SuggestionSource.SPELLING) clearSuggestions()
             return
@@ -854,6 +897,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             ToolbarItem.SYMBOLS -> togglePanel(PanelKind.SYMBOLS)
             ToolbarItem.SETTINGS -> togglePanel(PanelKind.SETTINGS)
             ToolbarItem.TRANSLATE -> beginEditor(EditorPurpose.TRANSLATE)
+            ToolbarItem.FANCY -> beginEditor(EditorPurpose.FANCY)
             ToolbarItem.HANDWRITING -> {
                 closePanel()
                 if (mode == InputMode.HANDWRITING) {
@@ -902,6 +946,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 onChange = { settingsChanged() },
                 onOpenApp = { openApp() },
                 onAdjustPhoto = { startPhotoAdjust() },
+                shortcuts = shortcuts,
+                onAddShortcut = { beginEditor(EditorPurpose.SHORTCUT_PHRASE) },
                 onResetLearning = { engine?.resetLearning(); toast("已清除選字學習紀錄") },
                 onBack = { closePanel() })
         }
@@ -1001,24 +1047,30 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         commitAll()
         finishHangul()
         suggestions = emptyList()
-        editorReturnPanel = if (purpose == EditorPurpose.EMOTICON) panel else null
+        editorReturnPanel = if (purpose == EditorPurpose.EMOTICON || purpose == EditorPurpose.SHORTCUT_PHRASE) panel else null
         closePanel()
-        if (purpose == EditorPurpose.EMOTICON && mode == InputMode.HANDWRITING) {
+        if (purpose != EditorPurpose.TRANSLATE && mode == InputMode.HANDWRITING) {
             mode = settings.enabledModes.firstOrNull { it != InputMode.HANDWRITING } ?: InputMode.ZHUYIN
         }
         layer = KeyboardLayer.LETTERS
         editorPurpose = purpose
         editorText = ""
-        translation = null
+        editorResult = null
         rebuildKeys()
         refreshTopBar()
-        toast(if (purpose == EditorPurpose.EMOTICON) "用鍵盤打字，或按 (•ᴗ•) 挑顏文字零件" else "先打要翻譯的話，按「→語言」換目標語言")
+        toast(when (purpose) {
+            EditorPurpose.EMOTICON -> "用鍵盤打字，或按 (•ᴗ•) 挑顏文字零件"
+            EditorPurpose.TRANSLATE -> "先打要翻譯的話，按「→語言」換目標語言"
+            EditorPurpose.FANCY -> "打想變花樣的字（英文樣式最多），再按「變花樣」"
+            EditorPurpose.SHORTCUT_PHRASE -> "先打常用的整段話，例如地址、自我介紹"
+            EditorPurpose.SHORTCUT_CODE -> "再打縮寫"
+        })
     }
 
     private fun editorExtraTapped() {
         if (editorPurpose == EditorPurpose.EMOTICON) {
             togglePanel(PanelKind.KAOMOJI)
-        } else {
+        } else if (editorPurpose == EditorPurpose.TRANSLATE) {
             val targets = Translator.targets
             val i = maxOf(0, targets.indexOfFirst { it.code == settings.translateTarget })
             settings.translateTarget = targets[(i + 1) % targets.size].code
@@ -1040,6 +1092,36 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             back?.let { openPanel(it) }
             return
         }
+        when (editorPurpose) {
+            EditorPurpose.FANCY -> {
+                if (text.isEmpty()) { toast("先打想變花樣的字"); return }
+                editorResult = EditorResult("點一個樣式送出（可以左右滑）", FancyText.variants(text))
+                refreshTopBar()
+                refreshReturnTitle()
+                return
+            }
+            EditorPurpose.SHORTCUT_PHRASE -> {
+                if (text.isEmpty()) { toast("先打片語內容"); return }
+                pendingPhrase = editorText ?: text
+                editorPurpose = EditorPurpose.SHORTCUT_CODE
+                editorText = ""
+                refreshTopBar()
+                refreshReturnTitle()
+                toast("再打縮寫，例如「地址」或「addr」")
+                return
+            }
+            EditorPurpose.SHORTCUT_CODE -> {
+                if (text.isEmpty()) { toast("先打縮寫"); return }
+                shortcuts.add(text, pendingPhrase)
+                pendingPhrase = ""
+                toast("好了！打「$text」就會出現這段話")
+                val back = editorReturnPanel
+                endEditor()
+                back?.let { openPanel(it) }
+                return
+            }
+            else -> {}
+        }
         if (text.isEmpty()) {
             toast("先打要翻譯的話")
             return
@@ -1050,7 +1132,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         Translator.translate(text, settings.translateTarget, status = { toast(it) }) { result ->
             translating = false
             if (editorText == null) return@translate
-            result.onSuccess { translation = text to it }.onFailure { toast(it.message ?: "翻譯失敗") }
+            result.onSuccess { editorResult = EditorResult("點翻譯結果送出 ・ 原文：$text", listOf(it)) }.onFailure { toast(it.message ?: "翻譯失敗") }
             refreshTopBar()
             refreshReturnTitle()
         }
@@ -1065,7 +1147,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         candidates = emptyList()
         editorText = null
         editorReturnPanel = null
-        translation = null
+        editorResult = null
         translating = false
         refreshTopBar()
         rebuildKeys()
@@ -1117,7 +1199,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun applyStyle() {
         val r = root ?: return
         val s = style
-        styleKey = s.theme.id + s.shape.name
+        styleKey = s.theme.id + s.shape.name + s.fontId
         r.background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(s.theme.top, s.theme.bottom))
         if (settings.hasBackground) {
             // 拖滑桿時也會跑這裡：照片沒換就不用重新讀檔
@@ -1153,8 +1235,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private val returnTitle: String
         get() {
             if (isComposing) return "確認"
-            if (translation != null) return "送出"
-            if (editorText != null) return if (editorPurpose == EditorPurpose.TRANSLATE) "翻譯" else "儲存"
+            if (editorResult != null) return "送出"
+            if (editorText != null) return editorConfirmTitle(editorPurpose)
             val info = currentInputEditorInfo ?: return "換行"
             if (info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0) return "換行"
             return when (info.imeOptions and EditorInfo.IME_MASK_ACTION) {

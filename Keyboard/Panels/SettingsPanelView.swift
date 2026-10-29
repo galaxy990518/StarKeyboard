@@ -6,12 +6,13 @@ final class SettingsPanelView: UIView {
     var onPasteBackground: (() -> Void)?
     var onClearBackground: (() -> Void)?
     var onAdjustPhoto: (() -> Void)?
+    var onAddShortcut: (() -> Void)?
     var onResetLearning: (() -> Void)?
     var onBack: (() -> Void)?
     var style: KeyboardStyle {
         didSet {
             // 拖滑桿時不要重建（不然滑桿會被拿掉），只有換主題或造型才重建
-            if oldValue.theme.id != style.theme.id || oldValue.shape != style.shape {
+            if oldValue.theme.id != style.theme.id || oldValue.shape != style.shape || oldValue.fontID != style.fontID {
                 rebuild()
             } else {
                 bar.style = style
@@ -21,13 +22,15 @@ final class SettingsPanelView: UIView {
 
     private let settings: KeyboardSettings
     private let hasFullAccess: Bool
+    private let shortcuts: ShortcutStore
     private let scroll = UIScrollView()
     private let stack = UIStackView()
     private let bar: PanelBottomBar
 
-    init(settings: KeyboardSettings, hasFullAccess: Bool, style: KeyboardStyle) {
+    init(settings: KeyboardSettings, hasFullAccess: Bool, style: KeyboardStyle, shortcuts: ShortcutStore) {
         self.settings = settings
         self.hasFullAccess = hasFullAccess
+        self.shortcuts = shortcuts
         self.style = style
         bar = PanelBottomBar(style: style)
         super.init(frame: .zero)
@@ -70,6 +73,10 @@ final class SettingsPanelView: UIView {
 
         stack.addArrangedSubview(header("按鍵造型"))
         stack.addArrangedSubview(shapeRow())
+
+        stack.addArrangedSubview(header("字體（按鍵和候選字）"))
+        stack.addArrangedSubview(fontRow())
+        stack.addArrangedSubview(note("字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。"))
 
         stack.addArrangedSubview(header("大小（邊拖邊看）"))
         stack.addArrangedSubview(sliderRow("鍵盤高度", value: Float(settings.heightScale), range: 0.8...1.3) { [weak self] v in
@@ -115,6 +122,15 @@ final class SettingsPanelView: UIView {
             self?.settings.keyAlpha = CGFloat(v)
             self?.onChange?()
         })
+
+        stack.addArrangedSubview(header("快捷片語（打縮寫就跳出整段話）"))
+        stack.addArrangedSubview(buttonRow([("＋ 新增快捷片語", { [weak self] in self?.onAddShortcut?() })]))
+        if shortcuts.items.isEmpty {
+            stack.addArrangedSubview(note("例如縮寫「地址」→ 你家的完整地址。打注音只打開頭（ㄉㄓ）也可以，英文打 addr 之類也行。"))
+        }
+        for item in shortcuts.items {
+            stack.addArrangedSubview(shortcutRow(item))
+        }
 
         stack.addArrangedSubview(header("輸入法（按「中／英」鍵輪流切換）"))
         for mode in InputMode.allCases {
@@ -262,6 +278,59 @@ final class SettingsPanelView: UIView {
         }
         scrollRow.contentSize = CGSize(width: x, height: 76)
         return scrollRow
+    }
+
+    private func shortcutRow(_ item: ShortcutStore.Item) -> UIView {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = 8
+        row.alignment = .center
+        let label = UILabel()
+        label.text = "\(item.code) → \(item.phrase)"
+        label.font = .rounded(14)
+        label.textColor = textColor
+        label.numberOfLines = 2
+        label.lineBreakMode = .byTruncatingTail
+        row.addArrangedSubview(label)
+        let delete = UIButton(type: .system)
+        delete.setTitle("刪除", for: .normal)
+        delete.titleLabel?.font = .rounded(13, .bold)
+        delete.setTitleColor(style.theme.specialText, for: .normal)
+        delete.backgroundColor = style.theme.specialKey
+        delete.layer.cornerRadius = 10
+        delete.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+        delete.setContentHuggingPriority(.required, for: .horizontal)
+        delete.setContentCompressionResistancePriority(.required, for: .horizontal)
+        delete.addAction(UIAction { [weak self, weak row] _ in
+            self?.shortcuts.remove(item)
+            row?.removeFromSuperview()
+            self?.setNeedsLayout()
+        }, for: .touchUpInside)
+        row.addArrangedSubview(delete)
+        return row
+    }
+
+    private func fontRow() -> UIView {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.distribution = .fillEqually
+        row.spacing = 8
+        row.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        for font in KeyFont.allCases {
+            let selected = font.rawValue == settings.fontID
+            let b = UIButton(type: .custom)
+            b.layer.cornerRadius = 12
+            b.backgroundColor = selected ? style.theme.accent : style.theme.key.withAlphaComponent(0.6)
+            b.setTitle(font.title, for: .normal)
+            b.setTitleColor(selected ? style.theme.accentText : style.theme.keyText, for: .normal)
+            b.titleLabel?.font = KeyFonts.font(font.rawValue, size: 16, weight: selected ? .bold : .regular)
+            b.addAction(UIAction { [weak self] _ in
+                self?.settings.fontID = font.rawValue
+                self?.onChange?()
+            }, for: .touchUpInside)
+            row.addArrangedSubview(b)
+        }
+        return row
     }
 
     private func shapeRow() -> UIView {

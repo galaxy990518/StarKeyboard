@@ -4,6 +4,8 @@ import com.startown.starkeyboard.core.Bopomofo
 import com.startown.starkeyboard.core.Candidate
 import com.startown.starkeyboard.core.ClipboardStore
 import com.startown.starkeyboard.core.HangulComposer
+import com.startown.starkeyboard.core.FancyText
+import com.startown.starkeyboard.core.ShortcutStore
 import com.startown.starkeyboard.core.MemoryPhraseSource
 import com.startown.starkeyboard.core.ReleaseChecker
 import com.startown.starkeyboard.core.Romaji
@@ -60,6 +62,22 @@ class CoreTest {
         assertTrue(engine().syllablePrefixes().containsAll(listOf("ㄋ", "ㄋㄧ", "ㄐㄧㄝ")))
         a.removeFirst(1)
         assertFalse(a.isComposing)
+    }
+
+    @Test fun fancyTextAndShortcuts() {
+        val v = FancyText.variants("Hi 1")
+        assertTrue(v.contains("\uD835\uDCD7\uD835\uDCF2 1"))   // 草寫 𝓗𝓲
+        assertTrue(v.contains("\u24BD\u24D8 \u2460"))           // 圈圈 Ⓗⓘ ①
+        assertTrue(v.contains("H\u0336i\u0336 1\u0336"))        // 刪除線
+        val zh = FancyText.variants("星光")
+        assertTrue(zh.contains("♡ 星光 ♡"))
+        assertFalse(zh.contains("星光"))
+        val s = ShortcutStore(null)
+        s.add("addr", "台北市")
+        s.add("地址", "台北市")
+        assertEquals(listOf("台北市"), s.matching("ADDR"))
+        assertEquals(listOf("台北市"), s.matching("地址"))
+        assertTrue(s.matching("add").isEmpty())
     }
 
     @Test fun previewAndAbbreviation() {

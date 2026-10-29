@@ -2,3 +2,4 @@ build/
 .gradle/
 local.properties
 app/src/main/assets/zhuyin.sqlite
+app/src/main/assets/fonts/

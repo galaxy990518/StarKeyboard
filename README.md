@@ -57,3 +57,5 @@ project.yml  XcodeGen 專案設定（雲端打包時產生 Xcode 專案）
 - 程式：自己寫的。
 - 注音字典：小麥注音 McBopomofo，MIT 授權，打包時下載並附上授權文件。
 - 表情符號是系統字型顯示；顏文字是常見的文字組合。
+- 字體（打包時下載、只留常用字）：jf open 粉圓（justfont）、芫荽 Iansui（But Ko）、霞鶩文楷 TC（LXGW），都是 SIL Open Font License 1.1。
+- 繁簡對照：OpenCC，Apache 2.0。

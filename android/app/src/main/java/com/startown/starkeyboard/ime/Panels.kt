@@ -17,6 +17,7 @@ import android.widget.Switch
 import android.widget.TextView
 import com.startown.starkeyboard.core.ClipboardStore
 import com.startown.starkeyboard.core.EmoticonStore
+import com.startown.starkeyboard.core.ShortcutStore
 import com.startown.starkeyboard.core.SymbolData
 
 /** 表情符號、顏文字、特殊符號共用的面板（含「我的表符」和自製貼圖） */
@@ -266,6 +267,8 @@ class SettingsPanel(
     private val onChange: () -> Unit,
     private val onOpenApp: () -> Unit,
     private val onAdjustPhoto: () -> Unit,
+    private val shortcuts: ShortcutStore,
+    private val onAddShortcut: () -> Unit,
     private val onResetLearning: () -> Unit,
     onBack: () -> Unit,
 ) : LinearLayout(context) {
@@ -349,6 +352,20 @@ class SettingsPanel(
         }
         col.addView(shapes)
 
+        header("字體（按鍵和候選字）")
+        val fonts = LinearLayout(context).apply { orientation = HORIZONTAL }
+        for (font in KeyFont.values()) {
+            val selected = font.id == settings.fontId
+            fonts.addView(Tap(context, font.title, 16f, if (selected) t.accentText else t.keyText, selected) {
+                settings.fontId = font.id; onChange()
+            }.apply {
+                background = roundRect(if (selected) t.accent else t.key.withAlpha(0.6f), dp(12f))
+                KeyFonts.get(context, font.id)?.let { typeface = it }
+            }, LayoutParams(0, dpi(40f), 1f).apply { rightMargin = dpi(6f) })
+        }
+        col.addView(fonts)
+        note("字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。")
+
         header("大小（邊拖邊看）")
         slider("鍵盤高度", settings.heightScale, 0.8f, 1.3f) { settings.heightScale = it }
         slider("字的大小", settings.fontScale, 0.8f, 1.4f) { settings.fontScale = it }
@@ -365,6 +382,25 @@ class SettingsPanel(
         }
         slider("照片淡化", settings.backgroundFade, 0f, 0.9f) { settings.backgroundFade = it }
         slider("按鍵透明度", settings.keyAlpha, 0.35f, 1f) { settings.keyAlpha = it }
+
+        header("快捷片語（打縮寫就跳出整段話）")
+        button("＋ 新增快捷片語") { onAddShortcut() }
+        if (shortcuts.items.isEmpty()) {
+            note("例如縮寫「地址」→ 你家的完整地址。打注音只打開頭（ㄉㄓ）也可以，英文打 addr 之類也行。")
+        }
+        for (item in shortcuts.items.toList()) {
+            val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            row.addView(TextView(context).apply {
+                text = "${item.code} → ${item.phrase}"; textSize = 14f; setTextColor(t.keyText); maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+            row.addView(Tap(context, "刪除", 13f, t.specialText, true) {
+                shortcuts.remove(item)
+                (row.parent as? android.view.ViewGroup)?.removeView(row)
+            }.apply { background = roundRect(t.special, dp(10f)); setPadding(dpi(12f), dpi(6f), dpi(12f), dpi(6f)) },
+                LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+            col.addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dpi(6f) })
+        }
 
         header("輸入法（按「中／英」鍵輪流切換，長按可換別的鍵盤）")
         for (mode in InputMode.values()) {

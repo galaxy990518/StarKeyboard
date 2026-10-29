@@ -6,6 +6,7 @@ on:
     paths:
       - "android/**"
       - "tools/build_dict.py"
+      - "tools/build_fonts.py"
       - ".github/workflows/android.yml"
   workflow_dispatch:
 
@@ -32,6 +33,17 @@ jobs:
           make -C "$RUNNER_TEMP/McBopomofo/Source/Data" data.txt
           for f in TSCharacters TSPhrases; do curl -sSfL -o "$RUNNER_TEMP/$f.txt" "https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/$f.txt"; done
           python3 tools/build_dict.py "$RUNNER_TEMP/McBopomofo/Source/Data/data.txt" android/app/src/main/assets/zhuyin.sqlite "$RUNNER_TEMP/TSCharacters.txt" "$RUNNER_TEMP/TSPhrases.txt"
+
+      - name: 下載可愛字體並縮小（粉圓、芫荽、霞鶩文楷，都是 SIL OFL 1.1）
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q fonttools
+          curl -sSfL -o "$RUNNER_TEMP/huninn.ttf" https://github.com/justfont/open-huninn-font/releases/download/v2.1/jf-openhuninn-2.1.ttf
+          curl -sSfL -o "$RUNNER_TEMP/iansui.zip" https://github.com/ButTaiwan/iansui/releases/download/v1.020/iansui.zip
+          unzip -q -o "$RUNNER_TEMP/iansui.zip" -d "$RUNNER_TEMP/iansui"
+          IANSUI=$(find "$RUNNER_TEMP/iansui" \( -iname "*.ttf" -o -iname "*.otf" \) | head -1)
+          curl -sSfL -o "$RUNNER_TEMP/wenkai.ttf" https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.530/LXGWWenKaiTC-Regular.ttf
+          "$RUNNER_TEMP/venv/bin/python" tools/build_fonts.py android/app/src/main/assets/zhuyin.sqlite android/app/src/main/assets/fonts huninn="$RUNNER_TEMP/huninn.ttf" iansui="$IANSUI" wenkai="$RUNNER_TEMP/wenkai.ttf"
 
       - uses: actions/setup-java@v4
         with:

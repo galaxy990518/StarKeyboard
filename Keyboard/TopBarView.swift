@@ -1,7 +1,7 @@
 import UIKit
 
 enum ToolbarItem: CaseIterable {
-    case clipboard, emoji, kaomoji, symbols, translate, handwriting, settings, dismiss
+    case clipboard, emoji, kaomoji, symbols, fancy, translate, handwriting, settings, dismiss
 }
 
 /// 鍵盤最上面那一條：沒在打字時是工具列，打注音時是候選字，新增表符或翻譯時是編輯框
@@ -50,6 +50,7 @@ final class TopBarView: UIView {
             case .emoji: b.setImage(Self.icon("face.smiling"), for: .normal)
             case .kaomoji: b.setTitle("(•ᴗ•)", for: .normal)
             case .symbols: b.setTitle("※", for: .normal)
+            case .fancy: b.setTitle("𝒜", for: .normal)
             case .translate: b.setImage(Self.icon("translate"), for: .normal)
             case .handwriting: b.setImage(Self.icon("hand.draw"), for: .normal)
             case .settings: b.setImage(Self.icon("gearshape"), for: .normal)
@@ -137,7 +138,7 @@ final class TopBarView: UIView {
         candidateButtons = items.enumerated().map { (i, text) in
             let b = UIButton(type: .system)
             b.setTitle(text, for: .normal)
-            b.titleLabel?.font = .rounded(20, i == 0 ? .bold : .regular)
+            b.titleLabel?.font = KeyFonts.font(style.fontID, size: 20, weight: i == 0 ? .bold : .regular)
             b.setTitleColor(i == 0 ? style.theme.accent : style.theme.keyText, for: .normal)
             if style.theme.accent == style.theme.key { b.setTitleColor(style.theme.keyText, for: .normal) }
             b.tag = i

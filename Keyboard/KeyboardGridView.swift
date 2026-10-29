@@ -80,7 +80,7 @@ final class KeyButton: UIView {
             label.isHidden = false
             icon.isHidden = true
             label.text = s
-            label.font = .rounded(spec.fontSize * style.fontScale, spec.kind == .normal ? .regular : .semibold)
+            label.font = KeyFonts.font(style.fontID, size: spec.fontSize * style.fontScale, weight: spec.kind == .normal ? .regular : .semibold)
         case .symbol(let name):
             label.isHidden = true
             icon.isHidden = false
