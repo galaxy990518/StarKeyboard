@@ -122,6 +122,9 @@ final class TopBarView: UIView {
             editorExtra.setTitle(extra, for: .normal)
             editorSave.setTitle(confirm, for: .normal)
         }
+        // 選字區、編輯框墊一層半透明的底，放背景照片時字才看得清楚（深色主題墊深色）
+        backgroundColor = isToolbar ? .clear
+            : (style.theme.isDark ? UIColor.black.withAlphaComponent(0.35) : UIColor.white.withAlphaComponent(0.6))
         toolbar.isHidden = !isToolbar
         compositionLabel.isHidden = !isCandidates || (compositionLabel.text ?? "").isEmpty
         candidateScroll.isHidden = !isCandidates
