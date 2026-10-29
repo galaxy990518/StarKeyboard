@@ -17,6 +17,19 @@ final class PinyinEngine {
 
     static let maxSyllable = 6
 
+    /// 簡拼：只打聲母（nh → 你好）。y、w 當成 ㄧ、ㄨ 開頭
+    static let abbreviations: [String: String] = [
+        "zh": "ㄓ", "ch": "ㄔ", "sh": "ㄕ",
+        "b": "ㄅ", "p": "ㄆ", "m": "ㄇ", "f": "ㄈ", "d": "ㄉ", "t": "ㄊ", "n": "ㄋ", "l": "ㄌ",
+        "g": "ㄍ", "k": "ㄎ", "h": "ㄏ", "j": "ㄐ", "q": "ㄑ", "x": "ㄒ", "r": "ㄖ",
+        "z": "ㄗ", "c": "ㄘ", "s": "ㄙ", "y": "ㄧ", "w": "ㄨ",
+    ]
+
+    /// 拼音或簡拼 → 查字典用的注音（簡拼後面加 *，表示「這個聲母開頭的字」）
+    private func bopomofo(_ py: String) -> String {
+        table[py] ?? Self.abbreviations[py].map { $0 + "*" } ?? ""
+    }
+
     let engine: ZhuyinEngine
     private let table: [String: String]       // 拼音 → 注音
     private let completions: [String: [String]]   // 拼音開頭 → 所有以它開頭的音節
@@ -62,7 +75,7 @@ final class PinyinEngine {
                 var len = py.count + pending
                 pending = 0
                 if !isLast && j == syllables.count - 1 { len += 1 }
-                pieces.append(Piece(pinyin: py, bopomofo: table[py] ?? "", length: len))
+                pieces.append(Piece(pinyin: py, bopomofo: bopomofo(py), length: len))
             }
             if !isLast && syllables.isEmpty { pending += 1 }
             if isLast { partial = tail }
@@ -70,18 +83,19 @@ final class PinyinEngine {
         return Segmentation(pieces: pieces, partial: partial)
     }
 
-    /// 最後一段：盡量全部斷成音節，斷不完的尾巴（某些音節的開頭）放在 tail
+    /// 最後一段：盡量全部斷成音節，斷不完的尾巴（某些音節的開頭）放在 tail；都不行就當成簡拼
     private func split(_ s: [Character]) -> ([String], String) {
         for cut in stride(from: s.count, through: 0, by: -1) {
             let tail = String(s[cut...])
             guard tail.isEmpty || completions[tail] != nil else { continue }
-            if let head = splitFull(Array(s[0..<cut])) { return (head, tail) }
+            if let head = splitFull(Array(s[0..<cut]), abbreviate: false) { return (head, tail) }
         }
+        if let all = splitFull(s, abbreviate: true) { return (all, "") }
         return ([], String(s))
     }
 
-    /// 取最長的合法音節，後面斷不下去就往回退
-    private func splitFull(_ s: [Character]) -> [String]? {
+    /// 取最長的合法音節，後面斷不下去就往回退；abbreviate 時也可以只打聲母
+    private func splitFull(_ s: [Character], abbreviate: Bool) -> [String]? {
         var memo: [Int: [String]?] = [:]
         func go(_ start: Int) -> [String]? {
             if start == s.count { return [] }
@@ -93,6 +107,14 @@ final class PinyinEngine {
                 result = [py] + rest
                 break
             }
+            if result == nil && abbreviate {
+                for len in stride(from: 2, through: 1, by: -1) where start + len <= s.count {
+                    let py = String(s[start..<(start + len)])
+                    guard Self.abbreviations[py] != nil, let rest = go(start + len) else { continue }
+                    result = [py] + rest
+                    break
+                }
+            }
             memo[start] = result
             return result
         }
@@ -103,7 +125,11 @@ final class PinyinEngine {
 
     /// 拿去查字典的注音（打到一半的音節換成分數最高的補完）
     func readings(for seg: Segmentation) -> [String] {
-        var base = seg.pieces.map { $0.bopomofo.isEmpty ? (table[$0.pinyin] ?? $0.pinyin) : $0.bopomofo }
+        var base = seg.pieces.map { p -> String in
+            if !p.bopomofo.isEmpty { return p.bopomofo }
+            let b = bopomofo(p.pinyin)
+            return b.isEmpty ? p.pinyin : b
+        }
         guard !seg.partial.isEmpty, let options = completions[seg.partial] else { return base }
         var best: (score: Double, reading: String)? = nil
         for py in options {

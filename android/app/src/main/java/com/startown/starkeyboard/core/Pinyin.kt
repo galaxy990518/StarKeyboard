@@ -9,7 +9,18 @@ class PinyinEngine(val engine: ZhuyinEngine, private val table: Map<String, Stri
 
     companion object {
         const val MAX_SYLLABLE = 6
+
+        /** 簡拼：只打聲母（nh → 你好）。y、w 當成 ㄧ、ㄨ 開頭 */
+        val ABBREVIATIONS = mapOf(
+            "zh" to "ㄓ", "ch" to "ㄔ", "sh" to "ㄕ",
+            "b" to "ㄅ", "p" to "ㄆ", "m" to "ㄇ", "f" to "ㄈ", "d" to "ㄉ", "t" to "ㄊ", "n" to "ㄋ", "l" to "ㄌ",
+            "g" to "ㄍ", "k" to "ㄎ", "h" to "ㄏ", "j" to "ㄐ", "q" to "ㄑ", "x" to "ㄒ", "r" to "ㄖ",
+            "z" to "ㄗ", "c" to "ㄘ", "s" to "ㄙ", "y" to "ㄧ", "w" to "ㄨ",
+        )
     }
+
+    /** 拼音或簡拼 → 查字典用的注音（簡拼後面加 *，表示「這個聲母開頭的字」） */
+    private fun bopomofo(py: String) = table[py] ?: ABBREVIATIONS[py]?.let { "$it*" } ?: ""
 
     /** 拼音開頭 → 所有以它開頭的音節 */
     private val completions: Map<String, List<String>> = HashMap<String, MutableList<String>>().also { map ->
@@ -39,7 +50,7 @@ class PinyinEngine(val engine: ZhuyinEngine, private val table: Map<String, Stri
                 var len = py.length + pending
                 pending = 0
                 if (!isLast && j == syllables.size - 1) len += 1
-                pieces.add(Piece(py, table[py] ?: "", len))
+                pieces.add(Piece(py, bopomofo(py), len))
             }
             if (!isLast && syllables.isEmpty()) pending += 1
             if (isLast) partial = tail
@@ -47,18 +58,19 @@ class PinyinEngine(val engine: ZhuyinEngine, private val table: Map<String, Stri
         return Segmentation(pieces, partial)
     }
 
-    /** 盡量全部斷成音節，斷不完的尾巴（某些音節的開頭）放在 second */
+    /** 盡量全部斷成音節，斷不完的尾巴（某些音節的開頭）放在 second；都不行就當成簡拼 */
     private fun split(s: String): Pair<List<String>, String> {
         for (cut in s.length downTo 0) {
             val tail = s.substring(cut)
             if (tail.isNotEmpty() && tail !in completions) continue
-            splitFull(s.substring(0, cut))?.let { return it to tail }
+            splitFull(s.substring(0, cut), false)?.let { return it to tail }
         }
+        splitFull(s, true)?.let { return it to "" }
         return emptyList<String>() to s
     }
 
-    /** 取最長的合法音節，後面斷不下去就往回退 */
-    private fun splitFull(s: String): List<String>? {
+    /** 取最長的合法音節，後面斷不下去就往回退；abbreviate 時也可以只打聲母 */
+    private fun splitFull(s: String, abbreviate: Boolean): List<String>? {
         val memo = HashMap<Int, List<String>?>()
         fun go(start: Int): List<String>? {
             if (start == s.length) return emptyList()
@@ -71,6 +83,16 @@ class PinyinEngine(val engine: ZhuyinEngine, private val table: Map<String, Stri
                 result = listOf(py) + rest
                 break
             }
+            if (result == null && abbreviate) {
+                for (len in 2 downTo 1) {
+                    if (start + len > s.length) continue
+                    val py = s.substring(start, start + len)
+                    if (py !in ABBREVIATIONS) continue
+                    val rest = go(start + len) ?: continue
+                    result = listOf(py) + rest
+                    break
+                }
+            }
             memo[start] = result
             return result
         }
@@ -79,7 +101,7 @@ class PinyinEngine(val engine: ZhuyinEngine, private val table: Map<String, Stri
 
     /** 拿去查字典的注音（打到一半的音節換成分數最高的補完） */
     fun readings(seg: Segmentation): List<String> {
-        val base = seg.pieces.map { it.bopomofo.ifEmpty { table[it.pinyin] ?: it.pinyin } }
+        val base = seg.pieces.map { it.bopomofo.ifEmpty { bopomofo(it.pinyin).ifEmpty { it.pinyin } } }
         val options = completions[seg.partial]
         if (seg.partial.isEmpty() || options == null) return base
         var best: Pair<Double, String>? = null

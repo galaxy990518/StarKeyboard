@@ -43,7 +43,8 @@ class MemoryPhraseSource(private val rows: List<Triple<String, String, Double>>)
 }
 
 /** 注音選字：整串用動態規劃找分數最高的斷詞，也會猜打錯的字 */
-class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseModel) {
+/** toneless：字典用沒聲調的讀音查（拼音用） */
+class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseModel, private val toneless: Boolean = false) {
     /** 容錯：打錯鍵、聲調錯、ㄣㄥ這類模糊音也猜得到 */
     data class FuzzyOptions(
         val keyNeighbors: Boolean = true,   // 打出來的音不存在時，試試旁邊的鍵
@@ -80,14 +81,15 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
          * 讀音合不合 pattern：有 * 的音節只要開頭一樣（聲調不限），其他要完全一樣。
          * 合的話回傳要扣的分數，不合回傳 null
          */
-        fun matchPenalty(pattern: List<String>, reading: List<String>): Double? {
+        fun matchPenalty(pattern: List<String>, reading: List<String>, ignoreTones: Boolean = false): Double? {
             if (pattern.size != reading.size) return null
             var penalty = 0.0
             for (i in pattern.indices) {
                 val want = pattern[i]
                 val have = reading[i]
                 if (!want.endsWith('*')) {
-                    if (want != have) return null
+                    val h = if (ignoreTones) have.filter { Bopomofo.TONES.indexOf(it) < 0 } else have
+                    if (want != h) return null
                     continue
                 }
                 val head = want.dropLast(1)
@@ -105,7 +107,7 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         val pattern = key.split('-')
         val best = HashMap<String, Double>()
         for ((reading, text, score) in source.byAbbreviation(pattern.joinToString("") { it.take(1) })) {
-            val penalty = matchPenalty(pattern, reading.split('-')) ?: continue
+            val penalty = matchPenalty(pattern, reading.split('-'), toneless) ?: continue
             val s = score + penalty
             val old = best[text]
             if (old == null || s > old) best[text] = s

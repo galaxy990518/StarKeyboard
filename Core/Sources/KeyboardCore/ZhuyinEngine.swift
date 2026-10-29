@@ -87,12 +87,13 @@ final class ZhuyinEngine {
     static func display(_ reading: String) -> String { reading.replacingOccurrences(of: "*", with: "") }
 
     /// 讀音合不合 pattern：有 * 的音節只要開頭一樣（聲調不限），其他要完全一樣。合的話回傳要扣的分數
-    static func matchPenalty(_ pattern: [Substring], _ reading: [Substring]) -> Double? {
+    static func matchPenalty(_ pattern: [Substring], _ reading: [Substring], ignoreTones: Bool = false) -> Double? {
         guard pattern.count == reading.count else { return nil }
         var penalty: Double = 0
         for (want, have) in zip(pattern, reading) {
             guard want.hasSuffix("*") else {
-                if want != have { return nil }
+                let h = ignoreTones ? Substring(have.filter { !Bopomofo.tones.contains($0) }) : have
+                if want != h { return nil }
                 continue
             }
             let head = want.dropLast()
@@ -115,8 +116,9 @@ final class ZhuyinEngine {
         let pattern = key.split(separator: "-")
         let abbr = String(pattern.compactMap { $0.first })
         var best: [String: Double] = [:]
+        let toneless = column == "plain"
         db.run("SELECT reading, phrase, score FROM phrases WHERE abbr = ?1", [.text(abbr)]) { stmt in
-            guard let penalty = Self.matchPenalty(pattern, SQLiteDB.text(stmt, 0).split(separator: "-")) else { return }
+            guard let penalty = Self.matchPenalty(pattern, SQLiteDB.text(stmt, 0).split(separator: "-"), ignoreTones: toneless) else { return }
             let phrase = SQLiteDB.text(stmt, 1)
             let s = SQLiteDB.double(stmt, 2) + penalty
             if let old = best[phrase], old >= s { return }

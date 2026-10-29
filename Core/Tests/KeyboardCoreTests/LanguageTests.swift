@@ -112,6 +112,16 @@ final class PinyinTests: XCTestCase {
         p.segment(s).pieces.map { $0.pinyin }
     }
 
+    func testAbbreviation() {
+        let p = makePinyin()
+        XCTAssertEqual(pieces(p, "nh"), ["n", "h"])
+        XCTAssertEqual(p.candidates(for: "nh").first?.text, "你好")
+        XCTAssertEqual(p.candidates(for: "nhao").first?.text, "你好")
+        XCTAssertEqual(p.candidates(for: "zhg").first?.text, "中國")
+        XCTAssertEqual(pieces(p, "zhong"), ["zhong"])
+        XCTAssertEqual(p.segment("zhon").partial, "zhon")   // 打到一半還是用補完，不會變成簡拼
+    }
+
     func testSegmentation() {
         let p = makePinyin()
         XCTAssertEqual(pieces(p, "nihao"), ["ni", "hao"])

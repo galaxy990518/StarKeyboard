@@ -40,6 +40,16 @@ class PinyinTest {
         assertEquals("ni h", p.display("nih"))
     }
 
+    @Test fun abbreviation() {
+        val p = pinyin()
+        assertEquals(listOf("n", "h"), pieces(p, "nh"))
+        assertEquals("你好", p.candidates("nh").first().text)
+        assertEquals("你好", p.candidates("nhao").first().text)
+        assertEquals("中國", p.candidates("zhg").first().text)
+        assertEquals(listOf("zhong"), pieces(p, "zhong"))
+        assertEquals("zhon", p.segment("zhon").partial)   // 打到一半還是用補完，不會變成簡拼
+    }
+
     @Test fun candidates() {
         val p = pinyin()
         assertEquals("你好", p.candidates("nihao").first().text)

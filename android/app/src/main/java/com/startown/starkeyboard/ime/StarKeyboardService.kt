@@ -151,7 +151,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                     composer.validPrefixes = prefixes
                 }
                 if (plain != null) {
-                    pinyinEngine = PinyinEngine(ZhuyinEngine(plain, UserPhraseModel(File(filesDir, "learned-pinyin.txt"))), plain.pinyinTable())
+                    pinyinEngine = PinyinEngine(ZhuyinEngine(plain, UserPhraseModel(File(filesDir, "learned-pinyin.txt")), toneless = true), plain.pinyinTable())
                     converter = ChineseConverter { plain.simplified(it) }
                 }
             }
