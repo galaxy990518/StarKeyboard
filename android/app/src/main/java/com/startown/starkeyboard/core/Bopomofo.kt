@@ -60,6 +60,20 @@ data class Syllable(
     val isEmpty get() = initial == null && medial == null && rhyme == null && tone == null
     val hasSound get() = initial != null || medial != null || rhyme != null
 
+    /** 沒打聲調就換下一個字（或只打了開頭）：查字典時當成「以這些注音開頭、聲調不限」 */
+    var open = false
+
+    /** 查字典用的寫法：沒打完的音節後面加 *，例如「ㄋ*」「ㄋㄧ*」 */
+    val key get() = if (open) "$reading*" else reading
+
+    /** 再打這一類的符號時，算是開始打下一個字（例如已經有韻母又打韻母、已經有音又打聲母） */
+    fun startsNewWith(kind: BopomofoKind) = when (kind) {
+        BopomofoKind.INITIAL -> hasSound
+        BopomofoKind.MEDIAL -> medial != null || rhyme != null
+        BopomofoKind.RHYME -> rhyme != null
+        BopomofoKind.TONE -> false
+    }
+
     /** 和字典一樣的寫法，例如「ㄋㄧˇ」「ㄇㄚ」「ㄉㄜ˙」 */
     val reading: String
         get() = buildString { listOf(initial, medial, rhyme, tone).forEach { if (it != null) append(it) } }
@@ -95,7 +109,8 @@ class ZhuyinComposer {
     var current = Syllable()
         private set
 
-    val readings get() = syllables.map { it.reading }
+    /** 查字典用的讀音：打完的音節＋正在打的音節（沒打聲調也算，先拿來預覽） */
+    val readings get() = syllables.map { it.key } + listOfNotNull(if (current.hasSound) current.reading + "*" else null)
     val isComposing get() = syllables.isNotEmpty() || !current.isEmpty
     val hasPendingSyllable get() = !current.isEmpty
 
@@ -108,6 +123,8 @@ class ZhuyinComposer {
             finish()
             return true
         }
+        // 不打聲調直接打下一個字：前一個字自動結束（ㄋㄏ → 你好）
+        if (current.startsNewWith(kind)) finish(open = true)
         current.put(c)
         return true
     }
@@ -125,14 +142,23 @@ class ZhuyinComposer {
             return true
         }
         if (syllables.isNotEmpty()) {
-            syllables.removeAt(syllables.size - 1)
+            val last = syllables.removeAt(syllables.size - 1)
+            if (last.open) {
+                // 沒打聲調的字：拿回來繼續一個一個刪
+                last.open = false
+                last.removeLast()
+                current = last
+            }
             return true
         }
         return false
     }
 
+    /** 選了字之後拿掉前 n 個音節（包含正在打的那個） */
     fun removeFirst(n: Int) {
-        repeat(minOf(maxOf(n, 0), syllables.size)) { syllables.removeAt(0) }
+        val count = maxOf(n, 0)
+        if (count > syllables.size) current = Syllable()
+        repeat(minOf(count, syllables.size)) { syllables.removeAt(0) }
     }
 
     fun clear() {
@@ -140,7 +166,8 @@ class ZhuyinComposer {
         current = Syllable()
     }
 
-    private fun finish() {
+    private fun finish(open: Boolean = false) {
+        current.open = open
         syllables.add(current)
         current = Syllable()
     }

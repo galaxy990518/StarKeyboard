@@ -51,6 +51,8 @@ final class ZhuyinEngine {
     static let tonePenalty: Double = -2.5
     static let phoneticPenalty: Double = -1.2
     static let neighborPenalty: Double = -2.5
+    /// 只打了開頭（ㄋ 當 ㄋㄧ），比打完整的排後面一點
+    static let prefixPenalty: Double = -1.0
     let userModel: UserPhraseModel
 
     init(db: SQLiteDB, userModel: UserPhraseModel, column: String = "reading") {
@@ -67,16 +69,63 @@ final class ZhuyinEngine {
     // MARK: 字典格式（tools/build_dict.py 也是用這個）
 
     static func createSchema(in db: SQLiteDB) {
-        db.execute("CREATE TABLE IF NOT EXISTS phrases(reading TEXT NOT NULL, plain TEXT NOT NULL, phrase TEXT NOT NULL, score REAL NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS phrases(reading TEXT NOT NULL, plain TEXT NOT NULL, abbr TEXT NOT NULL, phrase TEXT NOT NULL, score REAL NOT NULL)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_reading ON phrases(reading)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_plain ON phrases(plain)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_abbr ON phrases(abbr)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_phrase ON phrases(phrase)")
     }
 
     static func insert(into db: SQLiteDB, reading: String, phrase: String, score: Double) {
         let plain = String(reading.filter { !Bopomofo.tones.contains($0) })
-        db.run("INSERT INTO phrases(reading, plain, phrase, score) VALUES (?1, ?2, ?3, ?4)",
-               [.text(reading), .text(plain), .text(phrase), .double(score)])
+        let abbr = String(reading.split(separator: "-").compactMap { $0.first })
+        db.run("INSERT INTO phrases(reading, plain, abbr, phrase, score) VALUES (?1, ?2, ?3, ?4, ?5)",
+               [.text(reading), .text(plain), .text(abbr), .text(phrase), .double(score)])
+    }
+
+    /// 畫面上顯示的注音（拿掉查字典用的 *）
+    static func display(_ reading: String) -> String { reading.replacingOccurrences(of: "*", with: "") }
+
+    /// 讀音合不合 pattern：有 * 的音節只要開頭一樣（聲調不限），其他要完全一樣。合的話回傳要扣的分數
+    static func matchPenalty(_ pattern: [Substring], _ reading: [Substring]) -> Double? {
+        guard pattern.count == reading.count else { return nil }
+        var penalty: Double = 0
+        for (want, have) in zip(pattern, reading) {
+            guard want.hasSuffix("*") else {
+                if want != have { return nil }
+                continue
+            }
+            let head = want.dropLast()
+            let plain = String(have.filter { !Bopomofo.tones.contains($0) })
+            guard plain.hasPrefix(head) else { return nil }
+            if plain.count != head.count { penalty += prefixPenalty }
+        }
+        return penalty
+    }
+
+    /// 查字典：讀音裡有沒打完的音節（*）就用開頭注音查，再一個一個比
+    private func lookup(_ key: String) -> [(phrase: String, score: Double)] {
+        var out: [(phrase: String, score: Double)] = []
+        guard key.contains("*") else {
+            db.run("SELECT phrase, score FROM phrases WHERE \(column) = ?1 ORDER BY score DESC LIMIT 80", [.text(key)]) { stmt in
+                out.append((SQLiteDB.text(stmt, 0), SQLiteDB.double(stmt, 1)))
+            }
+            return out
+        }
+        let pattern = key.split(separator: "-")
+        let abbr = String(pattern.compactMap { $0.first })
+        var best: [String: Double] = [:]
+        db.run("SELECT reading, phrase, score FROM phrases WHERE abbr = ?1", [.text(abbr)]) { stmt in
+            guard let penalty = Self.matchPenalty(pattern, SQLiteDB.text(stmt, 0).split(separator: "-")) else { return }
+            let phrase = SQLiteDB.text(stmt, 1)
+            let s = SQLiteDB.double(stmt, 2) + penalty
+            if let old = best[phrase], old >= s { return }
+            best[phrase] = s
+        }
+        for (phrase, score) in best.sorted(by: { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }).prefix(80) {
+            out.append((phrase, score))
+        }
+        return out
     }
 
     // MARK: 查詢
@@ -88,12 +137,9 @@ final class ZhuyinEngine {
 
         var best: [String: Double] = [:]
         var order: [String] = []
-        db.run("SELECT phrase, score FROM phrases WHERE \(column) = ?1 ORDER BY score DESC LIMIT 80", [.text(key)]) { stmt in
-            let phrase = SQLiteDB.text(stmt, 0)
-            if best[phrase] == nil {
-                best[phrase] = SQLiteDB.double(stmt, 1)
-                order.append(phrase)
-            }
+        for (phrase, score) in lookup(key) where best[phrase] == nil {
+            best[phrase] = score
+            order.append(phrase)
         }
         for phrase in userModel.phrases(for: key) where best[phrase] == nil {
             best[phrase] = Self.userPhraseBase
@@ -145,6 +191,7 @@ final class ZhuyinEngine {
     /// 一個音節可能是哪些音打錯了（只留字典裡真的有的）
     func alternatives(for reading: String) -> [(reading: String, penalty: Double)] {
         if let cached = alternativeCache[reading] { return cached }
+        if reading.hasSuffix("*") { return [] }   // 沒打完的音節本來就聲調不限，不用再猜
         var syllable = Syllable()
         for c in reading { syllable.put(c) }
         var out: [(reading: String, penalty: Double)] = []
@@ -217,7 +264,7 @@ final class ZhuyinEngine {
                     let s = best[start] + Self.unknownPenalty
                     if s > best[i] {
                         best[i] = s
-                        back[i] = (start, readings[start], Self.unknownPenalty)
+                        back[i] = (start, Self.display(readings[start]), Self.unknownPenalty)
                     }
                 }
             }
@@ -251,7 +298,7 @@ final class ZhuyinEngine {
             }
         }
         if !hasSingle {
-            out.append(Candidate(text: readings[0], span: 1, kind: .literal))
+            out.append(Candidate(text: Self.display(readings[0]), span: 1, kind: .literal))
         }
         return out
     }

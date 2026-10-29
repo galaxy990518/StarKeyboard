@@ -17,13 +17,19 @@ final class ZhuyinComposerTests: XCTestCase {
         XCTAssertEqual(c.readings, ["ㄇㄚ"])
     }
 
-    func testSameKindReplaces() {
+    func testNextSymbolStartsNewSyllable() {
+        // 沒打聲調就打下一個字：前一個字自動結束，正在打的字也算進去
         var c = ZhuyinComposer()
-        c.input("ㄅ")
-        c.input("ㄆ")
-        c.input("ㄚ")
-        c.input("ˋ")
-        XCTAssertEqual(c.readings, ["ㄆㄚˋ"])
+        for ch in "ㄅㄆㄚˋ" { c.input(ch) }
+        XCTAssertEqual(c.readings, ["ㄅ*", "ㄆㄚˋ"])
+        var w = ZhuyinComposer()
+        for ch in "ㄨㄛㄏㄓㄜㄧ" { w.input(ch) }
+        XCTAssertEqual(w.readings, ["ㄨㄛ*", "ㄏ*", "ㄓㄜ*", "ㄧ*"])
+        w.backspace()
+        w.backspace()
+        XCTAssertEqual(w.readings, ["ㄨㄛ*", "ㄏ*", "ㄓ*"])
+        w.removeFirst(3)
+        XCTAssertFalse(w.isComposing)
     }
 
     func testNeutralToneAtEnd() {
@@ -104,6 +110,19 @@ final class ZhuyinEngineTests: XCTestCase {
         let e = makeEngine()
         e.learn(readings: ["ㄏㄠˇ", "ㄕˋ"], text: "好事")
         XCTAssertEqual(e.phrases(["ㄏㄠˇ", "ㄕˋ"]).first?.text, "好事")
+    }
+
+    func testPreviewAndAbbreviation() {
+        let e = makeEngine(extra: [("ㄨㄛˇ", "我", -2.5), ("ㄏㄨㄟˋ", "會", -2.8), ("ㄓㄜˋ", "這", -2.6),
+                                   ("ㄧㄤˋ", "樣", -3.0), ("ㄓㄜˋ-ㄧㄤˋ", "這樣", -3.5)])
+        func sentence(_ r: [String]) -> String { e.bestSegments(r).map { $0.text }.joined() }
+        XCTAssertEqual(sentence(["ㄋ*", "ㄏ*"]), "你好")
+        XCTAssertEqual(sentence(["ㄋㄧ*", "ㄏㄠ*"]), "你好")
+        XCTAssertEqual(sentence(["ㄋㄧˇ", "ㄏ*"]), "你好")
+        XCTAssertEqual(sentence(["ㄋ*", "ㄏ*", "ㄕ*", "ㄐ*"]), "你好世界")
+        XCTAssertEqual(sentence(["ㄨㄛ*", "ㄏ*", "ㄓㄜ*", "ㄧ*"]), "我會這樣")
+        XCTAssertEqual(e.candidates(for: ["ㄋㄧ*"]).map { $0.text }, ["你", "妳"])
+        XCTAssertEqual(e.candidates(for: ["ㄅ*"]).first?.text, "ㄅ")
     }
 
     func testAssociations() {

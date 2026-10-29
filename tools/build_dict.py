@@ -9,6 +9,7 @@ data.txt 每行是「讀音 字詞 分數」，讀音的音節用 - 連接，例
 - phrases(reading, plain, phrase, score)
     reading：有聲調的注音（注音輸入法用），例如 ㄋㄧˇ-ㄏㄠˇ
     plain：拿掉聲調的注音（拼音輸入法用），例如 ㄋㄧ-ㄏㄠ
+    abbr：每個音節的第一個注音（只打開頭的簡拼用），例如 ㄋㄏ
 - pinyin(py, bpmf)：漢語拼音音節 → 沒聲調的注音，例如 hao → ㄏㄠ、lv → ㄌㄩ
 - t2s(trad, simp)：繁體 → 簡體（OpenCC，Apache 2.0；有給 OpenCC 檔案才會有）
 """
@@ -71,6 +72,10 @@ def plain(reading):
     return "".join(c for c in reading if c not in TONES)
 
 
+def abbr(reading):
+    return "".join(syl[0] for syl in reading.split("-"))
+
+
 def load_opencc(paths):
     table = {}
     for path in paths:
@@ -120,11 +125,12 @@ def main(src, dst, opencc):
     os.makedirs(os.path.dirname(os.path.abspath(dst)), exist_ok=True)
     db = sqlite3.connect(dst)
     db.execute("PRAGMA page_size=4096")
-    db.execute("CREATE TABLE phrases(reading TEXT NOT NULL, plain TEXT NOT NULL, phrase TEXT NOT NULL, score REAL NOT NULL)")
-    db.executemany("INSERT INTO phrases VALUES (?, ?, ?, ?)",
-                   ((r, plain(r), p, round(s, 4)) for (r, p), s in sorted(best.items())))
+    db.execute("CREATE TABLE phrases(reading TEXT NOT NULL, plain TEXT NOT NULL, abbr TEXT NOT NULL, phrase TEXT NOT NULL, score REAL NOT NULL)")
+    db.executemany("INSERT INTO phrases(reading, plain, abbr, phrase, score) VALUES (?, ?, ?, ?, ?)",
+                   ((r, plain(r), abbr(r), p, round(s, 4)) for (r, p), s in sorted(best.items())))
     db.execute("CREATE INDEX idx_reading ON phrases(reading)")
     db.execute("CREATE INDEX idx_plain ON phrases(plain)")
+    db.execute("CREATE INDEX idx_abbr ON phrases(abbr)")
     db.execute("CREATE INDEX idx_phrase ON phrases(phrase)")
     db.execute("CREATE TABLE pinyin(py TEXT PRIMARY KEY, bpmf TEXT NOT NULL)")
     db.executemany("INSERT INTO pinyin VALUES (?, ?)", sorted(pinyin.items()))
@@ -149,6 +155,7 @@ def main(src, dst, opencc):
         ("SELECT phrase FROM phrases WHERE reading=? ORDER BY score DESC LIMIT 5", "ㄋㄧˇ-ㄏㄠˇ", "你好"),
         ("SELECT phrase FROM phrases WHERE reading=? ORDER BY score DESC LIMIT 5", "ㄉㄜ˙", "的"),
         ("SELECT phrase FROM phrases WHERE plain=? ORDER BY score DESC LIMIT 5", "ㄋㄧ-ㄏㄠ", "你好"),
+        ("SELECT phrase FROM phrases WHERE abbr=? ORDER BY score DESC LIMIT 20", "ㄋㄏ", "你好"),
         ("SELECT bpmf FROM pinyin WHERE py=?", "zhong", "ㄓㄨㄥ"),
         ("SELECT bpmf FROM pinyin WHERE py=?", "lv", "ㄌㄩ"),
         ("SELECT bpmf FROM pinyin WHERE py=?", "jue", "ㄐㄩㄝ"),

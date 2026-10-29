@@ -419,7 +419,13 @@ final class KeyboardViewController: UIInputViewController {
 
     private func space() {
         if mode == .zhuyin && layer == .letters && composer.hasPendingSyllable {
-            if composer.confirmSyllable() { updateCandidates() }
+            // 空白鍵＝一聲；這個音沒有一聲的字（例如只打了 ㄋ）就直接送出預覽的字
+            let noFirstTone = engine?.phrases([composer.current.reading][...]).isEmpty ?? false
+            if noFirstTone && !candidates.isEmpty {
+                selectCandidate(at: 0, learn: false)
+            } else if composer.confirmSyllable() {
+                updateCandidates()
+            }
             return
         }
         if isComposing {
@@ -565,12 +571,12 @@ final class KeyboardViewController: UIInputViewController {
             var seen = Set<String>()
             texts = texts.filter { seen.insert($0).inserted }
             candidates = texts.map { Candidate(text: $0, span: 0, kind: .phrase) }
-        } else if composer.syllables.isEmpty {
+        } else if composer.readings.isEmpty {
             candidates = []
         } else if let engine = engine {
             candidates = engine.candidates(for: composer.readings)
         } else {
-            candidates = [Candidate(text: composer.readings.joined(), span: composer.syllables.count, kind: .literal)]
+            candidates = [Candidate(text: ZhuyinEngine.display(composer.readings.joined()), span: composer.readings.count, kind: .literal)]
         }
         if !isComposing { closeCandidatePanel() }
         candidatePanel?.setCandidates(candidates.map { $0.text })
@@ -586,8 +592,9 @@ final class KeyboardViewController: UIInputViewController {
             let r = Romaji.convert(kanaBuffer)
             return r.kana + r.rest
         }
-        let head = composer.syllables.isEmpty ? "" : (candidates.first?.text ?? composer.readings.joined())
-        return head + composer.current.reading
+        // 正在打的字也先預覽成中文（還沒打聲調、只打開頭都可以）
+        if composer.readings.isEmpty { return "" }
+        return candidates.first?.text ?? ZhuyinEngine.display(composer.readings.joined())
     }
 
     private func selectCandidate(at i: Int, learn: Bool) {
@@ -689,10 +696,9 @@ final class KeyboardViewController: UIInputViewController {
             text = Romaji.finalize(kanaBuffer)
             kanaBuffer = ""
         } else {
-            if !composer.syllables.isEmpty {
-                text = engine?.bestSegments(composer.readings).map { $0.text }.joined() ?? composer.readings.joined()
+            if !composer.readings.isEmpty {
+                text = engine?.bestSegments(composer.readings).map { $0.text }.joined() ?? ZhuyinEngine.display(composer.readings.joined())
             }
-            text += composer.current.reading
             composer.clear()
         }
         candidates = []

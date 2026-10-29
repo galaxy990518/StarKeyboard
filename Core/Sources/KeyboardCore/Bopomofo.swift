@@ -62,6 +62,22 @@ struct Syllable: Equatable {
     var isEmpty: Bool { initial == nil && medial == nil && rhyme == nil && tone == nil }
     var hasSound: Bool { initial != nil || medial != nil || rhyme != nil }
 
+    /// 沒打聲調就換下一個字（或只打了開頭）：查字典時當成「以這些注音開頭、聲調不限」
+    var open = false
+
+    /// 查字典用的寫法：沒打完的音節後面加 *，例如「ㄋ*」「ㄋㄧ*」
+    var key: String { open ? reading + "*" : reading }
+
+    /// 再打這一類的符號時，算是開始打下一個字（例如已經有韻母又打韻母、已經有音又打聲母）
+    func startsNew(with kind: BopomofoKind) -> Bool {
+        switch kind {
+        case .initial: return hasSound
+        case .medial: return medial != nil || rhyme != nil
+        case .rhyme: return rhyme != nil
+        case .tone: return false
+        }
+    }
+
     /// 和字典一樣的寫法，例如「ㄋㄧˇ」「ㄇㄚ」「ㄉㄜ˙」
     var reading: String {
         var s = ""
@@ -95,7 +111,8 @@ struct ZhuyinComposer {
     private(set) var syllables: [Syllable] = []
     private(set) var current = Syllable()
 
-    var readings: [String] { syllables.map { $0.reading } }
+    /// 查字典用的讀音：打完的音節＋正在打的音節（沒打聲調也算，先拿來預覽）
+    var readings: [String] { syllables.map { $0.key } + (current.hasSound ? [current.reading + "*"] : []) }
     var isComposing: Bool { !syllables.isEmpty || !current.isEmpty }
     var hasPendingSyllable: Bool { !current.isEmpty }
 
@@ -109,6 +126,8 @@ struct ZhuyinComposer {
             finishSyllable()
             return true
         }
+        // 不打聲調直接打下一個字：前一個字自動結束（ㄋㄏ → 你好）
+        if current.startsNew(with: kind) { finishSyllable(open: true) }
         current.put(c)
         return true
     }
@@ -128,14 +147,23 @@ struct ZhuyinComposer {
             return true
         }
         if !syllables.isEmpty {
-            syllables.removeLast()
+            var last = syllables.removeLast()
+            if last.open {
+                // 沒打聲調的字：拿回來繼續一個一個刪
+                last.open = false
+                last.removeLast()
+                current = last
+            }
             return true
         }
         return false
     }
 
+    /// 選了字之後拿掉前 n 個音節（包含正在打的那個）
     mutating func removeFirst(_ n: Int) {
-        syllables.removeFirst(min(max(n, 0), syllables.count))
+        let count = max(n, 0)
+        if count > syllables.count { current = Syllable() }
+        syllables.removeFirst(min(count, syllables.count))
     }
 
     mutating func clear() {
@@ -143,7 +171,8 @@ struct ZhuyinComposer {
         current = Syllable()
     }
 
-    private mutating func finishSyllable() {
+    private mutating func finishSyllable(open: Bool = false) {
+        current.open = open
         syllables.append(current)
         current = Syllable()
     }

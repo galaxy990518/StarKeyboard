@@ -388,7 +388,10 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun space() {
         if (mode == InputMode.ZHUYIN && layer == KeyboardLayer.LETTERS && composer.hasPendingSyllable) {
-            if (composer.confirmSyllable()) updateCandidates()
+            // 空白鍵＝一聲；這個音沒有一聲的字（例如只打了 ㄋ）就直接送出預覽的字
+            val noFirstTone = engine?.phrases(listOf(composer.current.reading))?.isEmpty() ?: false
+            if (noFirstTone && candidates.isNotEmpty()) selectCandidate(0, false)
+            else if (composer.confirmSyllable()) updateCandidates()
             return
         }
         if (isComposing) {
@@ -542,9 +545,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 val hira = Romaji.finalize(kanaBuffer)
                 listOf(hira, Romaji.katakana(hira), kanaBuffer).distinct().map { Candidate(it, 0, Candidate.Kind.PHRASE) }
             }
-            composer.syllables.isEmpty() -> emptyList()
+            composer.readings.isEmpty() -> emptyList()
             else -> engine?.candidates(composer.readings)
-                ?: listOf(Candidate(composer.readings.joinToString(""), composer.syllables.size, Candidate.Kind.LITERAL))
+                ?: listOf(Candidate(ZhuyinEngine.display(composer.readings.joinToString("")), composer.readings.size, Candidate.Kind.LITERAL))
         }
         if (!isComposing) {
             currentInputConnection?.setComposingText("", 1)
@@ -563,8 +566,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 val (kana, rest) = Romaji.convert(kanaBuffer)
                 return kana + rest
             }
-            val head = if (composer.syllables.isEmpty()) "" else (candidates.firstOrNull()?.text ?: composer.readings.joinToString(""))
-            return head + composer.current.reading
+            // 正在打的字也先預覽成中文（還沒打聲調、只打開頭都可以）
+            if (composer.readings.isEmpty()) return ""
+            return candidates.firstOrNull()?.text ?: ZhuyinEngine.display(composer.readings.joinToString(""))
         }
 
     private fun selectCandidate(i: Int, learn: Boolean) {
@@ -661,9 +665,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             text = Romaji.finalize(kanaBuffer)
             kanaBuffer = ""
         } else {
-            val head = if (composer.syllables.isEmpty()) "" else
-                engine?.bestSegments(composer.readings)?.joinToString("") { it.text } ?: composer.readings.joinToString("")
-            text = head + composer.current.reading
+            text = engine?.bestSegments(composer.readings)?.joinToString("") { it.text }
+                ?: ZhuyinEngine.display(composer.readings.joinToString(""))
             composer.clear()
         }
         candidates = emptyList()

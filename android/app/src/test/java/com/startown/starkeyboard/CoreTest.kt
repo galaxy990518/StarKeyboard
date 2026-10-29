@@ -40,9 +40,32 @@ class CoreTest {
         assertTrue(c.confirmSyllable())
         assertEquals("ㄇㄚ", c.readings.last())
         assertFalse(ZhuyinComposer().input('ˇ'))
+        // 沒打聲調就打下一個字：前一個字自動結束，正在打的字也算進去
         val d = ZhuyinComposer()
         "ㄅㄆㄚˋ".forEach { d.input(it) }
-        assertEquals(listOf("ㄆㄚˋ"), d.readings)
+        assertEquals(listOf("ㄅ*", "ㄆㄚˋ"), d.readings)
+        val a = ZhuyinComposer()
+        "ㄋㄧㄏ".forEach { a.input(it) }
+        assertEquals(listOf("ㄋㄧ*", "ㄏ*"), a.readings)
+        a.backspace(); a.backspace()
+        assertEquals(listOf("ㄋ*"), a.readings)
+        val w = ZhuyinComposer()
+        "ㄨㄛㄏㄓㄜㄧ".forEach { w.input(it) }
+        assertEquals(listOf("ㄨㄛ*", "ㄏ*", "ㄓㄜ*", "ㄧ*"), w.readings)
+        a.removeFirst(1)
+        assertFalse(a.isComposing)
+    }
+
+    @Test fun previewAndAbbreviation() {
+        val e = engine(listOf(Triple("ㄨㄛˇ", "我", -2.5), Triple("ㄏㄨㄟˋ", "會", -2.8), Triple("ㄓㄜˋ", "這", -2.6),
+            Triple("ㄧㄤˋ", "樣", -3.0), Triple("ㄓㄜˋ-ㄧㄤˋ", "這樣", -3.5)))
+        assertEquals("我會這樣", sentence(e, listOf("ㄨㄛ*", "ㄏ*", "ㄓㄜ*", "ㄧ*")))
+        assertEquals("你好", sentence(e, listOf("ㄋ*", "ㄏ*")))
+        assertEquals("你好", sentence(e, listOf("ㄋㄧ*", "ㄏㄠ*")))
+        assertEquals("你好", sentence(e, listOf("ㄋㄧˇ", "ㄏ*")))
+        assertEquals("你好世界", sentence(e, listOf("ㄋ*", "ㄏ*", "ㄕ*", "ㄐ*")))
+        assertEquals(listOf("你", "妳"), e.candidates(listOf("ㄋㄧ*")).map { it.text })
+        assertEquals("ㄅ", e.candidates(listOf("ㄅ*")).first().text)
     }
 
     @Test fun sentences() {

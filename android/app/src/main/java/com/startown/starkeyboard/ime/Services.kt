@@ -44,6 +44,16 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
         return out
     }
 
+    override fun byAbbreviation(abbr: String): List<Triple<String, String, Double>> {
+        val out = ArrayList<Triple<String, String, Double>>()
+        runCatching {
+            db.rawQuery("SELECT reading, phrase, score FROM phrases WHERE abbr = ?", arrayOf(abbr)).use { c ->
+                while (c.moveToNext()) out.add(Triple(c.getString(0), c.getString(1), c.getDouble(2)))
+            }
+        }
+        return out
+    }
+
     /** 拼音音節 → 沒聲調的注音 */
     fun pinyinTable(): Map<String, String> {
         val map = HashMap<String, String>()

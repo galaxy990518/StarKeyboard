@@ -15,14 +15,20 @@ interface PhraseSource {
 
     /** 以某個字開頭的詞（聯想詞用），分數高的在前面 */
     fun startingWith(head: String, limit: Int): List<String>
+
+    /** 每個音節第一個注音接起來是 abbr 的所有字詞（讀音、字詞、分數），例如「ㄋㄏ」→ ㄋㄧˇ-ㄏㄠˇ 你好 */
+    fun byAbbreviation(abbr: String): List<Triple<String, String, Double>>
 }
 
 class MemoryPhraseSource(rows: List<Triple<String, String, Double>>) : PhraseSource {
     private val byReading = rows.groupBy({ it.first }, { Scored(it.second, it.third) })
         .mapValues { (_, v) -> v.sortedByDescending { it.score } }
     private val all = rows.map { Scored(it.second, it.third) }
+    private val byAbbr = rows.groupBy { r -> r.first.split('-').joinToString("") { it.take(1) } }
 
     override fun lookup(reading: String) = byReading[reading] ?: emptyList()
+
+    override fun byAbbreviation(abbr: String) = byAbbr[abbr] ?: emptyList()
 
     override fun startingWith(head: String, limit: Int): List<String> =
         all.filter { it.text.length > head.length && it.text.startsWith(head) }
@@ -59,13 +65,53 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         const val TONE_PENALTY = -2.5
         const val PHONETIC_PENALTY = -1.2
         const val NEIGHBOR_PENALTY = -2.5
+        const val PREFIX_PENALTY = -1.0      // 只打了開頭（ㄋ 當 ㄋㄧ），比打完整的排後面一點
+
+        /** 畫面上顯示的注音（拿掉查字典用的 *） */
+        fun display(reading: String) = reading.replace("*", "")
+
+        /**
+         * 讀音合不合 pattern：有 * 的音節只要開頭一樣（聲調不限），其他要完全一樣。
+         * 合的話回傳要扣的分數，不合回傳 null
+         */
+        fun matchPenalty(pattern: List<String>, reading: List<String>): Double? {
+            if (pattern.size != reading.size) return null
+            var penalty = 0.0
+            for (i in pattern.indices) {
+                val want = pattern[i]
+                val have = reading[i]
+                if (!want.endsWith('*')) {
+                    if (want != have) return null
+                    continue
+                }
+                val head = want.dropLast(1)
+                val plain = have.filter { Bopomofo.TONES.indexOf(it) < 0 }
+                if (!plain.startsWith(head)) return null
+                if (plain != head) penalty += PREFIX_PENALTY
+            }
+            return penalty
+        }
+    }
+
+    /** 查字典：讀音裡有沒打完的音節（*）就用開頭注音查，再一個一個比 */
+    private fun lookup(key: String): List<Scored> {
+        if ('*' !in key) return source.lookup(key).take(80)
+        val pattern = key.split('-')
+        val best = HashMap<String, Double>()
+        for ((reading, text, score) in source.byAbbreviation(pattern.joinToString("") { it.take(1) })) {
+            val penalty = matchPenalty(pattern, reading.split('-')) ?: continue
+            val s = score + penalty
+            val old = best[text]
+            if (old == null || s > old) best[text] = s
+        }
+        return best.entries.map { Scored(it.key, it.value) }.sortedByDescending { it.score }.take(80)
     }
 
     fun phrases(readings: List<String>): List<Scored> {
         val key = readings.joinToString("-")
         cache[key]?.let { return it }
         val best = LinkedHashMap<String, Double>()
-        for (p in source.lookup(key).take(80)) {
+        for (p in lookup(key)) {
             if (p.text !in best) best[p.text] = p.score
         }
         for (p in userModel.phrases(key)) {
@@ -105,6 +151,7 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
     /** 一個音節可能是哪些音打錯了（只留字典裡真的有的） */
     fun alternatives(reading: String): List<Pair<String, Double>> {
         alternativeCache[reading]?.let { return it }
+        if (reading.endsWith('*')) return emptyList()   // 沒打完的音節本來就聲調不限，不用再猜
         val syllable = Syllable.parse(reading)
         val out = ArrayList<Pair<String, Double>>()
         val seen = hashSetOf(reading)
@@ -165,7 +212,7 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
                 } else if (k == 1) {
                     val s = best[start] + UNKNOWN_PENALTY
                     if (s > best[i]) {
-                        best[i] = s; backStart[i] = start; backText[i] = readings[start]; backScore[i] = UNKNOWN_PENALTY
+                        best[i] = s; backStart[i] = start; backText[i] = display(readings[start]); backScore[i] = UNKNOWN_PENALTY
                     }
                 }
             }
@@ -197,7 +244,7 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
                 if (k == 1) hasSingle = true
             }
         }
-        if (!hasSingle) out.add(Candidate(readings[0], 1, Candidate.Kind.LITERAL))
+        if (!hasSingle) out.add(Candidate(display(readings[0]), 1, Candidate.Kind.LITERAL))
         return out
     }
 
