@@ -10,6 +10,7 @@ struct Candidate: Equatable {
     let text: String
     let span: Int       // 用掉前面幾個音節
     let kind: Kind
+    var reading: String? = nil   // 預測的詞：完整讀音（選了要記成這個，不是只打的那幾個字）
 }
 
 /// 注音選字：查小麥注音的字典（SQLite），整串用動態規劃找分數最高的斷詞
@@ -53,6 +54,8 @@ final class ZhuyinEngine {
     static let neighborPenalty: Double = -2.5
     /// 只打了開頭（ㄋ 當 ㄋㄧ），比打完整的排後面一點
     static let prefixPenalty: Double = -1.0
+    /// 簡拼裡的 ㄎㄞ 拆成 ㄎ＋ㄞ 兩個字的讀法加分（前一個字只打了聲母，多半整串都是簡拼）
+    static let splitBonus: Double = 2.5
     let userModel: UserPhraseModel
 
     init(db: SQLiteDB, userModel: UserPhraseModel, column: String = "reading") {
@@ -83,8 +86,30 @@ final class ZhuyinEngine {
                [.text(reading), .text(plain), .text(abbr), .text(phrase), .double(score)])
     }
 
-    /// 畫面上顯示的注音（拿掉查字典用的 *）
-    static func display(_ reading: String) -> String { reading.replacingOccurrences(of: "*", with: "") }
+    /// 畫面上顯示的注音（拿掉查字典用的 * 和 ~）
+    static func display(_ reading: String) -> String {
+        reading.replacingOccurrences(of: "*", with: "").replacingOccurrences(of: "~", with: "")
+    }
+
+    /// 可能是兩個字的音節（ㄎㄞ*~）拆成兩個只打開頭的字（ㄎ*、ㄞ*）；拆不了回傳 nil
+    static func splitAbbreviation(_ reading: String) -> [String]? {
+        guard reading.hasSuffix("*~") else { return nil }
+        let body = Array(reading.dropLast(2))
+        guard body.count >= 2, Bopomofo.kind(of: body[0]) == .initial,
+              let next = Bopomofo.kind(of: body[1]), next == .medial || next == .rhyme else { return nil }
+        return [String(body[0]) + "*", String(body[1...]) + "*"]
+    }
+
+    /// 後面接的是打完整的音節（不是只打聲母）：使用者回到完整打法，前面那個就不拆（ㄏ ㄎㄞ ㄒㄧㄣ 是好開心，不是好可愛心）
+    static func settleSplits(_ readings: [String]) -> [String] {
+        var out = readings
+        for j in out.indices.dropLast() where out[j].hasSuffix("~") {
+            let next = out[j + 1]   // 只打聲母的寫法是「ㄏ*」
+            let nextIsBare = next.count == 2 && next.hasSuffix("*") && Bopomofo.kind(of: next.first!) == .initial
+            if !nextIsBare { out[j].removeLast() }
+        }
+        return out
+    }
 
     /// 讀音合不合 pattern：有 * 的音節只要開頭一樣（聲調不限），其他要完全一樣。合的話回傳要扣的分數
     static func matchPenalty(_ pattern: [Substring], _ reading: [Substring], ignoreTones: Bool = false) -> Double? {
@@ -175,14 +200,24 @@ final class ZhuyinEngine {
                 }
             }
         }
-        merge(phrases(readings), 0)
-        let syllables = Array(readings)
+        // ~ 只是「可能是兩個字」的記號，查字典時拿掉
+        let syllables = readings.map { $0.hasSuffix("~") ? String($0.dropLast()) : $0 }
+        merge(phrases(syllables[...]), 0)
         for j in syllables.indices {
             for alt in alternatives(for: syllables[j]) {
                 var variant = syllables
                 variant[j] = alt.reading
                 merge(phrases(variant[...]), alt.penalty)
             }
+        }
+        // 簡拼的 ㄎㄞ 也當成 ㄎ＋ㄞ 兩個字試試（第一個組合是都不拆，上面已經查過）
+        var variants: [[String]] = [[]]
+        for (r, plain) in zip(readings, syllables) {
+            let unsplit = variants.map { $0 + [plain] }
+            variants = unsplit + (Self.splitAbbreviation(r).map { parts in variants.map { $0 + parts } } ?? [])
+        }
+        for variant in variants.dropFirst() where variant.count <= Self.maxPhraseLength {
+            merge(phrases(variant[...]), Self.splitBonus)
         }
         var list = order.enumerated().map { (i, text) in (i, Scored(text: text, score: best[text]!)) }
         list.sort { $0.1.score != $1.1.score ? $0.1.score > $1.1.score : $0.0 < $1.0 }
@@ -248,6 +283,7 @@ final class ZhuyinEngine {
 
     /// 整串注音分數最高的斷法
     func bestSegments(_ readings: [String]) -> [Scored] {
+        let readings = Self.settleSplits(readings)
         let n = readings.count
         guard n > 0 else { return [] }
         var best = [Double](repeating: -.infinity, count: n + 1)
@@ -282,9 +318,10 @@ final class ZhuyinEngine {
         return segments.reversed()
     }
 
-    /// 候選字：第一個是整句，接著是從開頭算起最長到最短的詞
+    /// 候選字：第一個是整句，接著是預測的詞，再來是從開頭算起最長到最短的詞
     func candidates(for readings: [String]) -> [Candidate] {
         guard !readings.isEmpty else { return [] }
+        let readings = Self.settleSplits(readings)
         var out: [Candidate] = []
         var seen = Set<String>()
         if readings.count > 1 {
@@ -303,7 +340,28 @@ final class ZhuyinEngine {
         if !hasSingle {
             out.append(Candidate(text: Self.display(readings[0]), span: 1, kind: .literal))
         }
+        // 第一個（按空白送出的）還是照打的字，預測的詞接在它後面
+        let predicted = predictions(for: readings).filter { !seen.contains($0.text) }
+        out.insert(contentsOf: predicted.map { Candidate(text: $0.text, span: readings.count, kind: .phrase, reading: $0.reading) },
+                   at: min(1, out.count))
         return out
+    }
+
+    /// 預測：打完整的字（有聲調）就先列出以它們開頭的詞，例如 ㄏㄠˇ → 好像、好的；學過的詞排最前面
+    func predictions(for readings: [String], limit: Int = 8) -> [(text: String, reading: String)] {
+        guard column == "reading", !readings.isEmpty, readings.allSatisfy({ !$0.contains("*") }) else { return [] }
+        let head = readings.joined(separator: "-") + "-"
+        var out: [(text: String, reading: String)] = []
+        var seen = Set<String>()
+        for learned in userModel.learned(startingWith: head) where seen.insert(learned.phrase).inserted {
+            out.append((learned.phrase, learned.reading))
+        }
+        db.run("SELECT phrase, reading, MAX(score) AS s FROM phrases WHERE reading > ?1 AND reading < ?2 GROUP BY phrase ORDER BY s DESC LIMIT ?3",
+               [.text(head), .text(head + "\u{10FFFF}"), .int(limit)]) { stmt in
+            let phrase = SQLiteDB.text(stmt, 0)
+            if seen.insert(phrase).inserted { out.append((phrase, SQLiteDB.text(stmt, 1))) }
+        }
+        return Array(out.prefix(limit))
     }
 
     /// 所有音節（沒聲調）的開頭，例如 ㄋㄧㄠ → ㄋ、ㄋㄧ、ㄋㄧㄠ（給組字用，判斷注音能不能接在一起）
@@ -336,8 +394,15 @@ final class ZhuyinEngine {
 
     /// 使用者選了某個詞：之後這個詞會排更前面
     func learn(readings: [String], text: String) {
-        guard !readings.isEmpty, readings.count <= Self.maxPhraseLength else { return }
-        userModel.record(reading: readings.joined(separator: "-"), phrase: text)
+        // 簡拼拆開選到的詞（ㄎㄞ*~ 選了「可愛」）記成拆開的讀音（ㄎ*-ㄞ*）；字數對不上就是沒拆（選了「開」）
+        let splits = readings.compactMap { Self.splitAbbreviation($0) }
+        let split = !splits.isEmpty && text.count == readings.count + splits.count
+        let used = readings.flatMap { r -> [String] in
+            if split, let parts = Self.splitAbbreviation(r) { return parts }
+            return [r.hasSuffix("~") ? String(r.dropLast()) : r]
+        }
+        guard !used.isEmpty, used.count <= Self.maxPhraseLength else { return }
+        userModel.record(reading: used.joined(separator: "-"), phrase: text)
         cache.removeAll()
         fuzzyCache.removeAll()
         alternativeCache.removeAll()
@@ -378,6 +443,16 @@ final class UserPhraseModel {
     func phrases(for reading: String) -> [String] {
         guard !reading.isEmpty else { return [] }
         return matchingCounts(for: reading).keys.sorted()
+    }
+
+    /// 學過、完整讀音以 prefix 開頭的詞（選越多次越前面），給預測用
+    func learned(startingWith prefix: String) -> [(reading: String, phrase: String)] {
+        var out: [(reading: String, phrase: String, count: Int)] = []
+        for (saved, phrases) in counts where saved.hasPrefix(prefix) && !saved.contains("*") {
+            for (phrase, count) in phrases { out.append((saved, phrase, count)) }
+        }
+        out.sort { $0.count != $1.count ? $0.count > $1.count : $0.phrase < $1.phrase }
+        return out.map { ($0.reading, $0.phrase) }
     }
 
     // 完整讀音和省略聲調／只打開頭的讀音也共用已選字詞；不混用不同的聲調。
