@@ -2,7 +2,7 @@ name: 打包 iOS 鍵盤
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths-ignore:
       - "android/**"
       - ".github/workflows/android.yml"
@@ -11,9 +11,9 @@ on:
 permissions:
   contents: write
 
-# 連續推好幾次時，只留最新的那次打包（避免舊的版本後完成、變成「最新版」）
+# 連續推好幾次時，只留最新的那次打包（避免舊的版本後完成、變成「最新版」）；main 和 develop 各排各的
 concurrency:
-  group: build
+  group: build-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -92,13 +92,16 @@ jobs:
           } > release_notes.md
           cat release_notes.md
 
+      # develop 發成「預發佈」的 dev-數字，不會變成 latest，App 的新版提醒只看 main 的 build-數字
       - name: 發佈到 Releases（方便下載）
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}
-          name: 星星鍵盤 第 ${{ github.run_number }} 版
+          tag_name: ${{ github.ref_name == 'main' && 'build' || 'dev' }}-${{ github.run_number }}
+          name: 星星鍵盤 ${{ github.ref_name != 'main' && '開發版 ' || '' }}第 ${{ github.run_number }} 版
           body_path: release_notes.md
           files: StarKeyboard.ipa
+          prerelease: ${{ github.ref_name != 'main' }}
+          make_latest: ${{ github.ref_name == 'main' }}
 
       - uses: actions/upload-artifact@v4
         if: always()

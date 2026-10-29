@@ -92,7 +92,7 @@ struct KeyboardTheme {
 
 /// 按鍵造型
 enum KeyShape: String, CaseIterable {
-    case rounded, jelly, catEar, cloud
+    case rounded, jelly, catEar, cloud, duck
 
     var title: String {
         switch self {
@@ -100,11 +100,13 @@ enum KeyShape: String, CaseIterable {
         case .jelly: return "果凍"
         case .catEar: return "貓耳"
         case .cloud: return "雲朵"
+        case .duck: return "小鴨"
         }
     }
 
     private func earSize(_ r: CGRect) -> CGFloat { min(r.width * 0.24, r.height * 0.24, 9) }
     private func bumpSize(_ r: CGRect) -> CGFloat { min(r.height * 0.16, 6) }
+    private func headSize(_ r: CGRect) -> CGFloat { min(r.width * 0.2, r.height * 0.2, 7) }
 
     /// 按鍵本體（文字畫在這裡面）
     func bodyRect(in r: CGRect) -> CGRect {
@@ -115,6 +117,9 @@ enum KeyShape: String, CaseIterable {
         case .cloud:
             let b = bumpSize(r)
             return CGRect(x: r.minX, y: r.minY + b, width: r.width, height: r.height - b)
+        case .duck:
+            let h = headSize(r) * 1.2
+            return CGRect(x: r.minX, y: r.minY + h, width: r.width, height: r.height - h)
         default:
             return r
         }
@@ -152,6 +157,20 @@ enum KeyShape: String, CaseIterable {
                 let circle = UIBezierPath(arcCenter: c, radius: b * 1.5, startAngle: 0, endAngle: .pi * 2, clockwise: true)
                 path = path.union(circle.cgPath)
             }
+            return path
+        case .duck:
+            // 左上鴨頭＋往左的嘴，右上翹尾巴
+            let h = headSize(r)
+            var path = UIBezierPath(roundedRect: body, cornerRadius: min(body.width, body.height) * 0.4).cgPath
+            let head = CGPoint(x: body.minX + h * 1.9, y: body.minY + h * 0.1)
+            let headCircle = UIBezierPath(arcCenter: head, radius: h, startAngle: 0, endAngle: .pi * 2, clockwise: true)
+            let beak = UIBezierPath(ovalIn: CGRect(x: body.minX, y: head.y - h * 0.05, width: h * 1.1, height: h * 0.55))
+            let tail = UIBezierPath()
+            tail.move(to: CGPoint(x: body.maxX - h * 1.6, y: body.minY + h * 0.4))
+            tail.addLine(to: CGPoint(x: body.maxX - h * 0.1, y: body.minY - h * 0.9))
+            tail.addLine(to: CGPoint(x: body.maxX - h * 0.3, y: body.minY + h * 1.0))
+            tail.close()
+            path = path.union(headCircle.cgPath).union(beak.cgPath).union(tail.cgPath)
             return path
         }
     }
