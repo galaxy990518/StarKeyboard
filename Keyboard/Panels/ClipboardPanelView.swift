@@ -84,7 +84,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         } else if showPinnedOnly {
             emptyLabel.text = "還沒有釘選的內容\n在項目上往右滑，或點 📌 就能釘選"
         } else {
-            emptyLabel.text = "複製文字後打開這個鍵盤，就會記在這裡"
+            emptyLabel.text = "點「＋」手動儲存複製的文字\n或到 ⚙ 隱私與安全開啟自動記錄"
         }
         emptyLabel.isHidden = !rows.isEmpty
     }

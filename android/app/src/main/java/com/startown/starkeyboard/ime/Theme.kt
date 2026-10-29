@@ -568,6 +568,12 @@ class KeyboardSettings(context: Context) {
     var lastMode: InputMode
         get() = runCatching { InputMode.valueOf(p.getString("lastMode", "ZHUYIN")!!) }.getOrDefault(InputMode.ZHUYIN)
         set(v) = p.edit().putString("lastMode", v.name).apply()
+    var clipboardHistoryEnabled: Boolean
+        get() = p.getBoolean("clipboardHistoryEnabled", false)
+        set(v) = p.edit().putBoolean("clipboardHistoryEnabled", v).apply()
+    var allowOnlineTranslation: Boolean
+        get() = p.getBoolean("allowOnlineTranslation", false)
+        set(v) = p.edit().putBoolean("allowOnlineTranslation", v).apply()
     var clipLimit: Int
         get() = p.getInt("clipLimit", 200)
         set(v) = p.edit().putInt("clipLimit", v).apply()

@@ -1112,9 +1112,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     // ===== 剪貼簿 =====
 
     private fun captureClipboard() {
+        if (!settings.clipboardHistoryEnabled) return
         runCatching {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            if (cm.primaryClipDescription?.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true) return
             val clip = cm.primaryClip ?: return
+            if (clip.description.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true) return
             if (clip.itemCount == 0) return
             val text = clip.getItemAt(0).coerceToText(this)?.toString() ?: return
             if (clipStore.add(text)) (panelView as? ClipboardPanel)?.reload()
@@ -1123,7 +1126,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun addCurrentClipboard() {
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val text = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()
+        val clip = cm.primaryClip
+        if (clip?.description?.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true) {
+            toast("已略過標示為敏感的剪貼簿內容")
+            return
+        }
+        val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()
         if (text.isNullOrBlank() || !clipStore.add(text)) {
             toast("剪貼簿裡沒有文字")
             return
@@ -1219,7 +1227,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         if (translating) return
         translating = true
         refreshTopBar()
-        Translator.translate(text, settings.translateSource, settings.translateTarget, status = { toast(it) }) { result ->
+        Translator.translate(text, settings.translateSource, settings.translateTarget, settings.allowOnlineTranslation, status = { toast(it) }) { result ->
             translating = false
             if (editorText == null) return@translate
             result.onSuccess { editorResult = EditorResult("點翻譯結果送出 ・ 原文：$text", listOf(it)) }.onFailure { toast(it.message ?: "翻譯失敗") }
@@ -1250,7 +1258,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             EmojiPanel.AddOption.TYPE -> beginEditor(EditorPurpose.EMOTICON)
             EmojiPanel.AddOption.CLIPBOARD_TEXT -> {
                 val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val text = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()
+                val clip = cm.primaryClip
+        if (clip?.description?.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true) {
+            toast("已略過標示為敏感的剪貼簿內容")
+            return
+        }
+        val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()
                 if (text.isNullOrBlank()) {
                     toast("剪貼簿裡沒有文字")
                     return

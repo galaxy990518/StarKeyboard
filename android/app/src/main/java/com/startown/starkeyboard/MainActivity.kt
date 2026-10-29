@@ -102,6 +102,8 @@ class MainActivity : Activity() {
             }
         }
 
+        button("隱私與安全") { PrivacySafety.show(this) }
+        text("剪貼簿與外部翻譯預設關閉。使用前請了解保存內容與連網風險。")
         showCrashLog()
 
         title("第一次使用：打開鍵盤")
@@ -133,7 +135,7 @@ class MainActivity : Activity() {
         text("• 按住「中／英」鍵可以換回別的鍵盤。按住空白鍵左右滑可以移動游標。")
         text("• 手寫：第一次用會下載 Google 的手寫辨識資料（約 20MB），之後不用網路。")
         text("• 翻譯：工具列的「譯」。第一次翻譯某個語言要下載資料。")
-        text("• 剪貼簿：糯糯鍵盤是目前的鍵盤時，複製的文字都會記下來。")
+        text("• 剪貼簿：自動記錄預設關閉，可在鍵盤 ⚙ → 隱私與安全開啟；不要保存密碼或驗證碼。")
         text("• 大小、主題、按鍵造型都在鍵盤的 ⚙ 設定裡調。")
         text("• 所有版本：${ReleaseChecker.PAGE}")
     }

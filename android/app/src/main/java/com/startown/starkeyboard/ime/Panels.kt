@@ -217,7 +217,7 @@ class ClipboardPanel(
         val rows = if (pinnedOnly) store.ordered.filter { it.pinned } else store.ordered
         if (rows.isEmpty()) {
             list.addView(TextView(context).apply {
-                text = if (pinnedOnly) "還沒有釘選的內容\n點項目右邊的 📌 就能釘選" else "複製文字後就會記在這裡\n（要先把糯糯鍵盤設成預設鍵盤）"
+                text = if (pinnedOnly) "還沒有釘選的內容\n點項目右邊的 📌 就能釘選" else "按「＋」手動儲存，或到 ⚙ 隱私與安全開啟自動記錄\n請勿保存密碼或驗證碼"
                 textSize = 14f
                 gravity = Gravity.CENTER
                 setTextColor(t.keyText.withAlpha(0.7f))
@@ -504,7 +504,7 @@ class SettingsPanel(
         toggle("注音模糊音：ㄣㄥ、ㄓㄗ、ㄔㄘ、ㄕㄙ 分不清", settings.fuzzyPhonetic) { settings.fuzzyPhonetic = it; onChange() }
 
         header("翻譯")
-        note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。會先用 Google 的離線翻譯（第一次要下載語言資料），不行再用網路翻譯 MyMemory。")
+        note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。會先用 Google 的離線翻譯（第一次要下載語言資料），只有開啟「允許外部網路翻譯」後，才會在本機翻譯失敗時使用 MyMemory。")
 
         header("聲音與震動")
         toggle("按鍵聲音", settings.keySound) { settings.keySound = it }
@@ -514,6 +514,11 @@ class SettingsPanel(
         note("點一下就會播放聽聽看。")
         toggle("按鍵震動", settings.haptics) { settings.haptics = it }
 
+        header("隱私與安全")
+        toggle("自動記錄剪貼簿", settings.clipboardHistoryEnabled) { settings.clipboardHistoryEnabled = it }
+        note("預設關閉。開啟後會儲存複製的文字；會略過敏感標記，但無法辨識所有密碼。舊紀錄可在剪貼簿逐筆刪除。")
+        toggle("允許外部網路翻譯", settings.allowOnlineTranslation) { settings.allowOnlineTranslation = it }
+        note("預設關閉。開啟後，本機翻譯失敗時會將最多 450 字送到 MyMemory；文字在網址參數中，服務商可能保留紀錄。請勿翻譯私密資料。完整說明見 App 的「隱私與安全」。")
         header("剪貼簿最多記幾筆")
         val limits = LinearLayout(context).apply { orientation = HORIZONTAL }
         for (n in listOf(50, 100, 200, 500)) {

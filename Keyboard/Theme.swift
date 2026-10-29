@@ -760,6 +760,14 @@ final class KeyboardSettings {
         get { d.string(forKey: "translateTarget") ?? "en" }
         set { d.set(newValue, forKey: "translateTarget") }
     }
+    var clipboardHistoryEnabled: Bool {
+        get { bool("clipboardHistoryEnabled", false) }
+        set { d.set(newValue, forKey: "clipboardHistoryEnabled") }
+    }
+    var allowOnlineTranslation: Bool {
+        get { bool("allowOnlineTranslation", false) }
+        set { d.set(newValue, forKey: "allowOnlineTranslation") }
+    }
     var clipLimit: Int {
         get { d.object(forKey: "clipLimit") as? Int ?? 200 }
         set { d.set(newValue, forKey: "clipLimit") }
@@ -774,8 +782,20 @@ enum Storage {
     static let directory: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("StarKeyboard", isDirectory: true)
-        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        return base
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true,
+                                                  attributes: [.protectionKey: FileProtectionType.complete])
+        // Migrate existing data too; this does not delete older backups or existing history.
+        var directory = base
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? directory.setResourceValues(values)
+        try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: base.path)
+        if let files = FileManager.default.enumerator(at: base, includingPropertiesForKeys: nil) {
+            for case let file as URL in files {
+                try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: file.path)
+            }
+        }
+        return directory
     }()
 
     static func url(_ name: String) -> URL {

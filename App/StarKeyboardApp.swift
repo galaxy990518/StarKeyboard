@@ -38,6 +38,14 @@ struct ContentView: View {
                     .padding(.vertical, 6)
                 }
 
+                Section {
+                    NavigationLink(destination: PrivacySafetyView()) {
+                        Label("隱私與安全", systemImage: "hand.raised")
+                    }
+                    Text("剪貼簿與外部翻譯預設關閉。使用前請了解保存內容與連網風險。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+
                 if let latest = latest, latest.build > ReleaseChecker.currentBuild {
                     Section {
                         VStack(alignment: .leading, spacing: 8) {

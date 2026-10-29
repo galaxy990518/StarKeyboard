@@ -125,7 +125,7 @@ object Translator {
     }
 
     /** chosen：原文語言；"auto" 就自己猜 */
-    fun translate(text: String, chosen: String, target: String, status: (String) -> Unit, done: (Result<String>) -> Unit) {
+    fun translate(text: String, chosen: String, target: String, allowOnline: Boolean, status: (String) -> Unit, done: (Result<String>) -> Unit) {
         val picked = chosen.takeIf { it != "auto" }
         var source = picked ?: detectSource(text)
         if (picked == null && source == target) source = if (target == "en") "zh-TW" else "en"
@@ -133,7 +133,7 @@ object Translator {
         val src = TranslateLanguage.fromLanguageTag(source.substringBefore('-'))
         val tgt = TranslateLanguage.fromLanguageTag(target.substringBefore('-'))
         if (src == null || tgt == null || target == "zh-TW") {
-            online(text, source, target, done)
+            online(text, source, target, allowOnline, done)
             return
         }
         val translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(src).setTargetLanguage(tgt).build())
@@ -142,12 +142,16 @@ object Translator {
             .addOnSuccessListener {
                 translator.translate(text)
                     .addOnSuccessListener { done(Result.success(it)); translator.close() }
-                    .addOnFailureListener { translator.close(); online(text, source, target, done) }
+                    .addOnFailureListener { translator.close(); online(text, source, target, allowOnline, done) }
             }
-            .addOnFailureListener { translator.close(); online(text, source, target, done) }
+            .addOnFailureListener { translator.close(); online(text, source, target, allowOnline, done) }
     }
 
-    private fun online(text: String, source: String, target: String, done: (Result<String>) -> Unit) {
+    private fun online(text: String, source: String, target: String, allowOnline: Boolean, done: (Result<String>) -> Unit) {
+        if (!allowOnline) {
+            done(Result.failure(IllegalStateException("本機翻譯目前不可用；如需外部服務，請先到 ⚙ 隱私與安全開啟網路翻譯")))
+            return
+        }
         Thread {
             val result = runCatching {
                 val q = URLEncoder.encode(text.take(450), "UTF-8")

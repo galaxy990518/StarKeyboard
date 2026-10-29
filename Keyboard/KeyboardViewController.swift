@@ -1097,11 +1097,11 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - 剪貼簿
 
     private func captureClipboard() {
-        guard hasFullAccess else { return }
+        guard hasFullAccess, settings.clipboardHistoryEnabled else { return }
         let pb = UIPasteboard.general
         guard pb.changeCount != settings.lastPasteboardChange else { return }
         settings.lastPasteboardChange = pb.changeCount
-        guard pb.hasStrings, let s = pb.string else { return }
+        guard ClipboardPrivacy.mayRecord(types: pb.types), pb.hasStrings, let s = pb.string else { return }
         if clipStore.add(s) {
             (panelView as? ClipboardPanelView)?.reload()
         }
@@ -1112,7 +1112,12 @@ final class KeyboardViewController: UIInputViewController {
             toast("要先開啟「允許完整取用」")
             return
         }
-        guard let s = UIPasteboard.general.string, clipStore.add(s) else {
+        let pb = UIPasteboard.general
+        guard ClipboardPrivacy.mayRecord(types: pb.types) else {
+            toast("已略過標示為敏感或暫存的剪貼簿內容")
+            return
+        }
+        guard let s = pb.string, clipStore.add(s) else {
             toast("剪貼簿裡沒有文字")
             return
         }
@@ -1210,7 +1215,7 @@ final class KeyboardViewController: UIInputViewController {
             guard !translating else { return }
             translating = true
             refreshTopBar()
-            Translator.translate(trimmed, from: settings.translateSource, to: settings.translateTarget) { [weak self] result in
+            Translator.translate(trimmed, from: settings.translateSource, to: settings.translateTarget, allowOnline: settings.allowOnlineTranslation) { [weak self] result in
                 guard let self = self, self.editorText != nil else { return }
                 self.translating = false
                 switch result {

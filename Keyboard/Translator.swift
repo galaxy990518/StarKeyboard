@@ -48,7 +48,7 @@ enum Translator {
     }
 
     /// from：原文語言；"auto" 或 nil 就自己猜
-    static func translate(_ text: String, from chosen: String? = nil, to target: String, completion: @escaping (Result<String, Failure>) -> Void) {
+    static func translate(_ text: String, from chosen: String? = nil, to target: String, allowOnline: Bool = false, completion: @escaping (Result<String, Failure>) -> Void) {
         let picked = chosen.flatMap { $0 == "auto" ? nil : $0 }
         var source = picked ?? detectSource(text)
         if picked == nil && source == target {
@@ -57,6 +57,10 @@ enum Translator {
         Task {
             if let local = await translateOnDevice(text, from: source, to: target) {
                 await MainActor.run { completion(.success(local)) }
+                return
+            }
+            guard allowOnline else {
+                await MainActor.run { completion(.failure(.message("本機翻譯目前不可用；如需外部服務，請先到 ⚙ 隱私與安全開啟網路翻譯"))) }
                 return
             }
             translateOnline(text, from: source, to: target) { result in

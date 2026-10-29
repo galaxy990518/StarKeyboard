@@ -8,7 +8,15 @@ enum JSONFile {
 
     static func save<T: Encodable>(_ value: T, to url: URL) {
         guard let data = try? JSONEncoder().encode(value) else { return }
+        #if os(iOS)
+        try? data.write(to: url, options: [.atomic, .completeFileProtection])
+        #else
         try? data.write(to: url, options: .atomic)
+        #endif
+        var protectedURL = url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? protectedURL.setResourceValues(values)
     }
 }
 

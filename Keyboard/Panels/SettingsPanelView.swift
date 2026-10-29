@@ -191,7 +191,7 @@ final class SettingsPanelView: UIView {
         })
 
         stack.addArrangedSubview(header("翻譯"))
-        stack.addArrangedSubview(note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。iOS 26 以上且已下載語言時用 iPhone 內建翻譯，不然會用網路翻譯服務 MyMemory（你打的句子會傳到那邊）。"))
+        stack.addArrangedSubview(note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。iOS 26 以上且已下載語言時用 iPhone 內建翻譯，只有開啟「允許外部網路翻譯」後，才會在本機翻譯不可用時使用 MyMemory（原文會傳到該服務）。"))
 
         stack.addArrangedSubview(header("聲音與震動"))
         stack.addArrangedSubview(switchRow("按鍵聲音", on: settings.keySound) { [weak self] on in
@@ -208,6 +208,15 @@ final class SettingsPanelView: UIView {
             self?.settings.haptics = on
         })
 
+        stack.addArrangedSubview(header("隱私與安全"))
+        stack.addArrangedSubview(switchRow("自動記錄剪貼簿", on: settings.clipboardHistoryEnabled) { [weak self] on in
+            self?.settings.clipboardHistoryEnabled = on
+        })
+        stack.addArrangedSubview(note("預設關閉。開啟後會儲存複製的文字；會略過敏感標記，但無法辨識所有密碼。可在剪貼簿逐筆刪除舊資料。"))
+        stack.addArrangedSubview(switchRow("允許外部網路翻譯", on: settings.allowOnlineTranslation) { [weak self] on in
+            self?.settings.allowOnlineTranslation = on
+        })
+        stack.addArrangedSubview(note("預設關閉。開啟後，本機翻譯失敗時會將最多 450 字送到 MyMemory；文字在網址參數中，服務商可能保留紀錄。請勿翻譯密碼或私密資料。完整說明見糯糯鍵盤 App 的「隱私與安全」。"))
         stack.addArrangedSubview(header("剪貼簿最多記幾筆"))
         stack.addArrangedSubview(clipLimitRow())
 
