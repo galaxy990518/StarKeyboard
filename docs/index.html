@@ -1,12 +1,8 @@
-<!doctype html>
-<html lang="zh-Hant">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!doctype html><html lang="zh-Hant"><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>星星鍵盤安裝說明</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
-  /* 版面：一欄的說明書，上面先準備東西，中間用分頁切 Windows／Mac，下面是 iPhone 設定和常見問題 */
+  /* 版面：一欄的說明書。最上面切 iPhone／Android，各自從準備、下載、安裝、設定到更新；下面是兩邊共用的「怎麼用」和常見問題 */
   :root {
     --bg: #fff7f9;
     --fg: #43262f;
@@ -16,18 +12,19 @@
     --card: #ffffff;
     --line: #f2cfda;
     --ok: #2f8f6b;
-    --display: "Fredoka", "Noto Sans TC", system-ui, sans-serif;
+    --warn: #b5612a;
+    --display: "Fredoka", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
     --body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #1d1418; --fg: #f6e6eb; --muted: #c09aa6; --accent: #ff86a8;
-      --soft: #3a2430; --card: #271b20; --line: #4a3039; --ok: #6fd3a9; color-scheme: dark;
+      --soft: #3a2430; --card: #271b20; --line: #4a3039; --ok: #6fd3a9; --warn: #f0a46b; color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
     --bg: #1d1418; --fg: #f6e6eb; --muted: #c09aa6; --accent: #ff86a8;
-    --soft: #3a2430; --card: #271b20; --line: #4a3039; --ok: #6fd3a9; color-scheme: dark;
+    --soft: #3a2430; --card: #271b20; --line: #4a3039; --ok: #6fd3a9; --warn: #f0a46b; color-scheme: dark;
   }
   body {
     background: var(--bg);
@@ -46,20 +43,18 @@
     flex-direction: column;
     gap: 28px;
   }
-  h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.3; }
+  h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.3; }
   h1 { font-size: 30px; }
   h1 .star { color: var(--accent); }
-  h2 { font-size: 21px; }
+  h2 { font-size: 22px; }
+  h3 { font-size: 17px; }
   p { margin: 0; }
+  ul { margin: 4px 0 0; padding-left: 20px; }
   .lead { color: var(--muted); }
-  section { display: flex; flex-direction: column; gap: 12px; }
+  section, .panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .panel { gap: 28px; }
   .need { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
-  .need div {
-    background: var(--soft);
-    border-radius: 14px;
-    padding: 10px 12px;
-    font-size: 14px;
-  }
+  .need div { background: var(--soft); border-radius: 14px; padding: 10px 12px; font-size: 14px; }
   .need b { display: block; font-size: 15px; }
   .download {
     display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
@@ -69,18 +64,25 @@
     display: inline-block; background: var(--accent); color: var(--card);
     font-weight: 700; text-decoration: none; padding: 9px 16px; border-radius: 999px;
   }
-  .btn:focus-visible, .tab:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
-  .tabs { display: flex; gap: 6px; background: var(--soft); padding: 5px; border-radius: 999px; width: fit-content; }
+  .btn:focus-visible, .tab:focus-visible, summary:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+
+  /* 最上面的大切換：iPhone／Android */
+  .switch {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+    background: var(--bg); padding-block: 8px;
+  }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+  .tabs { display: flex; gap: 6px; background: var(--soft); padding: 5px; border-radius: 999px; width: fit-content; max-width: 100%; }
+  .tabs.big { width: 100%; }
+  .tabs.big .tab { flex: 1; font-size: 17px; padding: 9px 12px; }
   .tab {
     border: 0; background: transparent; color: var(--fg); font: 600 15px var(--display);
     padding: 7px 18px; border-radius: 999px; cursor: pointer;
   }
   .tab[aria-selected="true"] { background: var(--card); color: var(--accent); }
-  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; display: flex; flex-direction: column; gap: 10px; }
-  ol.steps > li {
-    counter-increment: step;
-    display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start;
-  }
+
+  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; display: flex; flex-direction: column; gap: 12px; }
+  ol.steps > li { counter-increment: step; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start; }
   ol.steps > li::before {
     content: counter(step);
     font: 600 15px var(--display);
@@ -88,141 +90,286 @@
     display: grid; place-items: center;
     background: var(--accent); color: var(--card);
   }
-  .path {
-    font-weight: 500; background: var(--soft); padding: 1px 7px; border-radius: 6px;
-    white-space: normal; word-break: keep-all;
-  }
+  .path { font-weight: 500; background: var(--soft); padding: 1px 7px; border-radius: 6px; word-break: keep-all; }
+  .key { font-weight: 700; border: 1.5px solid var(--line); background: var(--card); padding: 0 7px; border-radius: 7px; white-space: nowrap; }
   .note { color: var(--muted); font-size: 14px; }
   a { color: var(--accent); }
-  .tip {
-    border-left: 4px solid var(--ok); padding: 4px 0 4px 12px; font-size: 15px;
-  }
+  .tip { border-left: 4px solid var(--ok); padding: 4px 0 4px 12px; font-size: 15px; }
+  .warn { border-left: 4px solid var(--warn); padding: 4px 0 4px 12px; font-size: 15px; }
+  details { background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 10px 14px; }
+  summary { cursor: pointer; font-weight: 700; }
+  details > div { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
+  .brands { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; font-size: 15px; }
+  .brands b { white-space: nowrap; }
+
+  /* 功能說明：兩欄的小卡，手機上變一欄 */
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+  .feature { background: var(--card); border: 1.5px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .feature h3 { font-size: 16px; }
+  .feature p { font-size: 15px; }
+  .eg { font-family: var(--display); color: var(--accent); }
+
   dl { margin: 0; display: flex; flex-direction: column; gap: 12px; }
   dt { font-weight: 700; }
   dd { margin: 2px 0 0; color: var(--muted); }
   footer { color: var(--muted); font-size: 13px; }
 </style>
 
-<style>html,body{margin:0}*{box-sizing:border-box}</style>
-</head>
-<body>
 <div class="wrap">
   <header style="display:flex;flex-direction:column;gap:8px">
     <h1><span class="star">★</span> 星星鍵盤安裝說明</h1>
-    <p class="lead">自製的 iPhone 鍵盤：注音、手寫、英文、韓文、日文、表符、顏文字、剪貼簿紀錄、翻譯、可愛主題。還沒上架 App Store，要用電腦裝進 iPhone，大約 15 分鐘。</p>
+    <p class="lead">自己做的手機鍵盤：注音（不打聲調也能出字）、拼音、手寫、英文、韓文、日文、表符、顏文字、花式文字、快捷片語、剪貼簿、翻譯、可愛主題和自己的背景照片。還沒上架商店，照下面的步驟自己安裝。</p>
   </header>
 
-  <p class="tip">用 Android 手機的話不用電腦，直接跳到 <a href="#android">Android 手機安裝</a>。下面「先準備」到「每 7 天要重裝一次」是 iPhone 的步驟。</p>
-
-  <section>
-    <h2>先準備（iPhone）</h2>
-    <div class="need">
-      <div><b>iPhone</b>iOS 16 以上</div>
-      <div><b>傳輸線</b>能接電腦的線</div>
-      <div><b>電腦</b>Windows 或 Mac</div>
-      <div><b>Apple ID</b>免費的就可以</div>
+  <div class="switch">
+    <div class="tabs big" role="tablist" aria-label="手機種類">
+      <button class="tab" role="tab" id="tab-iphone" aria-controls="panel-iphone" aria-selected="true">iPhone</button>
+      <button class="tab" role="tab" id="tab-android" aria-controls="panel-android" aria-selected="false">Android</button>
     </div>
-    <p class="tip">安裝工具會要你輸入 Apple ID 和密碼（它要用你的帳號幫 App 簽名）。不放心的話，可以另外註冊一個專門裝 App 用的 Apple ID。</p>
-  </section>
+  </div>
 
-  <section>
-    <h2>下載安裝檔</h2>
-    <div class="download">
-      <a class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/latest">前往下載頁</a>
-      <span class="note">在 Assets 下面點 <span class="path">StarKeyboard.ipa</span>，存到電腦上</span>
-    </div>
-  </section>
+  <!-- ===================== iPhone ===================== -->
+  <div class="panel" id="panel-iphone" role="tabpanel" aria-labelledby="tab-iphone">
+    <p class="tip">iPhone 沒上架的 App 要用電腦裝，第一次大約 15 分鐘。用免費 Apple ID 裝的 App 每 7 天要用電腦重裝一次（資料不會不見）。</p>
 
-  <section>
-    <h2>用電腦裝進 iPhone</h2>
-    <div class="tabs" role="tablist" aria-label="電腦種類">
-      <button class="tab" role="tab" id="tab-windows" aria-controls="panel-windows" aria-selected="true">Windows</button>
-      <button class="tab" role="tab" id="tab-mac" aria-controls="panel-mac" aria-selected="false">Mac</button>
-    </div>
+    <section>
+      <h2>先準備</h2>
+      <div class="need">
+        <div><b>iPhone</b>iOS 16 以上</div>
+        <div><b>傳輸線</b>能接電腦的線（充電線不一定能傳資料）</div>
+        <div><b>電腦</b>Windows 或 Mac</div>
+        <div><b>Apple ID</b>免費的就可以</div>
+      </div>
+      <p class="tip">安裝工具會要你輸入 Apple ID 和密碼（它要用你的帳號幫 App 簽名）。不放心的話，可以另外註冊一個專門裝 App 用的 Apple ID。</p>
+    </section>
 
-    <div id="panel-windows" role="tabpanel" aria-labelledby="tab-windows">
+    <section>
+      <h2>下載安裝檔（在電腦上）</h2>
+      <div class="download">
+        <a class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/latest">前往 iPhone 下載頁</a>
+        <span class="note">捲到最下面的 Assets，點 <span class="path">StarKeyboard.ipa</span> 存到電腦上</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>用電腦裝進 iPhone</h2>
+      <div class="tabs" role="tablist" aria-label="電腦種類">
+        <button class="tab" role="tab" id="tab-windows" aria-controls="panel-windows" aria-selected="true">Windows</button>
+        <button class="tab" role="tab" id="tab-mac" aria-controls="panel-mac" aria-selected="false">Mac</button>
+      </div>
+
+      <div id="panel-windows" role="tabpanel" aria-labelledby="tab-windows">
+        <ol class="steps">
+          <li><div>安裝 <b>iTunes</b>：要從 Apple 官網下載的 Windows 版，<b>不要</b>用 Microsoft Store 的版本。<br>
+            <a href="https://www.apple.com/itunes/download/win64">apple.com/itunes/download/win64</a></div></li>
+          <li><div>安裝 <b>Sideloadly</b>：到 <a href="https://sideloadly.io">sideloadly.io</a> 下載 Windows 版並安裝。<br>
+            <span class="note">如果 Sideloadly 說還缺 iCloud，照它畫面上的連結裝非 Store 版的 iCloud。</span></div></li>
+          <li><div>用傳輸線把 iPhone 接到電腦，<b>解鎖手機</b>。手機跳出「要信任這部電腦嗎？」時按<b>信任</b>，再輸入手機密碼。</div></li>
+          <li><div>打開 Sideloadly：
+            <ul>
+              <li>把 <span class="path">StarKeyboard.ipa</span> 拖到左上角的方框（或按方框選檔案）</li>
+              <li>「iDevice」選你的 iPhone</li>
+              <li>「Apple account」填你的 Apple ID</li>
+              <li>按 <b>Start</b>，輸入 Apple ID 密碼；有兩步驟驗證就輸入手機收到的驗證碼</li>
+            </ul></div></li>
+          <li><div>等下面的進度跑完、出現 <b>Done</b> 就裝好了，接著做下面的「iPhone 上的設定」。</div></li>
+        </ol>
+      </div>
+
+      <div id="panel-mac" role="tabpanel" aria-labelledby="tab-mac" hidden>
+        <ol class="steps">
+          <li><div>Mac 不用裝 iTunes。到 <a href="https://sideloadly.io">sideloadly.io</a> 下載 <b>Sideloadly</b> 的 macOS 版，拖進「應用程式」。</div></li>
+          <li><div>第一次打開如果說「無法打開」：到 <span class="path">系統設定 › 隱私權與安全性</span>，往下找到 Sideloadly，按<b>強制打開</b>（或「仍要打開」）。</div></li>
+          <li><div>用傳輸線把 iPhone 接到 Mac，<b>解鎖手機</b>，手機跳出「要信任這部電腦嗎？」時按<b>信任</b>。Mac 若問「允許配件連接」也按允許。</div></li>
+          <li><div>打開 Sideloadly：
+            <ul>
+              <li>把 <span class="path">StarKeyboard.ipa</span> 拖到左上角的方框</li>
+              <li>「iDevice」選你的 iPhone</li>
+              <li>「Apple account」填你的 Apple ID</li>
+              <li>按 <b>Start</b>，輸入 Apple ID 密碼；有兩步驟驗證就輸入驗證碼</li>
+            </ul></div></li>
+          <li><div>等下面出現 <b>Done</b> 就裝好了，接著做下面的「iPhone 上的設定」。</div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section>
+      <h2>iPhone 上的設定（只要做一次）</h2>
       <ol class="steps">
-        <li><div>安裝 <b>iTunes</b>：要從 Apple 官網下載的 Windows 版，<b>不要</b>用 Microsoft Store 的版本。<br>
-          <a href="https://www.apple.com/itunes/download/win64">apple.com/itunes/download/win64</a></div></li>
-        <li><div>安裝 <b>Sideloadly</b>：到 <a href="https://sideloadly.io">sideloadly.io</a> 下載 Windows 版並安裝。<br>
-          <span class="note">如果 Sideloadly 說還缺 iCloud，照它畫面上的連結裝非 Store 版的 iCloud。</span></div></li>
-        <li><div>用傳輸線把 iPhone 接到電腦，解鎖手機，手機跳出「要信任這部電腦嗎？」時按<b>信任</b>並輸入手機密碼。</div></li>
-        <li><div>打開 Sideloadly：
-          <ul style="margin:4px 0 0;padding-left:20px">
-            <li>把 <span class="path">StarKeyboard.ipa</span> 拖到左上角的方框</li>
-            <li>「iDevice」選你的 iPhone</li>
-            <li>「Apple account」填你的 Apple ID</li>
-            <li>按 <b>Start</b>，輸入 Apple ID 密碼；有兩步驟驗證就輸入手機收到的驗證碼</li>
-          </ul></div></li>
-        <li><div>等下面出現 <b>Done</b> 就裝好了，接著做下面的 iPhone 設定。</div></li>
+        <li><div><b>打開開發者模式</b>：<span class="path">設定 › 隱私權與安全性 › 開發者模式</span>，打開後手機會重新開機，開機後再按一次「開啟」並輸入密碼。<br>
+          <span class="note">要先用 Sideloadly 裝好 App，這個選項才會出現。</span></div></li>
+        <li><div><b>信任開發者</b>：<span class="path">設定 › 一般 › VPN 與裝置管理</span>，點你的 Apple ID（開發者 App 下面那一個），按「信任」。</div></li>
+        <li><div><b>加入鍵盤</b>：<span class="path">設定 › 一般 › 鍵盤 › 鍵盤 › 新增鍵盤…</span>，往下找到「第三方鍵盤」，選<b>星星鍵盤</b>。</div></li>
+        <li><div><b>允許完整取用</b>：回到鍵盤清單點「星星鍵盤」，打開「允許完整取用」，跳出提醒時按「允許」。<br>
+          <span class="note">剪貼簿紀錄、按鍵聲音、震動、貼圖、背景照片、翻譯、檢查新版都需要它。</span></div></li>
+        <li><div><b>開始打字</b>：到任何能打字的地方（LINE、備忘錄都可以），<b>按住</b>左下角的 🌐 地球鍵，在跳出的清單選「星星鍵盤」。之後按一下地球鍵就能在鍵盤之間切換。</div></li>
+        <li><div>想看說明或試打，打開桌面上的「星星鍵盤」App。</div></li>
       </ol>
-    </div>
+    </section>
 
-    <div id="panel-mac" role="tabpanel" aria-labelledby="tab-mac" hidden>
+    <section>
+      <h2>放自己的背景照片（iPhone）</h2>
       <ol class="steps">
-        <li><div>Mac 不用裝 iTunes。到 <a href="https://sideloadly.io">sideloadly.io</a> 下載 <b>Sideloadly</b> 的 macOS 版，拖進「應用程式」。</div></li>
-        <li><div>第一次打開如果說「無法打開」：到 <span class="path">系統設定 › 隱私權與安全性</span>，往下找到 Sideloadly，按<b>強制打開</b>（或「仍要打開」）。</div></li>
-        <li><div>用傳輸線把 iPhone 接到 Mac，解鎖手機，手機跳出「要信任這部電腦嗎？」時按<b>信任</b>。Mac 若問「允許配件連接」也按允許。</div></li>
-        <li><div>打開 Sideloadly：
-          <ul style="margin:4px 0 0;padding-left:20px">
-            <li>把 <span class="path">StarKeyboard.ipa</span> 拖到左上角的方框</li>
-            <li>「iDevice」選你的 iPhone</li>
-            <li>「Apple account」填你的 Apple ID</li>
-            <li>按 <b>Start</b>，輸入 Apple ID 密碼；有兩步驟驗證就輸入驗證碼</li>
-          </ul></div></li>
-        <li><div>等下面出現 <b>Done</b> 就裝好了，接著做下面的 iPhone 設定。</div></li>
+        <li><div>打開「照片」App，點開想用的照片，按左下角的分享 › <b>拷貝</b>。</div></li>
+        <li><div>叫出星星鍵盤，按上面工具列的 <span class="key">⚙</span> 設定 › 背景照片 › <b>從剪貼簿貼上圖片</b>。</div></li>
+        <li><div>鍵盤會直接進入調整：<b>一指拖拉</b>移動照片、<b>兩指捏合</b>放大縮小，看到的就是之後的樣子。調好按<b>完成</b>。</div></li>
+        <li><div>之後想再調：<span class="path">⚙ 設定 › 調整照片位置和大小</span>。「照片淡化」和「按鍵透明度」可以讓字更清楚。</div></li>
+        <li><div><b>可以放好幾張</b>：再拷貝別張照片，按「＋ 從剪貼簿新增照片」。設定裡點縮圖換照片，也可以選<b>固定這張、每次打開換、每天換</b>。每張照片的位置和大小各自記住。</div></li>
       </ol>
-    </div>
-  </section>
+    </section>
 
+    <section>
+      <h2>每 7 天重裝、裝新版</h2>
+      <p>免費 Apple ID 裝的 App 只能用 7 天，到期時鍵盤會叫不出來、App 一打開就閃退。這時候照上面「用電腦裝進 iPhone」再裝一次就好，<b>不用刪掉舊的</b>，設定、照片、剪貼簿紀錄、自製表符都會保留。</p>
+      <p>有新版時鍵盤上方會提醒你。裝新版也是一樣的步驟：到下載頁拿最新的 <span class="path">StarKeyboard.ipa</span>，用 Sideloadly 直接裝，會蓋過舊版。重裝會重新算 7 天，所以順便更新最划算。</p>
+      <p class="note">開發者模式和「信任」通常只要設定一次。如果重裝後又打不開，再去「VPN 與裝置管理」按一次信任。</p>
+    </section>
+  </div>
+
+  <!-- ===================== Android ===================== -->
+  <div class="panel" id="panel-android" role="tabpanel" aria-labelledby="tab-android" hidden>
+    <p class="tip">Android 不用電腦，用手機直接下載安裝，大約 5 分鐘，也不用每 7 天重裝。</p>
+
+    <section>
+      <h2>先準備</h2>
+      <div class="need">
+        <div><b>Android 手機</b>Android 8 以上</div>
+        <div><b>空間</b>約 150 MB</div>
+        <div><b>網路</b>安裝檔約 70 MB，建議連 Wi-Fi</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>已經裝過舊版？先移除</h2>
+      <p class="warn">目前的測試版每一版的簽名都不一樣，<b>不能直接蓋過舊版</b>，會顯示「未安裝應用程式」或「套件與現有套件衝突」。請先移除舊版：<b>長按</b>桌面上的「星星鍵盤」圖示 › <b>解除安裝</b>（或 <span class="path">設定 › 應用程式 › 星星鍵盤 › 解除安裝</span>）。移除後設定和背景照片會不見，裝好要重新設定。</p>
+      <p class="note">第一次安裝的人跳過這一步。</p>
+    </section>
+
+    <section>
+      <h2>下載並安裝</h2>
+      <div class="download">
+        <a class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/android-latest/StarKeyboard.apk">下載 Android 安裝檔</a>
+        <span class="note">這個按鈕永遠是最新版。各版本的更新內容在 <a href="https://github.com/z3332111-cloud/StarKeyboard/releases">所有版本</a>（名稱有「Android 第幾版」的）。</span>
+      </div>
+      <ol class="steps">
+        <li><div>用 Android 手機打開這一頁，按上面的「下載 Android 安裝檔」。瀏覽器如果問「要下載嗎？」或說「這類檔案可能有害」，按<b>下載</b>／<b>仍要下載</b>。</div></li>
+        <li><div>下載好後，點通知列上的 <span class="path">StarKeyboard.apk</span>。找不到的話，打開「檔案」（或「我的檔案」）App › <b>下載</b>資料夾，點那個檔案。</div></li>
+        <li><div>第一次會說「基於安全考量，你的手機目前不允許安裝這個來源的應用程式」：按<b>設定</b>，打開「允許來自這個來源的應用程式」，再按返回。</div></li>
+        <li><div>按<b>安裝</b>。跳出 Play 安全防護的提醒時，按「仍要安裝」，有時要先按「更多詳細資料」才看得到。因為這個 App 沒有上架 Google Play，所以會有這個提醒。</div></li>
+        <li><div>裝好按<b>開啟</b>，接著做下面的「打開鍵盤」。</div></li>
+      </ol>
+      <details>
+        <summary>小米、紅米、POCO 的手機</summary>
+        <div>
+          <p>可能會先跑「安全性檢查」或要等幾秒、勾選「我已了解風險」才能按安裝，照畫面按繼續安裝就好。</p>
+          <p>如果完全不讓你裝，到 <span class="path">設定 › 隱私保護 › 特殊權限設定 › 安裝未知應用</span>，讓你用來下載的瀏覽器或「檔案管理」可以安裝。</p>
+        </div>
+      </details>
+    </section>
+
+    <section>
+      <h2>打開鍵盤（只要做一次）</h2>
+      <ol class="steps">
+        <li><div>打開「星星鍵盤」App，按 <b>① 打開鍵盤設定</b>。</div></li>
+        <li><div>在跳出來的清單裡，把<b>星星鍵盤</b>的開關打開。手機會提醒「這個輸入法可能會收集你輸入的所有文字」，按<b>確定</b>。<br>
+          <span class="note">每一個第三方鍵盤都會跳這個提醒。星星鍵盤只把你的設定、剪貼簿紀錄存在你自己的手機裡。</span></div></li>
+        <li><div>按返回回到 App，按 <b>② 切換成星星鍵盤</b>，在清單裡點「星星鍵盤」。</div></li>
+        <li><div>在 App 下面的試打框打幾個字，看到星星鍵盤就完成了。</div></li>
+      </ol>
+      <details>
+        <summary>按 ① 沒反應，或想自己去設定裡找</summary>
+        <div class="brands">
+          <b>三星</b><span><span class="path">設定 › 一般管理 › 鍵盤清單與預設 › 預設鍵盤</span></span>
+          <b>Pixel</b><span><span class="path">設定 › 系統 › 鍵盤 › 螢幕鍵盤 › 管理螢幕鍵盤</span></span>
+          <b>小米</b><span><span class="path">設定 › 更多設定 › 語言與輸入法 › 管理輸入法</span></span>
+          <b>OPPO</b><span><span class="path">設定 › 系統設定 › 鍵盤與輸入法</span></span>
+          <b>其他</b><span>在設定最上面的搜尋框打「鍵盤」或「輸入法」</span>
+        </div>
+      </details>
+      <p class="tip">要換回原本的鍵盤：按住星星鍵盤的 <span class="key">中／英</span> 鍵，或點螢幕右下角的小鍵盤圖示，選別的鍵盤。</p>
+    </section>
+
+    <section>
+      <h2>放自己的背景照片（Android）</h2>
+      <ol class="steps">
+        <li><div>打開「星星鍵盤」App，按<b>新增一張背景照片</b>，選照片。</div></li>
+        <li><div>選好後鍵盤會自動跳出來並進入調整：<b>一指拖拉</b>移動照片、<b>兩指捏合</b>放大縮小，看到的就是之後的樣子。調好按<b>完成</b>。<br>
+          <span class="note">有找到臉的話，照片會先自動對準臉。</span></div></li>
+        <li><div>之後想再調：鍵盤的 <span class="path">⚙ 設定 › 調整照片位置和大小</span>。「照片淡化」和「按鍵透明度」可以讓字更清楚。</div></li>
+        <li><div><b>可以放好幾張</b>：在 App 再按一次「新增一張背景照片」。鍵盤設定裡點縮圖換照片，也可以選<b>固定這張、每次打開換、每天換</b>。每張照片的位置和大小各自記住。</div></li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>裝新版</h2>
+      <p>有新版時，打開「星星鍵盤」App 最上面會出現「有新版」和下載按鈕；或直接按這一頁的「下載 Android 安裝檔」。</p>
+      <ol class="steps">
+        <li><div>先下載新的安裝檔（還不要點開）。</div></li>
+        <li><div>移除舊版：長按「星星鍵盤」圖示 › 解除安裝。</div></li>
+        <li><div>到「檔案」App 的<b>下載</b>資料夾點新的 <span class="path">StarKeyboard.apk</span> 安裝。資料夾裡有好幾個檔案的話，點最新的那個。</div></li>
+        <li><div>重新做一次「打開鍵盤」的 ① ②，背景照片要重新挑。</div></li>
+      </ol>
+      <p class="note">等正式簽名設定好以後，就可以直接蓋過舊版、不用重新設定，到時候這裡會改寫。</p>
+    </section>
+  </div>
+
+  <!-- ===================== 兩邊共用 ===================== -->
   <section>
-    <h2>iPhone 上的設定</h2>
-    <ol class="steps">
-      <li><div><b>打開開發者模式</b>：<span class="path">設定 › 隱私權與安全性 › 開發者模式</span> 打開，手機會重新開機，開機後再按一次「開啟」。<br>
-        <span class="note">要先用 Sideloadly 裝好 App，這個選項才會出現。</span></div></li>
-      <li><div><b>信任開發者</b>：<span class="path">設定 › 一般 › VPN 與裝置管理</span>，點你的 Apple ID，按「信任」。</div></li>
-      <li><div><b>加入鍵盤</b>：<span class="path">設定 › 一般 › 鍵盤 › 鍵盤 › 新增鍵盤…</span>，在「第三方鍵盤」選<b>星星鍵盤</b>。</div></li>
-      <li><div><b>允許完整取用</b>：在同一頁點「星星鍵盤」，打開「允許完整取用」。剪貼簿、聲音、震動、貼圖、背景照片、翻譯都需要它。</div></li>
-      <li><div><b>開始打字</b>：在任何輸入框按住 🌐 地球鍵，選「星星鍵盤」。也可以打開桌面上的「星星鍵盤」App，看說明和試打。</div></li>
-    </ol>
-  </section>
-
-  <section>
-    <h2>每 7 天要重裝一次</h2>
-    <p>免費 Apple ID 裝的 App 只能用 7 天，到期時打開會閃退。再照上面的步驟用 Sideloadly 裝一次就好，<b>設定、剪貼簿紀錄、自製表符都不會不見</b>。</p>
-  </section>
-
-  <section id="android">
-    <h2>Android 手機安裝（不用電腦）</h2>
-    <div class="download">
-      <a class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/android-latest/StarKeyboard.apk">下載 Android 安裝檔</a>
-      <span class="note">約 70MB，建議連 Wi-Fi</span>
+    <h2>怎麼用</h2>
+    <p class="note">iPhone 和 Android 的功能一樣。工具列在鍵盤最上面那一排；<span class="key">⚙</span> 是鍵盤設定。</p>
+    <div class="features">
+      <div class="feature">
+        <h3>注音：不打聲調也可以</h3>
+        <p>打到一半上面就會先出字。可以只打每個字開頭的注音，連打好幾個字再一起選：<span class="eg">ㄨㄛㄏㄓㄜㄧ → 我會這樣</span>、<span class="eg">ㄋㄏ → 你好</span>。打聲調也可以，會更準。</p>
+      </div>
+      <div class="feature">
+        <h3>拼音（給習慣拼音的朋友）</h3>
+        <p>到 <span class="path">⚙ › 輸入法</span> 打開「拼音」，按 <span class="key">中／英</span> 切過去。打 <span class="eg">nihao</span> 或只打聲母 <span class="eg">nh</span> 都會出「你好」。預設是繁體字，想要簡體在設定裡打開「拼音輸出簡體字」。</p>
+      </div>
+      <div class="feature">
+        <h3>𝒜 花式文字</h3>
+        <p>按工具列的 <span class="key">𝒜</span>，打字後按「變花樣」，點一個樣式送出。對方也看得到：<span class="eg">𝓼𝓽𝓪𝓻</span>、<span class="eg">ⓢⓣⓐⓡ</span>、<span class="eg">刪̶除̶線̶</span>、<span class="eg">♡ 愛心 ♡</span>。英文的樣式最多。</p>
+      </div>
+      <div class="feature">
+        <h3>快捷片語</h3>
+        <p><span class="path">⚙ › 快捷片語 › ＋ 新增</span>：先打整段話（例如地址），再打縮寫（例如「地址」或 addr）。之後打縮寫，候選字第二個就是整段話。</p>
+      </div>
+      <div class="feature">
+        <h3>英文滑行輸入</h3>
+        <p>英文鍵盤上手指<b>不要放開</b>，依序滑過字母再放開，就會打出整個字，例如滑過 h→e→l→o 出 <span class="eg">hello</span>。認錯了就點上面列出的別的字。不想用可以在 <span class="path">⚙ › 打錯字修正</span> 關掉。</p>
+      </div>
+      <div class="feature">
+        <h3>字體、主題、特效、按鍵音</h3>
+        <p><span class="path">⚙</span> 裡可以換主題顏色、按鍵造型（果凍、貓耳…）、字體（粉圓、芫荽、文楷）、<b>按鍵特效</b>（按下去冒出星星、愛心、花花…），還有<b>可愛按鍵音</b>（泡泡、木琴、叮鈴、啵啵，點一下就試聽）。字體只改變你鍵盤上的樣子。</p>
+      </div>
+      <div class="feature">
+        <h3>剪貼簿、表符、翻譯、手寫</h3>
+        <p><span class="key">剪貼</span> 會記住你複製過的文字，可以釘選。<span class="key">☺</span> 表情、<span class="key">(•ᴗ•)</span> 顏文字、<span class="key">譯</span> 先打中文再翻成外文、<span class="key">✍</span> 用手指寫字。</p>
+      </div>
     </div>
-    <ol class="steps">
-      <li><div>用 Android 手機打開這一頁，按上面的「下載 Android 安裝檔」。瀏覽器如果問「要下載嗎？」或說「這類檔案可能有害」，按<b>下載</b>／<b>仍要下載</b>。</div></li>
-      <li><div>下載完按通知列上的檔案（或到「檔案」App 的「下載」資料夾找 <span class="path">StarKeyboard.apk</span>）點開。</div></li>
-      <li><div>第一次會說「基於安全考量，你的手機目前不允許安裝這個來源的應用程式」：按<b>設定</b>，打開「允許來自這個來源的應用程式」，再按返回。</div></li>
-      <li><div>按<b>安裝</b>。如果跳出 Play 安全防護的提醒，按「仍要安裝」或「更多詳細資料 › 仍要安裝」（因為這個 App 沒有上架 Google Play）。</div></li>
-      <li><div>打開「星星鍵盤」App，照畫面上的 ① ② 按鈕：先在清單裡打開星星鍵盤，再切換成星星鍵盤，然後在下面試打。</div></li>
-    </ol>
-    <p class="note">Android 版不用每 7 天重裝。之後有新版，打開「星星鍵盤」App 會出現「有新版」和下載按鈕。目前測試版更新時要先移除舊版再裝（正式版會改成可以直接更新）。</p>
   </section>
 
   <section>
     <h2>常見問題</h2>
     <dl>
-      <div><dt>打開 App 馬上閃退，或說「無法驗證 App」</dt>
-        <dd>還沒開開發者模式，或還沒在「VPN 與裝置管理」按信任。裝超過 7 天也會這樣，重裝即可。</dd></div>
-      <div><dt>Sideloadly 找不到我的 iPhone</dt>
+      <div><dt>iPhone：App 一打開就閃退，或說「無法驗證 App」</dt>
+        <dd>還沒開開發者模式，或還沒在「VPN 與裝置管理」按信任。裝超過 7 天也會這樣，用電腦重裝一次就好。</dd></div>
+      <div><dt>iPhone：Sideloadly 找不到手機</dt>
         <dd>換一條線或換一個 USB 孔，手機保持解鎖，重新按一次「信任」。Windows 可以先打開 iTunes，看看有沒有出現手機。</dd></div>
-      <div><dt>Sideloadly 說 App ID 數量到上限</dt>
+      <div><dt>iPhone：Sideloadly 說 App ID 數量到上限</dt>
         <dd>免費帳號 7 天內最多建立 10 個 App ID。等幾天，或改用另一個 Apple ID。</dd></div>
-      <div><dt>鍵盤清單裡找不到星星鍵盤</dt>
+      <div><dt>iPhone：鍵盤清單裡找不到星星鍵盤</dt>
         <dd>先打開一次「星星鍵盤」App，再把手機重新開機。</dd></div>
-      <div><dt>打密碼的時候變回原本的鍵盤</dt>
+      <div><dt>iPhone：打密碼的時候變回原本的鍵盤</dt>
         <dd>這是 iOS 的規定，所有第三方鍵盤在密碼欄都會被換掉，不是壞掉。</dd></div>
+      <div><dt>Android：顯示「未安裝應用程式」</dt>
+        <dd>手機裡還有舊版。先長按圖示解除安裝，再點新的安裝檔。</dd></div>
+      <div><dt>Android：鍵盤突然叫不出來、變回原本的鍵盤</dt>
+        <dd>鍵盤當掉或清除過資料時，手機會自動換回內建鍵盤。打開「星星鍵盤」App 再按一次 ① ②。如果 App 最上面出現「⚠️ 鍵盤出過問題」，按「複製紀錄」傳給把這頁給你的人。</dd></div>
       <div><dt>剪貼簿沒有記到</dt>
-        <dd>要打開「允許完整取用」。iOS 只讓鍵盤在打開的時候讀剪貼簿，所以是複製完、切到要打字的地方時才記錄。</dd></div>
+        <dd>iPhone 要打開「允許完整取用」，而且只會在鍵盤打開的時候記，所以是複製完、切到要打字的地方時才記錄。Android 是星星鍵盤是目前的鍵盤時才會記。</dd></div>
+      <div><dt>注音一直跳出奇怪的字</dt>
+        <dd>點正確的候選字，鍵盤會記住你常選的字，越用越順。也可以多打一點注音或打聲調，會更準。</dd></div>
     </dl>
   </section>
 
@@ -231,21 +378,28 @@
 
 <script>
   (function () {
-    var tabs = { windows: document.getElementById("tab-windows"), mac: document.getElementById("tab-mac") };
-    var panels = { windows: document.getElementById("panel-windows"), mac: document.getElementById("panel-mac") };
-    function show(name) {
-      Object.keys(tabs).forEach(function (k) {
-        var on = k === name;
-        tabs[k].setAttribute("aria-selected", on ? "true" : "false");
-        panels[k].hidden = !on;
+    function tabGroup(map) {
+      function show(name) {
+        Object.keys(map).forEach(function (k) {
+          var on = k === name;
+          map[k][0].setAttribute("aria-selected", on ? "true" : "false");
+          map[k][1].hidden = !on;
+        });
+      }
+      Object.keys(map).forEach(function (k) {
+        map[k][0].addEventListener("click", function () { show(k); });
       });
+      return show;
     }
-    tabs.windows.addEventListener("click", function () { show("windows"); });
-    tabs.mac.addEventListener("click", function () { show("mac"); });
-    var start = (location.hash || "").replace("#", "");
-    if (start === "mac" || /Macintosh/.test(navigator.userAgent)) show("mac");
-    if (start === "windows") show("windows");
+    var $ = function (id) { return document.getElementById(id); };
+    var phone = tabGroup({ iphone: [$("tab-iphone"), $("panel-iphone")], android: [$("tab-android"), $("panel-android")] });
+    var computer = tabGroup({ windows: [$("tab-windows"), $("panel-windows")], mac: [$("tab-mac"), $("panel-mac")] });
+
+    var ua = navigator.userAgent || "";
+    var hash = (location.hash || "").replace("#", "");
+    if (hash === "android" || (hash !== "iphone" && /Android/i.test(ua))) phone("android");
+    if (hash === "mac" || /Macintosh/.test(ua)) computer("mac");
   })();
 </script>
-</body>
-</html>
+
+</body></html>
