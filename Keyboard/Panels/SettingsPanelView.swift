@@ -166,7 +166,11 @@ final class SettingsPanelView: UIView {
         if !hasFullAccess {
             stack.addArrangedSubview(note("⚠️ 還沒開啟「允許完整取用」：剪貼簿、聲音、震動、貼圖、背景圖片都需要它。\n設定 › 一般 › 鍵盤 › 鍵盤 › 星星鍵盤 › 允許完整取用"))
         }
-        stack.addArrangedSubview(note("星星鍵盤 0.1 ・ 注音字典來自小麥注音（MIT 授權）"))
+        let current = ReleaseChecker.currentBuild
+        if settings.latestBuild > current {
+            stack.addArrangedSubview(note("🎉 有新版（第 \(settings.latestBuild) 版）：打開「星星鍵盤」App 看更新內容和下載方法"))
+        }
+        stack.addArrangedSubview(note("星星鍵盤 第 \(current) 版 ・ 注音字典來自小麥注音（MIT 授權）"))
 
         setNeedsLayout()
         layoutIfNeeded()
