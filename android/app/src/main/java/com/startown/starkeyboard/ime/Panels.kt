@@ -409,15 +409,18 @@ class SettingsPanel(
         col.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(themes) })
 
         header("按鍵造型")
-        val shapes = LinearLayout(context).apply { orientation = HORIZONTAL }
-        for (shape in KeyShape.values()) {
-            val selected = shape == settings.shape
-            shapes.addView(Tap(context, shape.title, 14f, if (selected) t.accentText else t.keyText, selected) {
-                settings.shape = shape; onChange()
-            }.apply { background = roundRect(if (selected) t.accent else t.key.withAlpha(0.6f), dp(12f)) },
-                LayoutParams(0, dpi(40f), 1f).apply { rightMargin = dpi(6f) })
+        for (group in KeyShape.values().toList().chunked(4)) {
+            val shapes = LinearLayout(context).apply { orientation = HORIZONTAL }
+            for (shape in group) {
+                val selected = shape == settings.shape
+                shapes.addView(Tap(context, shape.title, 14f, if (selected) t.accentText else t.keyText, selected) {
+                    settings.shape = shape; onChange()
+                }.apply { background = roundRect(if (selected) t.accent else t.key.withAlpha(0.6f), dp(12f)) },
+                    LayoutParams(0, dpi(44f), 1f).apply { rightMargin = dpi(6f); bottomMargin = dpi(6f) })
+            }
+            repeat(4 - group.size) { shapes.addView(View(context), LayoutParams(0, dpi(44f), 1f)) }
+            col.addView(shapes)
         }
-        col.addView(shapes)
 
         header("按鍵特效（按下去冒出小圖案）")
         choices(KeyEffect.values().map { it.title }, KeyEffect.values().indexOfFirst { it.id == settings.keyEffect }) {

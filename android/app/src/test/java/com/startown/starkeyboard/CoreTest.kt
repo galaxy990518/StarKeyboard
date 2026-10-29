@@ -34,6 +34,18 @@ class CoreTest {
 
     private fun sentence(e: ZhuyinEngine, r: List<String>) = e.bestSegments(r).joinToString("") { it.text }
 
+    @Test fun learnedWordsWorkWithPartialReadings() {
+        val e = engine()
+        e.candidates(listOf("ㄋㄧ*"))
+        e.learn(listOf("ㄋㄧˇ"), "妳")
+        assertEquals("妳", e.candidates(listOf("ㄋㄧ*")).first().text)
+        e.learn(listOf("ㄋ*", "ㄏ*"), "妳好")
+        assertTrue(e.phrases(listOf("ㄋㄧˇ", "ㄏㄠˇ")).any { it.text == "妳好" })
+        assertFalse(e.phrases(listOf("ㄕˋ", "ㄏㄠˇ")).any { it.text == "妳好" })
+        e.resetLearning()
+        assertEquals("你", e.candidates(listOf("ㄋㄧ*")).first().text)
+    }
+
     @Test fun composer() {
         val c = ZhuyinComposer()
         "ㄋㄧˇㄏㄠˇ".forEach { assertTrue(c.input(it)) }

@@ -17,7 +17,7 @@ interface PhraseSource {
     fun startingWith(head: String, limit: Int): List<String>
 
     /** 每個音節第一個注音接起來是 abbr 的所有字詞（讀音、字詞、分數），例如「ㄋㄏ」→ ㄋㄧˇ-ㄏㄠˇ 你好 */
-    fun byAbbreviation(abbr: String): List<Triple<String, String, Double>>
+    fun byAbbreviation(abbr: String, pattern: String? = null): List<Triple<String, String, Double>>
 
     /** 字典裡所有單字的讀音（沒聲調），例如 ㄋㄧ、ㄏㄠ */
     fun syllables(): List<String>
@@ -31,7 +31,7 @@ class MemoryPhraseSource(private val rows: List<Triple<String, String, Double>>)
 
     override fun lookup(reading: String) = byReading[reading] ?: emptyList()
 
-    override fun byAbbreviation(abbr: String) = byAbbr[abbr] ?: emptyList()
+    override fun byAbbreviation(abbr: String, pattern: String?) = byAbbr[abbr] ?: emptyList()
 
     override fun syllables() = rows.filter { '-' !in it.first }
         .map { r -> r.first.filter { Bopomofo.TONES.indexOf(it) < 0 } }.distinct()
@@ -106,7 +106,7 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         if ('*' !in key) return source.lookup(key).take(80)
         val pattern = key.split('-')
         val best = HashMap<String, Double>()
-        for ((reading, text, score) in source.byAbbreviation(pattern.joinToString("") { it.take(1) })) {
+        for ((reading, text, score) in source.byAbbreviation(pattern.joinToString("") { it.take(1) }, key)) {
             val penalty = matchPenalty(pattern, reading.split('-'), toneless) ?: continue
             val s = score + penalty
             val old = best[text]
@@ -271,18 +271,21 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         userModel.record(readings.joinToString("-"), text)
         cache.clear()
         fuzzyCache.clear()
+        alternativeCache.clear()
     }
 
     fun resetLearning() {
         userModel.reset()
         cache.clear()
         fuzzyCache.clear()
+        alternativeCache.clear()
     }
 }
 
 /** 記住使用者選過的字詞（每行：讀音 TAB 字詞 TAB 次數） */
 class UserPhraseModel(private val file: File?) {
     private val counts = HashMap<String, HashMap<String, Int>>()
+    private val matchingCache = HashMap<String, Map<String, Int>>()
 
     init {
         file?.takeIf { it.exists() }?.forEachLine { line ->
@@ -293,22 +296,49 @@ class UserPhraseModel(private val file: File?) {
         }
     }
 
-    /** 每選一次加 0.8（log10，大約變成 6 倍常用），最多算 5 次 */
+    /**
+     * 同樣的打法選過：每次加 0.8（log10，大約變成 6 倍常用），最多算 5 次；
+     * 不管用什麼打法，這個字詞選過就再加一點（每次 0.4，最多 5 次）。只記字的那一欄 key 是空字串。
+     */
     fun boost(reading: String, phrase: String): Double {
-        val c = counts[reading]?.get(phrase) ?: return 0.0
-        return minOf(c, 5) * 0.8
+        val same = minOf(matchingCounts(reading)[phrase] ?: 0, 5) * 0.8
+        val any = minOf(counts[""]?.get(phrase) ?: 0, 5) * 0.4
+        return same + any
     }
 
-    fun phrases(reading: String): List<String> = counts[reading]?.keys?.sorted() ?: emptyList()
+    fun phrases(reading: String): List<String> =
+        if (reading.isEmpty()) emptyList() else matchingCounts(reading).keys.sorted()
+
+    private fun matchingCounts(reading: String): Map<String, Int> = matchingCache.getOrPut(reading) {
+        val query = reading.split('-')
+        val result = HashMap<String, Int>()
+        for ((saved, phrases) in counts) {
+            if (saved.isEmpty()) continue
+            val parts = saved.split('-')
+            if (parts.size != query.size) continue
+            if (query.zip(parts).all { (want, have) ->
+                    want == have || ZhuyinEngine.matchPenalty(listOf(want), listOf(have)) != null ||
+                        ZhuyinEngine.matchPenalty(listOf(have), listOf(want)) != null
+                }) {
+                for ((phrase, count) in phrases) result[phrase] = maxOf(result[phrase] ?: 0, count)
+            }
+        }
+        result
+    }
 
     fun record(reading: String, phrase: String) {
-        val m = counts.getOrPut(reading) { HashMap() }
-        m[phrase] = (m[phrase] ?: 0) + 1
+        if (reading.isEmpty() || phrase.isEmpty()) return
+        matchingCache.clear()
+        for (key in listOf(reading, "")) {
+            val m = counts.getOrPut(key) { HashMap() }
+            m[phrase] = (m[phrase] ?: 0) + 1
+        }
         save()
     }
 
     fun reset() {
         counts.clear()
+        matchingCache.clear()
         save()
     }
 

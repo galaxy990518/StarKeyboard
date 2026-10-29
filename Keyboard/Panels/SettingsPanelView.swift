@@ -471,14 +471,23 @@ final class SettingsPanelView: UIView {
     }
 
     private func shapeRow() -> UIView {
-        let row = UIStackView()
-        row.axis = .horizontal
-        row.distribution = .fillEqually
-        row.spacing = 8
-        row.heightAnchor.constraint(equalToConstant: 64).isActive = true
-        for shape in KeyShape.allCases {
+        let column = UIStackView()
+        column.axis = .vertical
+        column.spacing = 8
+        var row = UIStackView()
+        for (index, shape) in KeyShape.allCases.enumerated() {
+            if index % 4 == 0 {
+                row = UIStackView()
+                row.axis = .horizontal
+                row.distribution = .fillEqually
+                row.spacing = 8
+                row.heightAnchor.constraint(equalToConstant: 64).isActive = true
+                column.addArrangedSubview(row)
+            }
             let selected = shape == settings.keyShape
             let b = UIButton(type: .custom)
+            b.accessibilityLabel = shape.title
+            b.accessibilityTraits = selected ? [.button, .selected] : .button
             b.layer.cornerRadius = 12
             b.backgroundColor = selected ? style.theme.specialKey.withAlphaComponent(0.8) : .clear
             let preview = CAShapeLayer()
@@ -489,6 +498,10 @@ final class SettingsPanelView: UIView {
             let holder = UIView(frame: CGRect(x: 0, y: 0, width: 40, height: 34))
             holder.isUserInteractionEnabled = false
             holder.layer.addSublayer(preview)
+            let detail = CAShapeLayer()
+            detail.path = shape.detailPath(in: CGRect(x: 0, y: 0, width: 40, height: 34))
+            detail.fillColor = shape.detailColor(theme: style.theme).withAlphaComponent(shape == .pudding || shape == .duck ? 0.85 : 0.4).cgColor
+            holder.layer.addSublayer(detail)
             holder.translatesAutoresizingMaskIntoConstraints = false
             b.addSubview(holder)
             NSLayoutConstraint.activate([
@@ -513,7 +526,8 @@ final class SettingsPanelView: UIView {
             }, for: .touchUpInside)
             row.addArrangedSubview(b)
         }
-        return row
+        while row.arrangedSubviews.count < 4 { row.addArrangedSubview(UIView()) }
+        return column
     }
 
     private func buttonRow(_ buttons: [(String, () -> Void)]) -> UIView {

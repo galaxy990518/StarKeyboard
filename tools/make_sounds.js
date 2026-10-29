@@ -39,6 +39,8 @@ function synth({ ms, freq, partials = [[1, 1]], tau, attack = 0.004, peak = 0.6 
 }
 
 const sounds = {
+  // 短促、低音量的柔和叮聲，連續輸入時不拖尾。
+  key_tink: synth({ ms: 45, freq: () => 1046, partials: [[1, 1], [2, 0.08]], tau: 0.012, attack: 0.002, peak: 0.2 }),
   // 泡泡：音高快速往上滑
   key_bubble: synth({ ms: 90, freq: (t) => 320 + 900 * Math.min(1, t / 0.07), partials: [[1, 1], [2, 0.15]], tau: 0.035 }),
   // 木琴：短短的木頭聲

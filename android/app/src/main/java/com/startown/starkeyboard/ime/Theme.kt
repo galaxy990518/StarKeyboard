@@ -45,19 +45,146 @@ fun Int.withAlpha(a: Float): Int = Color.argb((Color.alpha(this) * a.coerceIn(0f
 
 /** 按鍵造型（和 iPhone 版 KeyShape 一樣的算法，單位是 dp 換成的像素） */
 enum class KeyShape(val title: String) {
-    ROUNDED("圓角"), JELLY("果凍"), CAT_EAR("貓耳"), CLOUD("雲朵");
+    ROUNDED("圓角"), JELLY("果凍"), CAT_EAR("貓耳"), CLOUD("雲朵"), BUNNY("兔兔"), PUPPY("狗狗"), PUDDING("布丁"), JELLYFISH("水母"), FLAME("火焰"), DROPLET("水滴"), DUCK("鴨鴨");
+
+    val isSoftShape: Boolean get() = when (this) {
+        BUNNY, PUPPY, PUDDING, JELLYFISH, FLAME, DROPLET, DUCK -> true
+        else -> false
+    }
+
+    private fun isWide(r: RectF) = isSoftShape && r.width() > r.height() * 1.65f
+    private fun wideBody(r: RectF) = RectF(r).apply { inset(0f, r.height() * 0.08f) }
+    private fun badgeRect(r: RectF): RectF {
+        val size = r.height() * 0.54f
+        val left = r.left + r.height() * 0.17f
+        return RectF(left, r.centerY() - size / 2, left + size, r.centerY() + size / 2)
+    }
 
     private fun earSize(r: RectF, dp: Float) = minOf(r.width() * 0.24f, r.height() * 0.24f, 9 * dp)
     private fun bumpSize(r: RectF, dp: Float) = minOf(r.height() * 0.16f, 6 * dp)
 
     /** 按鍵本體（字畫在這裡面） */
-    fun bodyRect(r: RectF, dp: Float): RectF = when (this) {
+    fun bodyRect(r: RectF, dp: Float): RectF {
+        if (isWide(r)) return RectF(r.left + r.height() * 0.82f, r.top + r.height() * 0.15f,
+            r.right - r.height() * 0.14f, r.top + r.height() * 0.85f)
+        return when (this) {
         CAT_EAR -> RectF(r.left, r.top + earSize(r, dp) * 0.6f, r.right, r.bottom)
         CLOUD -> RectF(r.left, r.top + bumpSize(r, dp), r.right, r.bottom)
+        BUNNY -> RectF(r.left + r.width() * 0.08f, r.top + r.height() * 0.32f, r.left + r.width() * 0.92f, r.top + r.height() * 0.9f)
+        PUPPY -> RectF(r.left + r.width() * 0.2f, r.top + r.height() * 0.24f, r.left + r.width() * 0.8f, r.top + r.height() * 0.88f)
+        PUDDING -> RectF(r.left + r.width() * 0.12f, r.top + r.height() * 0.32f, r.left + r.width() * 0.88f, r.top + r.height() * 0.87f)
+        JELLYFISH -> RectF(r.left + r.width() * 0.09f, r.top + r.height() * 0.19f, r.left + r.width() * 0.91f, r.top + r.height() * 0.73f)
+        FLAME -> RectF(r.left + r.width() * 0.13f, r.top + r.height() * 0.35f, r.left + r.width() * 0.87f, r.top + r.height() * 0.9f)
+        DROPLET -> RectF(r.left + r.width() * 0.13f, r.top + r.height() * 0.34f, r.left + r.width() * 0.87f, r.top + r.height() * 0.87f)
+        DUCK -> RectF(r.left + r.width() * 0.14f, r.top + r.height() * 0.40f, r.left + r.width() * 0.84f, r.top + r.height() * 0.90f)
         else -> RectF(r)
+        }
+    }
+
+    fun detailPath(r: RectF, dp: Float): Path {
+        if (isWide(r)) return path(badgeRect(r), dp)
+        return Path().apply {
+            when (this@KeyShape) {
+            BUNNY -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                moveTo(x(0.22f), y(0.11f))
+                cubicTo(x(0.18f), y(0.14f), x(0.24f), y(0.29f), x(0.28f), y(0.3f))
+                cubicTo(x(0.32f), y(0.3f), x(0.27f), y(0.1f), x(0.22f), y(0.11f))
+                close()
+                moveTo(x(0.78f), y(0.11f))
+                cubicTo(x(0.73f), y(0.1f), x(0.68f), y(0.3f), x(0.72f), y(0.3f))
+                cubicTo(x(0.76f), y(0.29f), x(0.82f), y(0.14f), x(0.78f), y(0.11f))
+                close()
+            }
+            PUPPY -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                moveTo(x(0.17f), y(0.27f))
+                cubicTo(x(0.1f), y(0.28f), x(0.06f), y(0.49f), x(0.12f), y(0.57f))
+                cubicTo(x(0.17f), y(0.61f), x(0.21f), y(0.48f), x(0.22f), y(0.37f))
+                quadTo(x(0.23f), y(0.25f), x(0.17f), y(0.27f))
+                close()
+                moveTo(x(0.83f), y(0.27f))
+                quadTo(x(0.77f), y(0.25f), x(0.78f), y(0.37f))
+                cubicTo(x(0.79f), y(0.48f), x(0.83f), y(0.61f), x(0.88f), y(0.57f))
+                cubicTo(x(0.94f), y(0.49f), x(0.9f), y(0.28f), x(0.83f), y(0.27f))
+                close()
+            }
+            PUDDING -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                moveTo(x(0.24f), y(0.14f))
+                quadTo(x(0.5f), y(0.08f), x(0.76f), y(0.14f))
+                quadTo(x(0.83f), y(0.16f), x(0.85f), y(0.29f))
+                cubicTo(x(0.77f), y(0.35f), x(0.69f), y(0.24f), x(0.6f), y(0.29f))
+                cubicTo(x(0.43f), y(0.38f), x(0.34f), y(0.27f), x(0.15f), y(0.3f))
+                quadTo(x(0.17f), y(0.16f), x(0.24f), y(0.14f))
+                close()
+            }
+            JELLYFISH -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                moveTo(x(0.22f), y(0.26f))
+                cubicTo(x(0.32f), y(0.11f), x(0.65f), y(0.1f), x(0.78f), y(0.26f))
+                cubicTo(x(0.56f), y(0.2f), x(0.43f), y(0.2f), x(0.22f), y(0.26f))
+                close()
+            }
+            FLAME -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                moveTo(x(0.18f), y(0.59f))
+                cubicTo(x(0.11f), y(0.67f), x(0.14f), y(0.8f), x(0.23f), y(0.84f))
+                quadTo(x(0.27f), y(0.84f), x(0.23f), y(0.78f))
+                quadTo(x(0.17f), y(0.7f), x(0.18f), y(0.59f))
+                close()
+                moveTo(x(0.84f), y(0.61f))
+                quadTo(x(0.85f), y(0.73f), x(0.78f), y(0.81f))
+                quadTo(x(0.75f), y(0.86f), x(0.8f), y(0.84f))
+                cubicTo(x(0.9f), y(0.79f), x(0.9f), y(0.67f), x(0.84f), y(0.61f))
+                close()
+            }
+            DROPLET -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                moveTo(x(0.24f), y(0.4f))
+                cubicTo(x(0.13f), y(0.47f), x(0.13f), y(0.66f), x(0.21f), y(0.72f))
+                quadTo(x(0.25f), y(0.74f), x(0.23f), y(0.67f))
+                cubicTo(x(0.19f), y(0.55f), x(0.22f), y(0.47f), x(0.27f), y(0.42f))
+                quadTo(x(0.29f), y(0.38f), x(0.24f), y(0.4f))
+                close()
+            }
+            DUCK -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                moveTo(x(0.78f), y(0.26f))
+                quadTo(x(0.96f), y(0.25f), x(0.97f), y(0.31f))
+                quadTo(x(0.96f), y(0.36f), x(0.79f), y(0.36f))
+                quadTo(x(0.74f), y(0.31f), x(0.78f), y(0.26f))
+                close()
+                moveTo(x(0.64f), y(0.22f))
+                cubicTo(x(0.64f), y(0.19f), x(0.7f), y(0.19f), x(0.7f), y(0.22f))
+                cubicTo(x(0.7f), y(0.25f), x(0.64f), y(0.25f), x(0.64f), y(0.22f))
+                close()
+            }
+            else -> Unit
+            }
+        }
+    }
+
+    fun detailColor(theme: KeyboardTheme): Int = when (this) {
+        PUDDING -> Color.rgb(if (theme.dark) 215 else 168, if (theme.dark) 161 else 102, if (theme.dark) 95 else 53)
+        FLAME -> if (theme.dark) Color.rgb(255, 212, 107) else Color.rgb(237, 145, 74)
+        DROPLET -> if (theme.dark) Color.rgb(184, 239, 255) else Color.rgb(74, 173, 213)
+        DUCK -> if (theme.dark) Color.rgb(255, 210, 118) else Color.rgb(215, 138, 50)
+        else -> theme.accent
     }
 
     fun path(r: RectF, dp: Float): Path {
+        if (isWide(r)) {
+            val body = wideBody(r)
+            return Path().apply { addRoundRect(body, body.height() * 0.36f, body.height() * 0.36f, Path.Direction.CW) }
+        }
         val body = bodyRect(r, dp)
         val path = Path()
         val minSide = minOf(body.width(), body.height())
@@ -91,6 +218,111 @@ enum class KeyShape(val title: String) {
                     val circle = Path().apply { addCircle(body.left + step * i, body.top + b * 0.5f, b * 1.5f, Path.Direction.CW) }
                     path.op(circle, Path.Op.UNION)
                 }
+            }
+            BUNNY -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                path.moveTo(x(0.2f), y(0.32f))
+                path.cubicTo(x(0.13f), y(0.15f), x(0.13f), y(0.03f), x(0.23f), y(0.03f))
+                path.cubicTo(x(0.33f), y(0.03f), x(0.34f), y(0.19f), x(0.37f), y(0.28f))
+                path.quadTo(x(0.5f), y(0.24f), x(0.63f), y(0.28f))
+                path.cubicTo(x(0.66f), y(0.19f), x(0.67f), y(0.03f), x(0.77f), y(0.03f))
+                path.cubicTo(x(0.87f), y(0.03f), x(0.87f), y(0.15f), x(0.8f), y(0.32f))
+                path.cubicTo(x(0.96f), y(0.37f), x(0.98f), y(0.51f), x(0.97f), y(0.67f))
+                path.cubicTo(x(0.97f), y(0.91f), x(0.83f), y(0.97f), x(0.5f), y(0.97f))
+                path.cubicTo(x(0.17f), y(0.97f), x(0.03f), y(0.91f), x(0.03f), y(0.67f))
+                path.cubicTo(x(0.02f), y(0.51f), x(0.04f), y(0.37f), x(0.2f), y(0.32f))
+                path.close()
+            }
+            PUPPY -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                path.moveTo(x(0.24f), y(0.21f))
+                path.cubicTo(x(0.35f), y(0.09f), x(0.66f), y(0.09f), x(0.77f), y(0.21f))
+                path.cubicTo(x(0.9f), y(0.16f), x(0.96f), y(0.25f), x(0.98f), y(0.39f))
+                path.cubicTo(x(1.0f), y(0.55f), x(0.95f), y(0.69f), x(0.86f), y(0.67f))
+                path.lineTo(x(0.83f), y(0.66f))
+                path.cubicTo(x(0.82f), y(0.88f), x(0.73f), y(0.96f), x(0.5f), y(0.96f))
+                path.cubicTo(x(0.27f), y(0.96f), x(0.18f), y(0.88f), x(0.17f), y(0.66f))
+                path.lineTo(x(0.14f), y(0.67f))
+                path.cubicTo(x(0.05f), y(0.69f), x(0.0f), y(0.55f), x(0.02f), y(0.39f))
+                path.cubicTo(x(0.04f), y(0.25f), x(0.1f), y(0.16f), x(0.24f), y(0.21f))
+                path.close()
+            }
+            PUDDING -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                path.moveTo(x(0.24f), y(0.13f))
+                path.quadTo(x(0.5f), y(0.06f), x(0.76f), y(0.13f))
+                path.cubicTo(x(0.86f), y(0.16f), x(0.86f), y(0.28f), x(0.89f), y(0.45f))
+                path.lineTo(x(0.96f), y(0.77f))
+                path.cubicTo(x(1.0f), y(0.94f), x(0.79f), y(0.97f), x(0.5f), y(0.97f))
+                path.cubicTo(x(0.21f), y(0.97f), x(0.0f), y(0.94f), x(0.04f), y(0.77f))
+                path.lineTo(x(0.11f), y(0.45f))
+                path.cubicTo(x(0.14f), y(0.28f), x(0.14f), y(0.16f), x(0.24f), y(0.13f))
+                path.close()
+            }
+            JELLYFISH -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                path.moveTo(x(0.07f), y(0.67f))
+                path.cubicTo(x(0.03f), y(0.35f), x(0.19f), y(0.08f), x(0.5f), y(0.08f))
+                path.cubicTo(x(0.81f), y(0.08f), x(0.97f), y(0.35f), x(0.93f), y(0.67f))
+                path.quadTo(x(0.94f), y(0.77f), x(0.82f), y(0.77f))
+                path.cubicTo(x(0.82f), y(0.83f), x(0.89f), y(0.89f), x(0.83f), y(0.94f))
+                path.cubicTo(x(0.74f), y(1.0f), x(0.69f), y(0.88f), x(0.69f), y(0.79f))
+                path.lineTo(x(0.58f), y(0.8f))
+                path.cubicTo(x(0.57f), y(0.88f), x(0.6f), y(0.98f), x(0.5f), y(0.98f))
+                path.cubicTo(x(0.4f), y(0.98f), x(0.43f), y(0.88f), x(0.42f), y(0.8f))
+                path.lineTo(x(0.31f), y(0.79f))
+                path.cubicTo(x(0.31f), y(0.88f), x(0.26f), y(1.0f), x(0.17f), y(0.94f))
+                path.cubicTo(x(0.11f), y(0.89f), x(0.18f), y(0.83f), x(0.18f), y(0.77f))
+                path.quadTo(x(0.06f), y(0.77f), x(0.07f), y(0.67f))
+                path.close()
+            }
+            FLAME -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                path.moveTo(x(0.6f), y(0.05f))
+                path.cubicTo(x(0.65f), y(0.04f), x(0.63f), y(0.17f), x(0.7f), y(0.23f))
+                path.cubicTo(x(0.77f), y(0.31f), x(0.81f), y(0.34f), x(0.82f), y(0.43f))
+                path.quadTo(x(0.9f), y(0.32f), x(0.92f), y(0.41f))
+                path.cubicTo(x(1.0f), y(0.63f), x(0.97f), y(0.81f), x(0.83f), y(0.9f))
+                path.cubicTo(x(0.68f), y(1.0f), x(0.31f), y(1.0f), x(0.16f), y(0.9f))
+                path.cubicTo(x(0.02f), y(0.81f), x(0.0f), y(0.63f), x(0.09f), y(0.43f))
+                path.quadTo(x(0.13f), y(0.35f), x(0.16f), y(0.43f))
+                path.quadTo(x(0.19f), y(0.48f), x(0.24f), y(0.48f))
+                path.cubicTo(x(0.37f), y(0.47f), x(0.35f), y(0.21f), x(0.47f), y(0.16f))
+                path.quadTo(x(0.54f), y(0.13f), x(0.6f), y(0.05f))
+                path.close()
+            }
+            DROPLET -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                path.moveTo(x(0.58f), y(0.06f))
+                path.cubicTo(x(0.63f), y(0.03f), x(0.6f), y(0.14f), x(0.7f), y(0.24f))
+                path.cubicTo(x(0.79f), y(0.33f), x(0.95f), y(0.42f), x(0.95f), y(0.63f))
+                path.cubicTo(x(0.98f), y(0.88f), x(0.78f), y(0.97f), x(0.5f), y(0.97f))
+                path.cubicTo(x(0.22f), y(0.97f), x(0.02f), y(0.88f), x(0.05f), y(0.63f))
+                path.cubicTo(x(0.06f), y(0.41f), x(0.24f), y(0.3f), x(0.38f), y(0.22f))
+                path.quadTo(x(0.5f), y(0.16f), x(0.58f), y(0.06f))
+                path.close()
+            }
+            DUCK -> {
+                fun x(v: Float) = r.left + r.width() * v
+                fun y(v: Float) = r.top + r.height() * v
+                path.moveTo(x(0.32f), y(0.43f))
+                path.cubicTo(x(0.26f), y(0.32f), x(0.3f), y(0.14f), x(0.44f), y(0.1f))
+                path.cubicTo(x(0.59f), y(0.04f), x(0.79f), y(0.12f), x(0.8f), y(0.25f))
+                path.quadTo(x(0.98f), y(0.25f), x(0.98f), y(0.31f))
+                path.quadTo(x(0.98f), y(0.38f), x(0.8f), y(0.38f))
+                path.lineTo(x(0.78f), y(0.47f))
+                path.cubicTo(x(0.93f), y(0.53f), x(0.98f), y(0.68f), x(0.91f), y(0.82f))
+                path.cubicTo(x(0.84f), y(0.97f), x(0.64f), y(0.98f), x(0.45f), y(0.97f))
+                path.cubicTo(x(0.19f), y(0.97f), x(0.05f), y(0.84f), x(0.04f), y(0.66f))
+                path.quadTo(x(0.02f), y(0.54f), x(0.1f), y(0.57f))
+                path.quadTo(x(0.23f), y(0.64f), x(0.32f), y(0.43f))
+                path.close()
             }
         }
         return path

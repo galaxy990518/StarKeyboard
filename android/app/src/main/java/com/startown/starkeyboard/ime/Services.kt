@@ -44,10 +44,10 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
         return out
     }
 
-    override fun byAbbreviation(abbr: String): List<Triple<String, String, Double>> {
+    override fun byAbbreviation(abbr: String, pattern: String?): List<Triple<String, String, Double>> {
         val out = ArrayList<Triple<String, String, Double>>()
         runCatching {
-            db.rawQuery("SELECT reading, phrase, score FROM phrases WHERE abbr = ? ORDER BY score DESC LIMIT 400", arrayOf(abbr)).use { c ->
+            db.rawQuery("SELECT reading, phrase, score FROM phrases WHERE abbr = ? AND $column GLOB ? ORDER BY score DESC LIMIT 400", arrayOf(abbr, pattern ?: "*")).use { c ->
                 while (c.moveToNext()) out.add(Triple(c.getString(0), c.getString(1), c.getDouble(2)))
             }
         }

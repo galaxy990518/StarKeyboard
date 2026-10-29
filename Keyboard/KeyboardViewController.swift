@@ -2,6 +2,10 @@ import UIKit
 import AudioToolbox
 import Vision
 
+private final class KeyboardInputView: UIInputView, UIInputViewAudioFeedback {
+    var enableInputClicksWhenVisible: Bool { true }
+}
+
 final class KeyboardViewController: UIInputViewController {
     private enum Metrics {
         static let barHeight: CGFloat = 50
@@ -70,6 +74,8 @@ final class KeyboardViewController: UIInputViewController {
     private var kanaBuffer = ""              // 日文：還沒送出的羅馬拼音
     private var pinyinBuffer = ""            // 拼音：還沒送出的字母
     private var candidateOriginals: [String] = []   // 拼音候選轉簡體前的原文（學習、聯想詞用）
+    /// 這段注音裡已經選了哪些字（全部選完時記成一個詞）
+    private var composePicks: [(readings: [String], text: String)] = []
     private var hangul = HangulComposer()
     private var hangulShown = ""             // 韓文：已經放進輸入框、還在拼的那個字
     private var candidates: [Candidate] = []
@@ -121,6 +127,14 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: - 生命週期
 
+    override func loadView() {
+        view = KeyboardInputView(frame: .zero, inputViewStyle: .keyboard)
+    }
+
+    deinit {
+        for id in soundIDs.values { AudioServicesDisposeSystemSoundID(id) }
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         // 讓 iOS 照我們自己設的高度（不然「鍵盤高度」滑桿會被系統的預設高度蓋掉）
@@ -168,6 +182,7 @@ final class KeyboardViewController: UIInputViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         loadGlideWords()
+        prepareKeySound()
         // 背景照片輪播
         settings.rotatePhoto()
         loadBackground()
@@ -400,6 +415,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func typeZhuyin(_ c: Character) {
         clearSuggestions(refresh: false)
+        if !composer.isComposing { composePicks = [] }   // 新的一段話
         if composer.validPrefixes == nil, let prefixes = engine?.syllablePrefixes(), !prefixes.isEmpty {
             composer.validPrefixes = prefixes
         }
@@ -477,6 +493,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         if composer.isComposing {
             composer.backspace()
+            if !composer.isComposing { composePicks = [] }
             updateCandidates()
             return
         }
@@ -743,14 +760,28 @@ final class KeyboardViewController: UIInputViewController {
         if composer.isComposing {
             guard i < candidates.count else { return }
             let c = candidates[i]
-            if learn && c.kind != .literal {
-                engine?.learn(readings: Array(composer.readings.prefix(c.span)), text: c.text)
+            let used = Array(composer.readings.prefix(c.span))
+            // 點的字都記；按空白送出的單一個詞也記（整句只有點了才記，免得記住猜錯的句子）
+            if c.kind != .literal && (learn || c.kind == .phrase) {
+                engine?.learn(readings: used, text: c.text)
+            }
+            if c.kind != .literal && (learn || c.kind == .phrase) {
+                composePicks.append((used, c.text))
+            } else {
+                // 不把未知字、快捷片語或未確認的整句跨接成學習詞。
+                composePicks = []
             }
             output(c.text)
             composer.removeFirst(c.span)
             if composer.isComposing {
                 updateCandidates()
             } else {
+                // 一段話分好幾次選完：把整段記成一個詞，下次一打就出現
+                if composePicks.count > 1 {
+                    let all = composePicks.flatMap { $0.readings }
+                    engine?.learn(readings: all, text: composePicks.map { $0.text }.joined())
+                }
+                composePicks = []
                 candidates = []
                 closeCandidatePanel()
                 showAssociations(after: c.text)
@@ -780,7 +811,11 @@ final class KeyboardViewController: UIInputViewController {
             let s = suggestions[i]
             output(s)
             if suggestionSource == .handwriting { handwritingView?.clear() }
-            showAssociations(after: s)
+            if PunctuationSuggestions.marks.contains(s) {
+                clearSuggestions()   // 打完標點就收起來
+            } else {
+                showAssociations(after: s)
+            }
         }
     }
 
@@ -798,6 +833,7 @@ final class KeyboardViewController: UIInputViewController {
     private func glideTyped(path: [CGPoint], centers: [Character: CGPoint], keyWidth: CGFloat) {
         guard let decoder = glide else {
             loadGlideWords()
+        prepareKeySound()
             toast("英文字表還在載入，等一下再試")
             return
         }
@@ -830,6 +866,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func commitAll() {
         guard isComposing else { return }
+        composePicks = []
         var text = ""
         if !pinyinBuffer.isEmpty {
             // 拼音：送出整句（第一個候選）；完全查不到就照打的字母送出
@@ -861,6 +898,11 @@ final class KeyboardViewController: UIInputViewController {
             suggestions = p.engine.associations(after: text).map { simplify($0) }.filter { seen.insert($0).inserted }
         } else {
             suggestions = []
+        }
+        // 中文模式：選字那排最前面放標點，看起來是問句就把「？」排第一個
+        if editorText == nil, mode == .zhuyin || mode == .handwriting || mode == .pinyin {
+            let before = textDocumentProxy.documentContextBeforeInput ?? ""
+            suggestions = PunctuationSuggestions.after(before.hasSuffix(text) ? before : before + text) + suggestions
         }
         suggestionSource = .association
         refreshTopBar()
@@ -911,13 +953,23 @@ final class KeyboardViewController: UIInputViewController {
         p.onBackspace = { [weak self] in self?.backspace() }
         p.setCandidates(candidates.map { $0.text })
         p.frame = contentView.bounds
+        // 不透明的底，而且先把後面的按鍵藏起來，候選字才不會跟按鍵疊在一起看不清楚
         contentView.addSubview(p)
         candidatePanel = p
+        grid.isHidden = true
+        handwritingView?.isHidden = true
     }
 
     private func closeCandidatePanel() {
-        candidatePanel?.removeFromSuperview()
+        guard let p = candidatePanel else { return }
+        p.removeFromSuperview()
         candidatePanel = nil
+        // 按鍵恢復（有開別的面板就維持藏著）
+        let showHandwriting = mode == .handwriting && layer == .letters
+        if panelView == nil {
+            grid.isHidden = showHandwriting
+            handwritingView?.isHidden = !showHandwriting
+        }
     }
 
     // MARK: - 工具列與面板
@@ -1023,9 +1075,11 @@ final class KeyboardViewController: UIInputViewController {
 
     private func settingsChanged() {
         loadBackground()   // 可能在設定裡換了照片
+        prepareKeySound()
         // 換了按鍵音：播一下讓你聽聽看
         if settings.keySoundStyle != lastSoundStyle {
             lastSoundStyle = settings.keySoundStyle
+            prepareKeySound()
             if settings.keySound && hasFullAccess { playKeySound() }
         }
         engine?.fuzzy = fuzzyOptions
@@ -1172,6 +1226,8 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func endEditor() {
+        closeCandidatePanel()
+        composePicks = []
         composer.clear()
         kanaBuffer = ""
         pinyinBuffer = ""
@@ -1446,8 +1502,7 @@ final class KeyboardViewController: UIInputViewController {
                 hw.onAutoCommit = { [weak self] in
                     guard let self = self, self.suggestionSource == .handwriting, let first = self.suggestions.first else { return }
                     self.output(first)
-                    self.suggestions = []
-                    self.refreshTopBar()
+                    self.showAssociations(after: first)
                 }
                 hw.frame = contentView.bounds
                 contentView.addSubview(hw)
@@ -1459,11 +1514,8 @@ final class KeyboardViewController: UIInputViewController {
             handwritingView = nil
             if suggestionSource == .handwriting { clearSuggestions() }
         }
-        if panelView == nil {
-            grid.isHidden = showHandwriting
-        } else {
-            handwritingView?.isHidden = true
-        }
+        grid.isHidden = showHandwriting || panelView != nil || candidatePanel != nil
+        handwritingView?.isHidden = !showHandwriting || panelView != nil || candidatePanel != nil
         if let p = candidatePanel { contentView.bringSubviewToFront(p) }
         updateHeight()
     }
@@ -1525,19 +1577,23 @@ final class KeyboardViewController: UIInputViewController {
     private var soundIDs: [String: SystemSoundID] = [:]
     private lazy var lastSoundStyle = settings.keySoundStyle
 
+    private func prepareKeySound() {
+        guard hasFullAccess, settings.keySound,
+              KeySound(rawValue: settings.keySoundStyle) == .tink,
+              soundIDs["tink"] == nil,
+              let url = Bundle.main.url(forResource: "key_tink", withExtension: "wav")
+                ?? Bundle.main.url(forResource: "key_tink", withExtension: "wav", subdirectory: "Sounds") else { return }
+        var id: SystemSoundID = 0
+        if AudioServicesCreateSystemSoundID(url as CFURL, &id) == noErr { soundIDs["tink"] = id }
+    }
+
     private func playKeySound() {
-        let style = KeySound(rawValue: settings.keySoundStyle) ?? .system
-        guard style != .system else {
-            AudioServicesPlaySystemSound(1104)
-            return
+        if KeySound(rawValue: settings.keySoundStyle) == .tink, let id = soundIDs["tink"] {
+            AudioServicesPlaySystemSound(id)
+        } else {
+            // 使用公開的鍵盤音效 API，跟隨系統鍵盤聲音設定。
+            UIDevice.current.playInputClick()
         }
-        if soundIDs[style.rawValue] == nil,
-           let url = Bundle.main.url(forResource: "key_" + style.rawValue, withExtension: "wav")
-               ?? Bundle.main.url(forResource: "key_" + style.rawValue, withExtension: "wav", subdirectory: "Sounds") {
-            var id: SystemSoundID = 0
-            if AudioServicesCreateSystemSoundID(url as CFURL, &id) == noErr { soundIDs[style.rawValue] = id }
-        }
-        if let id = soundIDs[style.rawValue] { AudioServicesPlaySystemSound(id) } else { AudioServicesPlaySystemSound(1104) }
     }
 
     private func feedback() {

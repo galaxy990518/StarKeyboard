@@ -128,9 +128,9 @@ def main(src, dst, opencc):
     db.execute("CREATE TABLE phrases(reading TEXT NOT NULL, plain TEXT NOT NULL, abbr TEXT NOT NULL, phrase TEXT NOT NULL, score REAL NOT NULL)")
     db.executemany("INSERT INTO phrases(reading, plain, abbr, phrase, score) VALUES (?, ?, ?, ?, ?)",
                    ((r, plain(r), abbr(r), p, round(s, 4)) for (r, p), s in sorted(best.items())))
-    db.execute("CREATE INDEX idx_reading ON phrases(reading)")
-    db.execute("CREATE INDEX idx_plain ON phrases(plain)")
-    db.execute("CREATE INDEX idx_abbr ON phrases(abbr)")
+    db.execute("CREATE INDEX idx_reading ON phrases(reading, score DESC)")
+    db.execute("CREATE INDEX idx_plain ON phrases(plain, score DESC)")
+    db.execute("CREATE INDEX idx_abbr ON phrases(abbr, score DESC)")
     db.execute("CREATE INDEX idx_phrase ON phrases(phrase)")
     db.execute("CREATE TABLE pinyin(py TEXT PRIMARY KEY, bpmf TEXT NOT NULL)")
     db.executemany("INSERT INTO pinyin VALUES (?, ?)", sorted(pinyin.items()))
