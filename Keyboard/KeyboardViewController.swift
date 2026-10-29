@@ -6,7 +6,7 @@ final class KeyboardViewController: UIInputViewController {
         static let barHeight: CGFloat = 46
     }
 
-    private enum SuggestionSource { case association, handwriting }
+    private enum SuggestionSource { case association, handwriting, spelling }
 
     /// 上面那條編輯框的用途：新增表符，或是先打中文再翻譯
     private enum EditorPurpose { case emoticon, translate }
@@ -15,9 +15,18 @@ final class KeyboardViewController: UIInputViewController {
     private lazy var clipStore = ClipboardStore(fileURL: Storage.url("clipboard.json"), limit: settings.clipLimit)
     private lazy var emoStore = EmoticonStore(directory: Storage.directory)
     private lazy var engine: ZhuyinEngine? = {
-        guard let path = Bundle.main.path(forResource: "zhuyin", ofType: "sqlite") else { return nil }
-        return ZhuyinEngine(path: path, userModel: UserPhraseModel(fileURL: Storage.url("learned.json")))
+        guard let path = Bundle.main.path(forResource: "zhuyin", ofType: "sqlite"),
+              let e = ZhuyinEngine(path: path, userModel: UserPhraseModel(fileURL: Storage.url("learned.json"))) else { return nil }
+        e.fuzzy = self.fuzzyOptions
+        return e
     }()
+    private lazy var textChecker = UITextChecker()
+    /// 剛剛自動修正的字：馬上按刪除就改回原本打的
+    private var lastAutocorrect: (original: String, corrected: String)?
+
+    private var fuzzyOptions: ZhuyinEngine.FuzzyOptions {
+        ZhuyinEngine.FuzzyOptions(keyNeighbors: settings.fuzzyKeys, tones: settings.fuzzyTones, phonetic: settings.fuzzyPhonetic)
+    }
 
     // 狀態
     private var mode: InputMode = .zhuyin
@@ -189,6 +198,9 @@ final class KeyboardViewController: UIInputViewController {
 
     private func handle(_ spec: KeySpec) {
         feedback()
+        let pendingAutocorrect = lastAutocorrect
+        lastAutocorrect = nil
+        if spec.action == .backspace, let ac = pendingAutocorrect, revertAutocorrect(ac) { return }
         if case .jamo = spec.action {} else if spec.action != .backspace && spec.action != .shift {
             finishHangul()
         }
@@ -216,11 +228,86 @@ final class KeyboardViewController: UIInputViewController {
     private func typeText(_ s: String) {
         if isComposing { commitAll() }
         clearSuggestions()
+        // 英文打標點時，前一個字也順便修正
+        if mode == .english, ".,!?;:".contains(s) { applyAutocorrect() }
         output(s)
         if shift == .on {
             shift = .off
             rebuildKeys()
         }
+        updateSpelling()
+    }
+
+    // MARK: - 英文自動修正
+
+    /// 游標前面正在打的英文字
+    private var currentWord: String {
+        guard editorText == nil, let before = textDocumentProxy.documentContextBeforeInput else { return "" }
+        var word = ""
+        for ch in before.reversed() {
+            guard ch.isASCII && (ch.isLetter || ch == "'") else { break }
+            word.insert(ch, at: word.startIndex)
+        }
+        return word
+    }
+
+    private func isMisspelled(_ word: String) -> Bool {
+        let range = NSRange(location: 0, length: (word as NSString).length)
+        let miss = textChecker.rangeOfMisspelledWord(in: word, range: range, startingAt: 0, wrap: false, language: "en_US")
+        return miss.location != NSNotFound
+    }
+
+    private func guesses(_ word: String) -> [String] {
+        let range = NSRange(location: 0, length: (word as NSString).length)
+        return textChecker.guesses(forWordRange: range, in: word, language: "en_US") ?? []
+    }
+
+    /// 打字時在上面列出拼字建議：第一個是原本打的，後面是修正和補完
+    private func updateSpelling() {
+        guard mode == .english, settings.autocorrect else { return }
+        let word = currentWord
+        guard word.count >= 2 else {
+            if suggestionSource == .spelling { clearSuggestions() }
+            return
+        }
+        var list: [String] = []
+        if isMisspelled(word) { list += guesses(word).prefix(3) }
+        let range = NSRange(location: 0, length: (word as NSString).length)
+        list += (textChecker.completions(forPartialWordRange: range, in: word, language: "en_US") ?? []).prefix(5)
+        var seen: Set<String> = [word]
+        let options = list.map { Spelling.matchCase($0, like: word) }.filter { seen.insert($0).inserted }
+        suggestions = options.isEmpty ? [] : [word] + options
+        suggestionSource = .spelling
+        refreshTopBar()
+    }
+
+    private func autocorrection(for word: String) -> String? {
+        guard word.count >= 2, word.uppercased() != word, isMisspelled(word),
+              let guess = guesses(word).first, Spelling.isCloseEnough(word, guess) else { return nil }
+        return Spelling.matchCase(guess, like: word)
+    }
+
+    /// 把游標前打錯的字換掉；有換就回傳 true
+    @discardableResult
+    private func applyAutocorrect() -> Bool {
+        guard mode == .english, editorText == nil, settings.autocorrect else { return false }
+        let word = currentWord
+        guard let fix = autocorrection(for: word) else { return false }
+        for _ in word { textDocumentProxy.deleteBackward() }
+        textDocumentProxy.insertText(fix)
+        lastAutocorrect = (word, fix)
+        return true
+    }
+
+    private func revertAutocorrect(_ ac: (original: String, corrected: String)) -> Bool {
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        guard let last = before.last, !last.isLetter, before.dropLast().hasSuffix(ac.corrected) else { return false }
+        for _ in 0...ac.corrected.count { textDocumentProxy.deleteBackward() }
+        textDocumentProxy.insertText(last == " " ? ac.original : ac.original + String(last))
+        UITextChecker.learnWord(ac.original)
+        clearSuggestions()
+        toast("已改回「\(ac.original)」，之後不會再改它")
+        return true
     }
 
     private func typeZhuyin(_ c: Character) {
@@ -288,6 +375,7 @@ final class KeyboardViewController: UIInputViewController {
         clearSuggestions()
         deleteOutput()
         updateAutoShift()
+        updateSpelling()
     }
 
     private func space() {
@@ -314,6 +402,7 @@ final class KeyboardViewController: UIInputViewController {
             updateAutoShift()
             return
         }
+        applyAutocorrect()
         lastSpaceTime = Date()
         output(" ")
         updateAutoShift()
@@ -487,6 +576,17 @@ final class KeyboardViewController: UIInputViewController {
                 showAssociations(after: c.text)
                 refreshReturnTitle()
             }
+        } else if suggestionSource == .spelling, i < suggestions.count {
+            // 換掉正在打的英文字，後面補一個空白
+            let word = currentWord
+            let choice = suggestions[i]
+            if choice != word {
+                for _ in word { textDocumentProxy.deleteBackward() }
+                textDocumentProxy.insertText(choice)
+            }
+            textDocumentProxy.insertText(" ")
+            clearSuggestions()
+            updateAutoShift()
         } else if i < suggestions.count {
             let s = suggestions[i]
             output(s)
@@ -672,6 +772,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func settingsChanged() {
+        engine?.fuzzy = fuzzyOptions
         clipStore.limit = settings.clipLimit
         let modes = settings.enabledModes
         if !modes.contains(mode) {

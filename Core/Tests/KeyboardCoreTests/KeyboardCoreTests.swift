@@ -51,7 +51,7 @@ final class ZhuyinComposerTests: XCTestCase {
 }
 
 final class ZhuyinEngineTests: XCTestCase {
-    private func makeEngine() -> ZhuyinEngine {
+    private func makeEngine(extra: [(String, String, Double)] = []) -> ZhuyinEngine {
         let db = SQLiteDB.inMemory()!
         ZhuyinEngine.createSchema(in: db)
         let rows: [(String, String, Double)] = [
@@ -60,7 +60,7 @@ final class ZhuyinEngineTests: XCTestCase {
             ("ㄕˋ", "是", -2.5), ("ㄕˋ", "事", -3.2), ("ㄕˋ", "世", -3.6),
             ("ㄐㄧㄝˋ", "界", -4.2), ("ㄕˋ-ㄐㄧㄝˋ", "世界", -4.5),
         ]
-        for r in rows { ZhuyinEngine.insert(into: db, reading: r.0, phrase: r.1, score: r.2) }
+        for r in rows + extra { ZhuyinEngine.insert(into: db, reading: r.0, phrase: r.1, score: r.2) }
         return ZhuyinEngine(db: db, userModel: UserPhraseModel(fileURL: nil))
     }
 
@@ -156,5 +156,69 @@ final class StoreTests: XCTestCase {
                 XCTAssertFalse(cat.items.contains(""), cat.title)
             }
         }
+    }
+}
+
+final class FuzzyTests: XCTestCase {
+    private func makeEngine(extra: [(String, String, Double)] = []) -> ZhuyinEngine {
+        let db = SQLiteDB.inMemory()!
+        ZhuyinEngine.createSchema(in: db)
+        let rows: [(String, String, Double)] = [
+            ("ㄋㄧˇ", "你", -3.0), ("ㄏㄠˇ", "好", -3.0), ("ㄋㄧˇ-ㄏㄠˇ", "你好", -4.0),
+            ("ㄕˋ", "是", -2.5), ("ㄕˋ", "事", -3.2),
+        ]
+        for r in rows + extra { ZhuyinEngine.insert(into: db, reading: r.0, phrase: r.1, score: r.2) }
+        return ZhuyinEngine(db: db, userModel: UserPhraseModel(fileURL: nil))
+    }
+
+    private func sentence(_ e: ZhuyinEngine, _ r: [String]) -> String {
+        e.bestSegments(r).map { $0.text }.joined()
+    }
+
+    func testForgotTone() {
+        let e = makeEngine(extra: [("ㄋㄧ", "妮", -5.5)])
+        XCTAssertEqual(sentence(e, ["ㄋㄧ", "ㄏㄠˇ"]), "你好")
+        e.fuzzy.tones = false
+        XCTAssertEqual(sentence(e, ["ㄋㄧ", "ㄏㄠˇ"]), "妮好")
+    }
+
+    func testCorrectInputStaysCorrect() {
+        let e = makeEngine(extra: [("ㄕ", "詩", -4.0)])
+        XCTAssertEqual(e.candidates(for: ["ㄕ"]).first?.text, "詩")
+        XCTAssertEqual(e.candidates(for: ["ㄕˋ"]).first?.text, "是")
+    }
+
+    func testNeighborKey() {
+        let e = makeEngine()
+        // ㄡ 在 ㄠ 正下方，按錯了
+        XCTAssertEqual(sentence(e, ["ㄋㄧˇ", "ㄏㄡˇ"]), "你好")
+    }
+
+    func testPhonetic() {
+        let e = makeEngine()
+        XCTAssertEqual(e.candidates(for: ["ㄙˋ"]).first?.kind, .literal)
+        e.fuzzy.phonetic = true
+        XCTAssertEqual(e.candidates(for: ["ㄙˋ"]).first?.text, "是")
+    }
+
+    func testNeighborsMap() {
+        XCTAssertEqual(Set(Bopomofo.neighbors["ㄡ"] ?? []), Set("ㄝㄥㄠ"))
+    }
+}
+
+final class SpellingTests: XCTestCase {
+    func testEditDistance() {
+        XCTAssertEqual(Spelling.editDistance("teh", "the"), 1)
+        XCTAssertTrue(Spelling.isCloseEnough("teh", "the"))
+        XCTAssertEqual(Spelling.editDistance("helo", "hello"), 1)
+        XCTAssertEqual(Spelling.editDistance("", "abc"), 3)
+        XCTAssertTrue(Spelling.isCloseEnough("helo", "hello"))
+        XCTAssertFalse(Spelling.isCloseEnough("cat", "dog"))
+        XCTAssertTrue(Spelling.isCloseEnough("recieve", "receive"))
+    }
+
+    func testMatchCase() {
+        XCTAssertEqual(Spelling.matchCase("hello", like: "Helo"), "Hello")
+        XCTAssertEqual(Spelling.matchCase("hello", like: "helo"), "hello")
     }
 }

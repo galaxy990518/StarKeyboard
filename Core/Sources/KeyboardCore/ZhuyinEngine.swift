@@ -27,6 +27,28 @@ final class ZhuyinEngine {
 
     private let db: SQLiteDB
     private var cache: [String: [Scored]] = [:]
+    private var fuzzyCache: [String: [Scored]] = [:]
+    private var alternativeCache: [String: [(reading: String, penalty: Double)]] = [:]
+
+    /// 容錯：打錯鍵、聲調錯、ㄣㄥ這類模糊音也猜得到
+    struct FuzzyOptions: Equatable {
+        var keyNeighbors = true   // 打出來的音不存在時，試試旁邊的鍵
+        var tones = true          // 聲調打錯或忘了打
+        var phonetic = false      // ㄣㄥ、ㄓㄗ、ㄔㄘ、ㄕㄙ 分不清
+    }
+
+    var fuzzy = FuzzyOptions() {
+        didSet {
+            if fuzzy != oldValue {
+                fuzzyCache.removeAll()
+                alternativeCache.removeAll()
+            }
+        }
+    }
+
+    static let tonePenalty: Double = -2.5
+    static let phoneticPenalty: Double = -1.2
+    static let neighborPenalty: Double = -2.5
     let userModel: UserPhraseModel
 
     init(db: SQLiteDB, userModel: UserPhraseModel) {
@@ -82,6 +104,93 @@ final class ZhuyinEngine {
         return result
     }
 
+    /// 和 phrases 一樣，但也算進打錯的可能（每個詞最多猜錯一個音節，分數扣一點）
+    func fuzzyPhrases(_ readings: ArraySlice<String>) -> [Scored] {
+        let key = readings.joined(separator: "-")
+        if let cached = fuzzyCache[key] { return cached }
+        var best: [String: Double] = [:]
+        var order: [String] = []
+        func merge(_ list: [Scored], _ penalty: Double) {
+            for p in list {
+                let s = p.score + penalty
+                if let old = best[p.text] {
+                    if s > old { best[p.text] = s }
+                } else {
+                    best[p.text] = s
+                    order.append(p.text)
+                }
+            }
+        }
+        merge(phrases(readings), 0)
+        let syllables = Array(readings)
+        for j in syllables.indices {
+            for alt in alternatives(for: syllables[j]) {
+                var variant = syllables
+                variant[j] = alt.reading
+                merge(phrases(variant[...]), alt.penalty)
+            }
+        }
+        var list = order.enumerated().map { (i, text) in (i, Scored(text: text, score: best[text]!)) }
+        list.sort { $0.1.score != $1.1.score ? $0.1.score > $1.1.score : $0.0 < $1.0 }
+        let result = list.map { $0.1 }
+        fuzzyCache[key] = result
+        return result
+    }
+
+    /// 一個音節可能是哪些音打錯了（只留字典裡真的有的）
+    func alternatives(for reading: String) -> [(reading: String, penalty: Double)] {
+        if let cached = alternativeCache[reading] { return cached }
+        var syllable = Syllable()
+        for c in reading { syllable.put(c) }
+        var out: [(reading: String, penalty: Double)] = []
+        var seen: Set<String> = [reading]
+        func add(_ s: Syllable, _ penalty: Double) {
+            let r = s.reading
+            guard s.hasSound, !seen.contains(r) else { return }
+            seen.insert(r)
+            if !phrases([r][...]).isEmpty { out.append((r, penalty)) }
+        }
+
+        if fuzzy.tones {
+            for tone in [nil, "ˊ", "ˇ", "ˋ", "˙"] as [Character?] where tone != syllable.tone {
+                var s = syllable
+                s.tone = tone
+                add(s, Self.tonePenalty)
+            }
+        }
+        if fuzzy.phonetic {
+            if let i = syllable.initial, let swap = Bopomofo.similar[i] {
+                var s = syllable
+                s.initial = swap
+                add(s, Self.phoneticPenalty)
+            }
+            if let f = syllable.rhyme, let swap = Bopomofo.similar[f] {
+                var s = syllable
+                s.rhyme = swap
+                add(s, Self.phoneticPenalty)
+            }
+        }
+        // 打出來的音根本不存在：多半是按到旁邊的鍵
+        if fuzzy.keyNeighbors && phrases([reading][...]).isEmpty {
+            for c in reading {
+                for n in Bopomofo.neighbors[c] ?? [] {
+                    var s = syllable
+                    switch Bopomofo.kind(of: c) {
+                    case .initial: s.initial = nil
+                    case .medial: s.medial = nil
+                    case .rhyme: s.rhyme = nil
+                    case .tone: s.tone = nil
+                    case nil: continue
+                    }
+                    s.put(n)
+                    add(s, Self.neighborPenalty)
+                }
+            }
+        }
+        alternativeCache[reading] = out
+        return out
+    }
+
     /// 整串注音分數最高的斷法
     func bestSegments(_ readings: [String]) -> [Scored] {
         let n = readings.count
@@ -93,7 +202,7 @@ final class ZhuyinEngine {
             for k in 1...min(Self.maxPhraseLength, i) {
                 let start = i - k
                 guard best[start] > -.infinity else { continue }
-                if let top = phrases(readings[start..<i]).first {
+                if let top = fuzzyPhrases(readings[start..<i]).first {
                     let s = best[start] + top.score
                     if s > best[i] {
                         best[i] = s
@@ -130,7 +239,7 @@ final class ZhuyinEngine {
         }
         var hasSingle = false
         for k in stride(from: min(Self.maxPhraseLength, readings.count), through: 1, by: -1) {
-            for p in phrases(readings[0..<k]) where !seen.contains(p.text) {
+            for p in fuzzyPhrases(readings[0..<k]) where !seen.contains(p.text) {
                 seen.insert(p.text)
                 out.append(Candidate(text: p.text, span: k, kind: .phrase))
                 if k == 1 { hasSingle = true }
@@ -161,11 +270,13 @@ final class ZhuyinEngine {
         guard !readings.isEmpty, readings.count <= Self.maxPhraseLength else { return }
         userModel.record(reading: readings.joined(separator: "-"), phrase: text)
         cache.removeAll()
+        fuzzyCache.removeAll()
     }
 
     func resetLearning() {
         userModel.reset()
         cache.removeAll()
+        fuzzyCache.removeAll()
     }
 }
 

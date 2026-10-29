@@ -103,6 +103,23 @@ final class SettingsPanelView: UIView {
             self?.settings.associations = on
         })
 
+        stack.addArrangedSubview(header("打錯字修正"))
+        stack.addArrangedSubview(switchRow("英文自動修正（按空白時修正，馬上按刪除可以復原）", on: settings.autocorrect) { [weak self] on in
+            self?.settings.autocorrect = on
+        })
+        stack.addArrangedSubview(switchRow("注音：按到旁邊的鍵也猜得到", on: settings.fuzzyKeys) { [weak self] on in
+            self?.settings.fuzzyKeys = on
+            self?.onChange?()
+        })
+        stack.addArrangedSubview(switchRow("注音：聲調打錯或忘了打", on: settings.fuzzyTones) { [weak self] on in
+            self?.settings.fuzzyTones = on
+            self?.onChange?()
+        })
+        stack.addArrangedSubview(switchRow("注音模糊音：ㄣㄥ、ㄓㄗ、ㄔㄘ、ㄕㄙ 分不清", on: settings.fuzzyPhonetic) { [weak self] on in
+            self?.settings.fuzzyPhonetic = on
+            self?.onChange?()
+        })
+
         stack.addArrangedSubview(header("翻譯"))
         stack.addArrangedSubview(note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。iOS 26 以上且已下載語言時用 iPhone 內建翻譯，不然會用網路翻譯服務 MyMemory（你打的句子會傳到那邊）。"))
 

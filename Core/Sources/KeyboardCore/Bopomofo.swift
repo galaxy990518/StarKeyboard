@@ -25,6 +25,31 @@ enum Bopomofo {
         "ㄇㄋㄎㄑㄕㄘㄨㄜㄠㄤ",
         "ㄈㄌㄏㄒㄖㄙㄩㄝㄡㄥ",
     ]
+
+    /// 常分不清的音（模糊音）
+    static let similar: [Character: Character] = [
+        "ㄣ": "ㄥ", "ㄥ": "ㄣ", "ㄓ": "ㄗ", "ㄗ": "ㄓ",
+        "ㄔ": "ㄘ", "ㄘ": "ㄔ", "ㄕ": "ㄙ", "ㄙ": "ㄕ",
+    ]
+
+    /// 鍵盤上相鄰的鍵（左右、上下）
+    static let neighbors: [Character: [Character]] = {
+        let grid = dachenRows.map { Array($0) }
+        var map: [Character: [Character]] = [:]
+        for (r, row) in grid.enumerated() {
+            for (c, ch) in row.enumerated() {
+                var list: [Character] = []
+                for (dr, dc) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
+                    let rr = r + dr, cc = c + dc
+                    if rr >= 0, rr < grid.count, cc >= 0, cc < grid[rr].count {
+                        list.append(grid[rr][cc])
+                    }
+                }
+                map[ch] = list
+            }
+        }
+        return map
+    }()
 }
 
 /// 一個字的注音：聲母＋介音＋韻母＋聲調（一聲不標）

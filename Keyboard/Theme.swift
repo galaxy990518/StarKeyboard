@@ -215,6 +215,22 @@ final class KeyboardSettings {
         get { InputMode(rawValue: d.string(forKey: "lastMode") ?? "") ?? .zhuyin }
         set { d.set(newValue.rawValue, forKey: "lastMode") }
     }
+    var autocorrect: Bool {
+        get { bool("autocorrect", true) }
+        set { d.set(newValue, forKey: "autocorrect") }
+    }
+    var fuzzyKeys: Bool {
+        get { bool("fuzzyKeys", true) }
+        set { d.set(newValue, forKey: "fuzzyKeys") }
+    }
+    var fuzzyTones: Bool {
+        get { bool("fuzzyTones", true) }
+        set { d.set(newValue, forKey: "fuzzyTones") }
+    }
+    var fuzzyPhonetic: Bool {
+        get { bool("fuzzyPhonetic", false) }
+        set { d.set(newValue, forKey: "fuzzyPhonetic") }
+    }
     var translateTarget: String {
         get { d.string(forKey: "translateTarget") ?? "en" }
         set { d.set(newValue, forKey: "translateTarget") }
