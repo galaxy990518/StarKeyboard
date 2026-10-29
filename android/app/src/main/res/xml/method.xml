@@ -3,7 +3,7 @@
     android:settingsActivity="com.startown.starkeyboard.MainActivity"
     android:supportsSwitchingToNextInputMethod="true">
     <subtype
-        android:label="星星鍵盤"
+        android:label="糯糯鍵盤"
         android:imeSubtypeLocale="zh_TW"
         android:imeSubtypeMode="keyboard" />
 </input-method>

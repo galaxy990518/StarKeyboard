@@ -1568,7 +1568,7 @@ final class KeyboardViewController: UIInputViewController {
         let latest = settings.latestBuild
         guard latest > ReleaseChecker.currentBuild, latest > settings.notifiedBuild else { return }
         settings.notifiedBuild = latest
-        toast("有新版（第 \(latest) 版）！打開星星鍵盤 App 看更新內容")
+        toast("有新版（第 \(latest) 版）！打開糯糯鍵盤 App 看更新內容")
     }
 
     // MARK: - 回饋

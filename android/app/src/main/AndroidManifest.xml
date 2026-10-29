@@ -6,7 +6,7 @@
 
     <application
         android:name=".StarApp"
-        android:label="星星鍵盤"
+        android:label="糯糯鍵盤"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="false"
@@ -24,7 +24,7 @@
 
         <service
             android:name=".ime.StarKeyboardService"
-            android:label="星星鍵盤"
+            android:label="糯糯鍵盤"
             android:permission="android.permission.BIND_INPUT_METHOD"
             android:exported="true">
             <intent-filter>

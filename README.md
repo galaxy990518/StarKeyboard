@@ -1,4 +1,4 @@
-# ⭐ 星星鍵盤 StarKeyboard
+# 糯糯鍵盤 StarKeyboard
 
 支援 iOS 15 以上的 iPhone 鍵盤：注音、手寫、英文、數字、特殊符號、表情符號、日式顏文字、自製表符／貼圖、剪貼簿紀錄、可愛主題（可放自己的照片當背景）。
 
@@ -38,7 +38,7 @@
 3. 在 Windows 安裝 [Sideloadly](https://sideloadly.io/)＋ iTunes（要從 Apple 官網下載的版本，不是 Microsoft Store 版）。
 4. iPhone 用傳輸線接電腦，打開 Sideloadly，把 ipa 拖進去，輸入 Apple ID，按 Start。
 5. iPhone：設定 › 一般 › VPN 與裝置管理 › 信任你的 Apple ID。iOS 16 以上還要打開：設定 › 隱私權與安全性 › 開發者模式。
-6. 設定 › 一般 › 鍵盤 › 鍵盤 › 新增鍵盤 › 星星鍵盤，再點進去打開「允許完整取用」。
+6. 設定 › 一般 › 鍵盤 › 鍵盤 › 新增鍵盤 › 糯糯鍵盤，再點進去打開「允許完整取用」。
 
 免費 Apple ID 裝的 App 每 7 天會過期，用 Sideloadly 再裝一次就好（設定和剪貼簿紀錄不會不見）。
 

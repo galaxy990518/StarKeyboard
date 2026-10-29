@@ -111,7 +111,7 @@ final class SettingsPanelView: UIView {
         ]))
 
         stack.addArrangedSubview(header("背景圖片"))
-        stack.addArrangedSubview(note("先在相簿把照片「拷貝」，再按下面的按鈕。也可以用「星星鍵盤」App 挑照片。"))
+        stack.addArrangedSubview(note("先在相簿把照片「拷貝」，再按下面的按鈕。也可以用「糯糯鍵盤」App 挑照片。"))
         stack.addArrangedSubview(buttonRow([
             ("＋ 從剪貼簿新增照片", { [weak self] in self?.onPasteBackground?() }),
             ("全部拿掉", { [weak self] in self?.onClearBackground?() }),
@@ -216,13 +216,13 @@ final class SettingsPanelView: UIView {
             ("清除選字學習紀錄", { [weak self] in self?.onResetLearning?() }),
         ]))
         if !hasFullAccess {
-            stack.addArrangedSubview(note("⚠️ 還沒開啟「允許完整取用」：剪貼簿、聲音、震動、貼圖、背景圖片都需要它。\n設定 › 一般 › 鍵盤 › 鍵盤 › 星星鍵盤 › 允許完整取用"))
+            stack.addArrangedSubview(note("⚠️ 還沒開啟「允許完整取用」：剪貼簿、聲音、震動、貼圖、背景圖片都需要它。\n設定 › 一般 › 鍵盤 › 鍵盤 › 糯糯鍵盤 › 允許完整取用"))
         }
         let current = ReleaseChecker.currentBuild
         if settings.latestBuild > current {
-            stack.addArrangedSubview(note("🎉 有新版（第 \(settings.latestBuild) 版）：打開「星星鍵盤」App 看更新內容和下載方法"))
+            stack.addArrangedSubview(note("🎉 有新版（第 \(settings.latestBuild) 版）：打開「糯糯鍵盤」App 看更新內容和下載方法"))
         }
-        stack.addArrangedSubview(note("星星鍵盤 第 \(current) 版 ・ 注音字典來自小麥注音（MIT 授權）"))
+        stack.addArrangedSubview(note("糯糯鍵盤 第 \(current) 版 ・ 注音字典來自小麥注音（MIT 授權）"))
 
         setNeedsLayout()
         layoutIfNeeded()

@@ -80,7 +80,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         rows = showPinnedOnly ? store.ordered.filter { $0.pinned } : store.ordered
         table.reloadData()
         if !hasFullAccess {
-            emptyLabel.text = "要記錄剪貼簿，請到\n設定 › 一般 › 鍵盤 › 鍵盤 › 星星鍵盤\n打開「允許完整取用」"
+            emptyLabel.text = "要記錄剪貼簿，請到\n設定 › 一般 › 鍵盤 › 鍵盤 › 糯糯鍵盤\n打開「允許完整取用」"
         } else if showPinnedOnly {
             emptyLabel.text = "還沒有釘選的內容\n在項目上往右滑，或點 📌 就能釘選"
         } else {

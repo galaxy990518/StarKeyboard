@@ -217,7 +217,7 @@ class ClipboardPanel(
         val rows = if (pinnedOnly) store.ordered.filter { it.pinned } else store.ordered
         if (rows.isEmpty()) {
             list.addView(TextView(context).apply {
-                text = if (pinnedOnly) "還沒有釘選的內容\n點項目右邊的 📌 就能釘選" else "複製文字後就會記在這裡\n（要先把星星鍵盤設成預設鍵盤）"
+                text = if (pinnedOnly) "還沒有釘選的內容\n點項目右邊的 📌 就能釘選" else "複製文字後就會記在這裡\n（要先把糯糯鍵盤設成預設鍵盤）"
                 textSize = 14f
                 gravity = Gravity.CENTER
                 setTextColor(t.keyText.withAlpha(0.7f))
@@ -451,7 +451,7 @@ class SettingsPanel(
         }
 
         header("背景照片")
-        button("＋ 新增照片（打開星星鍵盤 App 挑）") { onOpenApp() }
+        button("＋ 新增照片（打開糯糯鍵盤 App 挑）") { onOpenApp() }
         if (settings.photos.isNotEmpty()) photoRow()
         if (settings.photos.size >= 2) {
             val modes = listOf("fixed" to "固定這張", "open" to "每次打開換", "daily" to "每天換")
@@ -528,9 +528,9 @@ class SettingsPanel(
         header("其他")
         button("清除選字學習紀錄") { onResetLearning() }
         if (settings.latestBuild > BuildInfo.current(context)) {
-            note("🎉 有新版（Android 第 ${settings.latestBuild} 版）：打開「星星鍵盤」App 更新")
+            note("🎉 有新版（Android 第 ${settings.latestBuild} 版）：打開「糯糯鍵盤」App 更新")
         }
-        note("星星鍵盤 Android 第 ${BuildInfo.current(context)} 版 ・ 注音字典來自小麥注音（MIT 授權）")
+        note("糯糯鍵盤 Android 第 ${BuildInfo.current(context)} 版 ・ 注音字典來自小麥注音（MIT 授權）")
     }
 }
 

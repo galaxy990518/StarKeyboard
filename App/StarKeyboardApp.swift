@@ -24,7 +24,9 @@ struct ContentView: View {
             List {
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("⭐️ 星星鍵盤")
+                        Image("BrandMark")
+                            .resizable().frame(width: 64, height: 64).clipShape(RoundedRectangle(cornerRadius: 17))
+                        Text("糯糯鍵盤")
                             .font(.system(.largeTitle, design: .rounded).bold())
                         Text("注音、手寫、英文、表符、顏文字、剪貼簿，還有可愛的主題。")
                             .font(.system(.subheadline, design: .rounded))
@@ -54,9 +56,9 @@ struct ContentView: View {
 
                 Section("第一次使用：打開鍵盤") {
                     step(1, "打開「設定」App › 一般 › 鍵盤 › 鍵盤 › 新增鍵盤…")
-                    step(2, "在「第三方鍵盤」選「星星鍵盤」")
-                    step(3, "點「星星鍵盤」，打開「允許完整取用」（剪貼簿、聲音、震動、貼圖、背景圖都需要）")
-                    step(4, "打字時長按 🌐 地球鍵，切換到星星鍵盤")
+                    step(2, "在「第三方鍵盤」選「糯糯鍵盤」")
+                    step(3, "點「糯糯鍵盤」，打開「允許完整取用」（剪貼簿、聲音、震動、貼圖、背景圖都需要）")
+                    step(4, "打字時長按 🌐 地球鍵，切換到糯糯鍵盤")
                     Button("打開本 App 的設定頁") {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             UIApplication.shared.open(url)
@@ -95,7 +97,7 @@ struct ContentView: View {
                     tip("免費 Apple ID", "用免費帳號安裝的話，每 7 天要用 Sideloadly 重新安裝一次（資料不會不見）。")
                 }
             }
-            .navigationTitle("星星鍵盤")
+            .navigationTitle("糯糯鍵盤")
             .navigationBarTitleDisplayMode(.inline)
             .tint(pink)
             .task {
