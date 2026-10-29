@@ -1020,6 +1020,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 onResetLearning = { engine?.resetLearning(); toast("已清除選字學習紀錄") },
                 onBack = { closePanel() })
         }
+        // 面板墊一層半透明的底，放背景照片時字和按鈕才看得清楚（設定的字多，墊厚一點）
+        val strong = if (kind == PanelKind.SETTINGS) 0.82f else 0.6f
+        v.setBackgroundColor(if (style.theme.dark) android.graphics.Color.BLACK.withAlpha(strong - 0.2f) else android.graphics.Color.WHITE.withAlpha(strong))
         content.addView(v, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         panelView = v
         keyboard.visibility = View.GONE

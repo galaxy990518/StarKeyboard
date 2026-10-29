@@ -121,6 +121,8 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        // 讓 iOS 照我們自己設的高度（不然「鍵盤高度」滑桿會被系統的預設高度蓋掉）
+        (view as? UIInputView)?.allowsSelfSizing = true
         let modes = settings.enabledModes
         mode = modes.contains(settings.lastMode) ? settings.lastMode : modes[0]
 
@@ -167,6 +169,14 @@ final class KeyboardViewController: UIInputViewController {
         }
         rebuildKeys()
         updateAutoShift()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // 鍵盤剛載入時設的高度有時會被系統忽略：出現後重新套一次
+        heightConstraint?.isActive = false
+        heightConstraint = nil
+        updateHeight()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -968,6 +978,9 @@ final class KeyboardViewController: UIInputViewController {
             p.onBack = { [weak self] in self?.closePanel() }
             v = p
         }
+        // 面板墊一層半透明的底，放背景照片時字和按鈕才看得清楚（設定的字多，墊厚一點）
+        let strong: CGFloat = kind == .settings ? 0.82 : 0.6
+        v.backgroundColor = style.theme.isDark ? UIColor.black.withAlphaComponent(strong - 0.2) : UIColor.white.withAlphaComponent(strong)
         v.frame = contentView.bounds
         contentView.addSubview(v)
         panelView = v
