@@ -288,6 +288,13 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         }
         topBar.onEditor = { confirm -> if (confirm) confirmEditor() else endEditor() }
         topBar.onEditorExtra = { editorExtraTapped() }
+        topBar.onEditorSource = {
+            // 原文語言：自動 → 英文 → 日文 → … 輪流換
+            val codes = listOf("auto") + Translator.targets.map { it.code }
+            val i = maxOf(0, codes.indexOf(settings.translateSource))
+            settings.translateSource = codes[(i + 1) % codes.size]
+            refreshTopBar()
+        }
     }
 
     private fun showImePicker() {
@@ -845,7 +852,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                     EditorPurpose.EMOTICON -> topBar.showEditor("新增表符：", ed + pending, "(•ᴗ•)", "儲存")
                     EditorPurpose.TRANSLATE -> {
                         val name = Translator.targets.firstOrNull { it.code == settings.translateTarget }?.name ?: "英文"
-                        topBar.showEditor(if (translating) "翻譯中…" else "翻譯：", ed + pending, "→$name", "翻譯")
+                        val from = Translator.targets.firstOrNull { it.code == settings.translateSource }?.name ?: "自動"
+                        topBar.showEditor(if (translating) "翻譯中…" else "翻譯：", ed + pending, "→$name", "翻譯", "從：$from")
                     }
                     else -> topBar.showEditor(editorLabel(editorPurpose), ed + pending, "", editorConfirmTitle(editorPurpose))
                 }
@@ -1211,7 +1219,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         if (translating) return
         translating = true
         refreshTopBar()
-        Translator.translate(text, settings.translateTarget, status = { toast(it) }) { result ->
+        Translator.translate(text, settings.translateSource, settings.translateTarget, status = { toast(it) }) { result ->
             translating = false
             if (editorText == null) return@translate
             result.onSuccess { editorResult = EditorResult("點翻譯結果送出 ・ 原文：$text", listOf(it)) }.onFailure { toast(it.message ?: "翻譯失敗") }

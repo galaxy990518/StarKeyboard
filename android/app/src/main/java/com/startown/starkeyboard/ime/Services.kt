@@ -124,9 +124,11 @@ object Translator {
         }
     }
 
-    fun translate(text: String, target: String, status: (String) -> Unit, done: (Result<String>) -> Unit) {
-        var source = detectSource(text)
-        if (source == target) source = if (target == "en") "zh-TW" else "en"
+    /** chosen：原文語言；"auto" 就自己猜 */
+    fun translate(text: String, chosen: String, target: String, status: (String) -> Unit, done: (Result<String>) -> Unit) {
+        val picked = chosen.takeIf { it != "auto" }
+        var source = picked ?: detectSource(text)
+        if (picked == null && source == target) source = if (target == "en") "zh-TW" else "en"
         // ML Kit 的中文只有一種（簡體），要繁中就直接用網路翻譯
         val src = TranslateLanguage.fromLanguageTag(source.substringBefore('-'))
         val tgt = TranslateLanguage.fromLanguageTag(target.substringBefore('-'))

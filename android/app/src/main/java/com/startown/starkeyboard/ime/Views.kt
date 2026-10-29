@@ -185,6 +185,7 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
     var onTrailing: ((Trailing) -> Unit)? = null
     var onEditor: ((Boolean) -> Unit)? = null
     var onEditorExtra: (() -> Unit)? = null
+    var onEditorSource: (() -> Unit)? = null
 
     var style = style
         set(value) {
@@ -195,7 +196,7 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
     private sealed class Content {
         object Toolbar : Content()
         data class Candidates(val composition: String, val items: List<String>, val trailing: Trailing) : Content()
-        data class Editor(val prompt: String, val text: String, val extra: String, val confirm: String) : Content()
+        data class Editor(val prompt: String, val text: String, val extra: String, val confirm: String, val source: String? = null) : Content()
     }
 
     private var content: Content = Content.Toolbar
@@ -204,8 +205,9 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
     fun showCandidates(composition: String, items: List<String>, trailing: Trailing) {
         content = Content.Candidates(composition, items, trailing); redraw()
     }
-    fun showEditor(prompt: String, text: String, extra: String, confirm: String) {
-        content = Content.Editor(prompt, text, extra, confirm); redraw()
+    /** source：翻譯時的「原文語言」按鈕（其他編輯框不用就是 null） */
+    fun showEditor(prompt: String, text: String, extra: String, confirm: String, source: String? = null) {
+        content = Content.Editor(prompt, text, extra, confirm, source); redraw()
     }
 
     private val tint get() = if (style.theme.dark) style.theme.keyText else style.theme.specialText
@@ -267,6 +269,10 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
                     ellipsize = TextUtils.TruncateAt.START
                     gravity = Gravity.CENTER_VERTICAL
                 }, LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply { leftMargin = dpi(12f) })
+                c.source?.let { src ->
+                    row.addView(Tap(context, src, 14f, tint, true) { onEditorSource?.invoke() }.apply { setPadding(dpi(6f), 0, dpi(6f), 0) },
+                        LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
+                }
                 row.addView(Tap(context, c.extra, 14f, tint, true) { onEditorExtra?.invoke() }.apply { setPadding(dpi(8f), 0, dpi(8f), 0) },
                     LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
                 row.addView(Tap(context, "取消", 15f, tint) { onEditor?.invoke(false) }, LinearLayout.LayoutParams(dpi(56f), LayoutParams.MATCH_PARENT))

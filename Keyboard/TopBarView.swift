@@ -11,7 +11,8 @@ final class TopBarView: UIView {
     enum Content {
         case toolbar
         case candidates(composition: String, items: [String], trailing: Trailing)
-        case editor(prompt: String, text: String, extra: String, confirm: String)
+        // source：翻譯時的「原文語言」按鈕（其他編輯框不用就是 nil）
+        case editor(prompt: String, text: String, extra: String, confirm: String, source: String? = nil)
     }
 
     var onToolbar: ((ToolbarItem) -> Void)?
@@ -19,11 +20,13 @@ final class TopBarView: UIView {
     var onTrailing: ((Trailing) -> Void)?
     var onEditor: ((Bool) -> Void)?
     var onEditorExtra: (() -> Void)?
+    var onEditorSource: (() -> Void)?
     var style: KeyboardStyle {
         didSet { applyStyle() }
     }
 
     private var content: Content = .toolbar
+    private var hasSource = false
     private var trailing: Trailing = .expand
     private let toolbar = UIStackView()
     private var toolbarButtons: [UIButton] = []
@@ -35,6 +38,7 @@ final class TopBarView: UIView {
     private let editorSave = UIButton(type: .system)
     private let editorCancel = UIButton(type: .system)
     private let editorExtra = UIButton(type: .system)
+    private let editorSource = UIButton(type: .system)
     private let separator = UIView()
 
     init(style: KeyboardStyle) {
@@ -89,6 +93,11 @@ final class TopBarView: UIView {
         editorExtra.titleLabel?.minimumScaleFactor = 0.6
         editorExtra.addAction(UIAction { [weak self] _ in self?.onEditorExtra?() }, for: .touchUpInside)
         addSubview(editorExtra)
+        editorSource.titleLabel?.font = .rounded(14, .semibold)
+        editorSource.titleLabel?.adjustsFontSizeToFitWidth = true
+        editorSource.titleLabel?.minimumScaleFactor = 0.6
+        editorSource.addAction(UIAction { [weak self] _ in self?.onEditorSource?() }, for: .touchUpInside)
+        addSubview(editorSource)
         addSubview(editorCancel)
         addSubview(editorSave)
 
@@ -116,8 +125,10 @@ final class TopBarView: UIView {
             trailingButton.setImage(Self.icon(trailing == .expand ? "chevron.down" : "xmark"), for: .normal)
             trailingButton.isHidden = items.isEmpty && trailing == .expand
             rebuildCandidates(Array(items.prefix(60)))
-        case let .editor(prompt, text, extra, confirm):
+        case let .editor(prompt, text, extra, confirm, source):
             isEditor = true
+            editorSource.setTitle(source, for: .normal)
+            hasSource = source != nil
             editorLabel.text = prompt + text + "▏"
             editorExtra.setTitle(extra, for: .normal)
             editorSave.setTitle(confirm, for: .normal)
@@ -132,6 +143,7 @@ final class TopBarView: UIView {
         editorSave.isHidden = !isEditor
         editorCancel.isHidden = !isEditor
         editorExtra.isHidden = !isEditor
+        editorSource.isHidden = !isEditor || !hasSource
         setNeedsLayout()
     }
 
@@ -173,7 +185,10 @@ final class TopBarView: UIView {
         }
         candidateScroll.contentSize = CGSize(width: x + 6, height: candidateScroll.bounds.height)
 
-        editorLabel.frame = CGRect(x: 12, y: 0, width: w - 222, height: h)
+        // 翻譯時多一顆「從：原文語言」，打的字區域變窄一點
+        let sourceW: CGFloat = hasSource ? 70 : 0
+        editorLabel.frame = CGRect(x: 12, y: 0, width: w - 222 - sourceW, height: h)
+        editorSource.frame = CGRect(x: w - 208 - sourceW, y: 0, width: sourceW, height: h)
         editorExtra.frame = CGRect(x: w - 208, y: 0, width: 72, height: h)
         editorCancel.frame = CGRect(x: w - 136, y: 0, width: 64, height: h)
         editorSave.frame = CGRect(x: w - 70, y: 0, width: 64, height: h)
@@ -191,6 +206,7 @@ final class TopBarView: UIView {
         editorLabel.textColor = t.keyText
         editorCancel.tintColor = tint
         editorExtra.tintColor = tint
+        editorSource.tintColor = tint
         editorSave.tintColor = t.isDark ? t.accent : t.specialText
         separator.backgroundColor = t.shadow.withAlphaComponent(0.4)
         if case .candidates = content { show(content) }

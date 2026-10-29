@@ -267,6 +267,14 @@ final class KeyboardViewController: UIInputViewController {
             if confirm { self?.confirmEditor() } else { self?.endEditor() }
         }
         topBar.onEditorExtra = { [weak self] in self?.editorExtraTapped() }
+        topBar.onEditorSource = { [weak self] in
+            // 原文語言：自動 → 英文 → 日文 → … 輪流換
+            guard let self = self else { return }
+            let codes = ["auto"] + Translator.targets.map { $0.code }
+            let i = codes.firstIndex(of: self.settings.translateSource) ?? 0
+            self.settings.translateSource = codes[(i + 1) % codes.count]
+            self.refreshTopBar()
+        }
     }
 
     // MARK: - 按鍵
@@ -879,8 +887,9 @@ final class KeyboardViewController: UIInputViewController {
                 topBar.show(.editor(prompt: "新增表符：", text: text, extra: "(•ᴗ•)", confirm: "儲存"))
             case .translate:
                 let name = Translator.targets.first { $0.code == settings.translateTarget }?.name ?? "英文"
+                let from = Translator.targets.first { $0.code == settings.translateSource }?.name ?? "自動"
                 topBar.show(.editor(prompt: translating ? "翻譯中…" : "翻譯：", text: text, extra: "→\(name)",
-                                    confirm: "翻譯"))
+                                    confirm: "翻譯", source: "從：\(from)"))
             default:
                 topBar.show(.editor(prompt: editorLabel(editorPurpose), text: text, extra: "", confirm: editorConfirmTitle(editorPurpose)))
             }
@@ -1147,7 +1156,7 @@ final class KeyboardViewController: UIInputViewController {
             guard !translating else { return }
             translating = true
             refreshTopBar()
-            Translator.translate(trimmed, to: settings.translateTarget) { [weak self] result in
+            Translator.translate(trimmed, from: settings.translateSource, to: settings.translateTarget) { [weak self] result in
                 guard let self = self, self.editorText != nil else { return }
                 self.translating = false
                 switch result {

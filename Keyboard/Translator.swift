@@ -47,9 +47,11 @@ enum Translator {
         return latin > 0 ? "en" : "zh-TW"
     }
 
-    static func translate(_ text: String, to target: String, completion: @escaping (Result<String, Failure>) -> Void) {
-        var source = detectSource(text)
-        if source == target {
+    /// from：原文語言；"auto" 或 nil 就自己猜
+    static func translate(_ text: String, from chosen: String? = nil, to target: String, completion: @escaping (Result<String, Failure>) -> Void) {
+        let picked = chosen.flatMap { $0 == "auto" ? nil : $0 }
+        var source = picked ?? detectSource(text)
+        if picked == nil && source == target {
             source = target == "en" ? "zh-TW" : "en"
         }
         Task {

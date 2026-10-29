@@ -488,6 +488,11 @@ final class KeyboardSettings {
         get { bool("fullWidthSymbols", false) }
         set { d.set(newValue, forKey: "fullWidthSymbols") }
     }
+    /// 翻譯的原文語言："auto" 是自己猜
+    var translateSource: String {
+        get { d.string(forKey: "translateSource") ?? "auto" }
+        set { d.set(newValue, forKey: "translateSource") }
+    }
     var translateTarget: String {
         get { d.string(forKey: "translateTarget") ?? "en" }
         set { d.set(newValue, forKey: "translateTarget") }

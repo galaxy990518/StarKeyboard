@@ -347,6 +347,10 @@ class KeyboardSettings(context: Context) {
     var fullWidthSymbols: Boolean
         get() = p.getBoolean("fullWidthSymbols", false)
         set(v) = p.edit().putBoolean("fullWidthSymbols", v).apply()
+    /** 翻譯的原文語言："auto" 是自己猜 */
+    var translateSource: String
+        get() = p.getString("translateSource", "auto")!!
+        set(v) = p.edit().putString("translateSource", v).apply()
     var translateTarget: String
         get() = p.getString("translateTarget", "en")!!
         set(v) = p.edit().putString("translateTarget", v).apply()
