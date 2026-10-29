@@ -75,13 +75,13 @@ jobs:
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk StarKeyboard.apk
           ls -la StarKeyboard.apk
-          PREV=$(git describe --tags --abbrev=0 --match "android-*" 2>/dev/null || true)
+          PREV=$(git describe --tags --abbrev=0 --match "android-[0-9]*" 2>/dev/null || true)
           if [ -n "$PREV" ]; then RANGE="$PREV..HEAD"; else RANGE="HEAD"; fi
           {
             echo "這次更新："
             git log --no-merges --pretty="- %s" $RANGE -- android tools | head -20
             echo
-            echo "在 Android 手機下載 StarKeyboard.apk，點開安裝（直接蓋過舊版，設定和資料會保留）。"
+            echo "在 Android 手機下載 StarKeyboard.apk，點開安裝。目前要先移除舊版再安裝（正式簽名金鑰設定好之後就能直接更新）。"
           } > release_notes.md
           cat release_notes.md
 
@@ -93,6 +93,13 @@ jobs:
           body_path: release_notes.md
           files: StarKeyboard.apk
           make_latest: "false"
+
+      - name: 更新固定下載網址（android-latest 永遠是最新的安裝檔，安裝說明頁用這個）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view android-latest >/dev/null 2>&1 || gh release create android-latest --title "星星鍵盤 Android 最新版（固定網址）" --notes "這裡永遠是最新的 Android 安裝檔，每次打包會自動換新。各版本的更新內容請看 android-數字 的版本。" --prerelease --latest=false
+          gh release upload android-latest StarKeyboard.apk --clobber
 
       - uses: actions/upload-artifact@v4
         if: always()

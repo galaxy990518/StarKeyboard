@@ -96,7 +96,7 @@ class MainActivity : Activity() {
                 setPadding(0, px(16f), 0, px(4f))
             })
             text(info.notes, updateBox)
-            text("按下面的按鈕下載 APK，下載完點開就能安裝（直接蓋過舊版，設定和資料都會保留）。", updateBox)
+            text("按下面的按鈕下載 APK。目前要先移除舊版（長按星星鍵盤圖示 › 解除安裝）再點開新的安裝檔安裝，裝好後要重新選一次鍵盤。", updateBox)
             button("下載新版", updateBox) {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl ?: info.pageUrl)))
             }
