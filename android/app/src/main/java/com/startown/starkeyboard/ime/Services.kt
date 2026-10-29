@@ -54,6 +54,16 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
         return out
     }
 
+    override fun syllables(): List<String> {
+        val out = ArrayList<String>()
+        runCatching {
+            db.rawQuery("SELECT DISTINCT plain FROM phrases WHERE plain NOT LIKE '%-%'", null).use { c ->
+                while (c.moveToNext()) out.add(c.getString(0))
+            }
+        }
+        return out
+    }
+
     /** 拼音音節 → 沒聲調的注音 */
     fun pinyinTable(): Map<String, String> {
         val map = HashMap<String, String>()

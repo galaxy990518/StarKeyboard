@@ -189,6 +189,15 @@ final class KeyboardSettings {
         get { CGFloat(double("backgroundFade", 0.25)) }
         set { d.set(Double(newValue), forKey: "backgroundFade") }
     }
+    /// 照片裁切時盡量放在中間的點（0～1）；貼上照片時有找到臉就是臉的位置
+    var backgroundFocusX: Double {
+        get { double("backgroundFocusX", 0.5) }
+        set { d.set(newValue, forKey: "backgroundFocusX") }
+    }
+    var backgroundFocusY: Double {
+        get { double("backgroundFocusY", 0.5) }
+        set { d.set(newValue, forKey: "backgroundFocusY") }
+    }
     var hasBackground: Bool {
         get { bool("hasBackground", false) }
         set { d.set(newValue, forKey: "hasBackground") }

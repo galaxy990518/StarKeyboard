@@ -18,9 +18,12 @@ interface PhraseSource {
 
     /** 每個音節第一個注音接起來是 abbr 的所有字詞（讀音、字詞、分數），例如「ㄋㄏ」→ ㄋㄧˇ-ㄏㄠˇ 你好 */
     fun byAbbreviation(abbr: String): List<Triple<String, String, Double>>
+
+    /** 字典裡所有單字的讀音（沒聲調），例如 ㄋㄧ、ㄏㄠ */
+    fun syllables(): List<String>
 }
 
-class MemoryPhraseSource(rows: List<Triple<String, String, Double>>) : PhraseSource {
+class MemoryPhraseSource(private val rows: List<Triple<String, String, Double>>) : PhraseSource {
     private val byReading = rows.groupBy({ it.first }, { Scored(it.second, it.third) })
         .mapValues { (_, v) -> v.sortedByDescending { it.score } }
     private val all = rows.map { Scored(it.second, it.third) }
@@ -29,6 +32,9 @@ class MemoryPhraseSource(rows: List<Triple<String, String, Double>>) : PhraseSou
     override fun lookup(reading: String) = byReading[reading] ?: emptyList()
 
     override fun byAbbreviation(abbr: String) = byAbbr[abbr] ?: emptyList()
+
+    override fun syllables() = rows.filter { '-' !in it.first }
+        .map { r -> r.first.filter { Bopomofo.TONES.indexOf(it) < 0 } }.distinct()
 
     override fun startingWith(head: String, limit: Int): List<String> =
         all.filter { it.text.length > head.length && it.text.startsWith(head) }
@@ -247,6 +253,9 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         if (!hasSingle) out.add(Candidate(display(readings[0]), 1, Candidate.Kind.LITERAL))
         return out
     }
+
+    /** 所有音節的開頭（給組字用，判斷注音能不能接在一起） */
+    fun syllablePrefixes(): Set<String> = Bopomofo.prefixes(source.syllables())
 
     /** 聯想詞：打完一個字後，接在它後面常見的字詞 */
     fun associations(after: String, limit: Int = 30): List<String> {

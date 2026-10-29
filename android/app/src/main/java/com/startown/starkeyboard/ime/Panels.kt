@@ -359,6 +359,9 @@ class SettingsPanel(
 
         header("背景照片")
         button("打開星星鍵盤 App 挑照片") { onOpenApp() }
+        slider("照片上下", settings.backgroundFocusY, 0f, 1f) { settings.backgroundFocusY = it }
+        slider("照片左右", settings.backgroundFocusX, 0f, 1f) { settings.backgroundFocusX = it }
+        note("照片會自動對準臉；沒對好可以用上面兩條拖拖看。")
         slider("照片淡化", settings.backgroundFade, 0f, 0.9f) { settings.backgroundFade = it }
         slider("按鍵透明度", settings.keyAlpha, 0.35f, 1f) { settings.keyAlpha = it }
 

@@ -101,6 +101,15 @@ final class SettingsPanelView: UIView {
             ("從剪貼簿貼上圖片", { [weak self] in self?.onPasteBackground?() }),
             ("清除背景", { [weak self] in self?.onClearBackground?() }),
         ]))
+        stack.addArrangedSubview(sliderRow("照片上下", value: Float(settings.backgroundFocusY), range: 0...1) { [weak self] v in
+            self?.settings.backgroundFocusY = Double(v)
+            self?.onChange?()
+        })
+        stack.addArrangedSubview(sliderRow("照片左右", value: Float(settings.backgroundFocusX), range: 0...1) { [weak self] v in
+            self?.settings.backgroundFocusX = Double(v)
+            self?.onChange?()
+        })
+        stack.addArrangedSubview(note("照片會自動對準臉；沒對好可以用上面兩條拖拖看。"))
         stack.addArrangedSubview(sliderRow("圖片淡化", value: Float(settings.backgroundFade), range: 0...0.9) { [weak self] v in
             self?.settings.backgroundFade = CGFloat(v)
             self?.onChange?()

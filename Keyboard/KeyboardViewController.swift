@@ -1,5 +1,6 @@
 import UIKit
 import AudioToolbox
+import Vision
 
 final class KeyboardViewController: UIInputViewController {
     private enum Metrics {
@@ -95,6 +96,7 @@ final class KeyboardViewController: UIInputViewController {
         let modes = settings.enabledModes
         mode = modes.contains(settings.lastMode) ? settings.lastMode : modes[0]
 
+        view.clipsToBounds = true   // 照片放大後會超出鍵盤，超出的部分不要畫
         view.layer.insertSublayer(gradientLayer, at: 0)
         backgroundImageView.contentMode = .scaleAspectFill
         backgroundImageView.clipsToBounds = true
@@ -148,7 +150,7 @@ final class KeyboardViewController: UIInputViewController {
         CATransaction.setDisableActions(true)
         gradientLayer.frame = b
         CATransaction.commit()
-        backgroundImageView.frame = b
+        backgroundImageView.frame = backgroundFrame(in: b)
         tintOverlay.frame = b
         topBar.frame = CGRect(x: 0, y: 0, width: b.width, height: Metrics.barHeight)
         contentView.frame = CGRect(x: 0, y: Metrics.barHeight, width: b.width, height: max(0, b.height - Metrics.barHeight))
@@ -329,6 +331,9 @@ final class KeyboardViewController: UIInputViewController {
 
     private func typeZhuyin(_ c: Character) {
         clearSuggestions(refresh: false)
+        if composer.validPrefixes == nil, let prefixes = engine?.syllablePrefixes(), !prefixes.isEmpty {
+            composer.validPrefixes = prefixes
+        }
         guard composer.input(c) else {
             output(String(c))
             refreshTopBar()
@@ -1035,6 +1040,40 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: - 主題與背景
 
+    /// 照片放大到蓋滿鍵盤，對準的點（例如臉）盡量放在中間，超出的部分裁掉
+    private func backgroundFrame(in b: CGRect) -> CGRect {
+        guard let img = backgroundImage, img.size.width > 0, img.size.height > 0 else { return b }
+        let s = max(b.width / img.size.width, b.height / img.size.height)
+        let w = img.size.width * s
+        let h = img.size.height * s
+        let x = min(0, max(b.width - w, b.width / 2 - CGFloat(settings.backgroundFocusX) * w))
+        let y = min(0, max(b.height - h, b.height / 2 - CGFloat(settings.backgroundFocusY) * h))
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+
+    /// 照片裡最大那張臉的中心（0～1，左上是 0,0）；找不到回傳 nil（畫的人物可能找不到）
+    private func faceCenter(in image: UIImage) -> CGPoint? {
+        guard let cg = image.cgImage else { return nil }
+        let request = VNDetectFaceRectanglesRequest()
+        let orientation: CGImagePropertyOrientation
+        switch image.imageOrientation {
+        case .down: orientation = .down
+        case .left: orientation = .left
+        case .right: orientation = .right
+        case .upMirrored: orientation = .upMirrored
+        case .downMirrored: orientation = .downMirrored
+        case .leftMirrored: orientation = .leftMirrored
+        case .rightMirrored: orientation = .rightMirrored
+        default: orientation = .up
+        }
+        try? VNImageRequestHandler(cgImage: cg, orientation: orientation, options: [:]).perform([request])
+        let faces = request.results ?? []
+        guard let face = faces.max(by: { $0.boundingBox.width * $0.boundingBox.height < $1.boundingBox.width * $1.boundingBox.height }) else { return nil }
+        // Vision 的座標原點在左下角
+        let box = face.boundingBox
+        return CGPoint(x: box.midX, y: 1 - box.midY)
+    }
+
     private func loadBackground() {
         backgroundImage = settings.hasBackground ? UIImage(contentsOfFile: Storage.url("background.jpg").path) : nil
     }
@@ -1048,13 +1087,18 @@ final class KeyboardViewController: UIInputViewController {
             toast("剪貼簿裡沒有圖片，先到相簿「拷貝」一張")
             return
         }
-        guard let data = img.resized(maxSide: 1000).jpegData(compressionQuality: 0.85) else { return }
+        let small = img.resized(maxSide: 1000)
+        guard let data = small.jpegData(compressionQuality: 0.85) else { return }
         do {
             try data.write(to: Storage.url("background.jpg"), options: .atomic)
+            // 對準臉；找不到臉就偏上面一點（人像的頭通常在上面）
+            let face = faceCenter(in: small)
+            settings.backgroundFocusX = Double(face?.x ?? 0.5)
+            settings.backgroundFocusY = Double(face?.y ?? 0.3)
             settings.hasBackground = true
             loadBackground()
             applyStyle()
-            toast("換好背景了")
+            toast(face != nil ? "換好背景了，已對準臉" : "換好背景了，位置可以在設定調")
         } catch {
             toast("存檔失敗")
         }
@@ -1075,6 +1119,7 @@ final class KeyboardViewController: UIInputViewController {
         CATransaction.commit()
         if let img = backgroundImage {
             backgroundImageView.image = img
+            view.setNeedsLayout()
             backgroundImageView.isHidden = false
             tintOverlay.isHidden = false
             tintOverlay.backgroundColor = s.theme.backgroundTop.withAlphaComponent(settings.backgroundFade)

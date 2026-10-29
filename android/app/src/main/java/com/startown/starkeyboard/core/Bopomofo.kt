@@ -24,6 +24,10 @@ object Bopomofo {
         "ㄈㄌㄏㄒㄖㄙㄩㄝㄡㄥ",
     )
 
+    /** 所有音節（沒聲調）的開頭，例如 ㄋㄧㄠ → ㄋ、ㄋㄧ、ㄋㄧㄠ */
+    fun prefixes(syllables: Collection<String>): Set<String> =
+        syllables.flatMapTo(HashSet()) { s -> (1..s.length).map { s.substring(0, it) } }
+
     /** 常分不清的音（模糊音） */
     val similar = mapOf(
         'ㄣ' to 'ㄥ', 'ㄥ' to 'ㄣ', 'ㄓ' to 'ㄗ', 'ㄗ' to 'ㄓ',
@@ -110,6 +114,9 @@ class ZhuyinComposer {
         private set
 
     /** 查字典用的讀音：打完的音節＋正在打的音節（沒打聲調也算，先拿來預覽） */
+    /** 字典裡所有音節的開頭（例如 ㄋ、ㄋㄧ、ㄋㄧㄠ）；有的話，組不出存在的音就自動換下一個字 */
+    var validPrefixes: Set<String>? = null
+
     val readings get() = syllables.map { it.key } + listOfNotNull(if (current.hasSound) current.reading + "*" else null)
     val isComposing get() = syllables.isNotEmpty() || !current.isEmpty
     val hasPendingSyllable get() = !current.isEmpty
@@ -124,9 +131,15 @@ class ZhuyinComposer {
             return true
         }
         // 不打聲調直接打下一個字：前一個字自動結束（ㄋㄏ → 你好）
-        if (current.startsNewWith(kind)) finish(open = true)
+        if (current.hasSound && (current.startsNewWith(kind) || !fits(c))) finish(open = true)
         current.put(c)
         return true
+    }
+
+    /** 加上這個符號還是某個字的開頭嗎（例如 ㄘ＋ㄧ 不是，ㄘ 要自己算一個字） */
+    private fun fits(c: Char): Boolean {
+        val set = validPrefixes ?: return true
+        return current.copy().also { it.put(c) }.reading in set
     }
 
     /** 空白鍵＝一聲 */

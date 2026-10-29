@@ -52,6 +52,12 @@ class CoreTest {
         val w = ZhuyinComposer()
         "ㄨㄛㄏㄓㄜㄧ".forEach { w.input(it) }
         assertEquals(listOf("ㄨㄛ*", "ㄏ*", "ㄓㄜ*", "ㄧ*"), w.readings)
+        // 組不出存在的音（ㄘㄧ）就自動換下一個字
+        val v = ZhuyinComposer()
+        v.validPrefixes = Bopomofo.prefixes(listOf("ㄘ", "ㄘㄜ", "ㄧ", "ㄧㄝ"))
+        "ㄘㄧㄝ".forEach { v.input(it) }
+        assertEquals(listOf("ㄘ*", "ㄧㄝ*"), v.readings)
+        assertTrue(engine().syllablePrefixes().containsAll(listOf("ㄋ", "ㄋㄧ", "ㄐㄧㄝ")))
         a.removeFirst(1)
         assertFalse(a.isComposing)
     }

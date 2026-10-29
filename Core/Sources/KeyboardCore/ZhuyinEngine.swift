@@ -303,6 +303,20 @@ final class ZhuyinEngine {
         return out
     }
 
+    /// 所有音節（沒聲調）的開頭，例如 ㄋㄧㄠ → ㄋ、ㄋㄧ、ㄋㄧㄠ（給組字用，判斷注音能不能接在一起）
+    func syllablePrefixes() -> Set<String> {
+        var out = Set<String>()
+        db.run("SELECT DISTINCT plain FROM phrases WHERE plain NOT LIKE '%-%'") { stmt in
+            let s = SQLiteDB.text(stmt, 0)
+            var prefix = ""
+            for c in s {
+                prefix.append(c)
+                out.insert(prefix)
+            }
+        }
+        return out
+    }
+
     /// 聯想詞：打完一個字後，接在它後面常見的字詞
     func associations(after text: String, limit: Int = 30) -> [String] {
         guard let last = text.last else { return [] }

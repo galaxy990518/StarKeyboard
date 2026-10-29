@@ -110,6 +110,8 @@ struct Syllable: Equatable {
 struct ZhuyinComposer {
     private(set) var syllables: [Syllable] = []
     private(set) var current = Syllable()
+    /// 字典裡所有音節的開頭（例如 ㄋ、ㄋㄧ、ㄋㄧㄠ）；有的話，組不出存在的音就自動換下一個字
+    var validPrefixes: Set<String>?
 
     /// 查字典用的讀音：打完的音節＋正在打的音節（沒打聲調也算，先拿來預覽）
     var readings: [String] { syllables.map { $0.key } + (current.hasSound ? [current.reading + "*"] : []) }
@@ -127,9 +129,17 @@ struct ZhuyinComposer {
             return true
         }
         // 不打聲調直接打下一個字：前一個字自動結束（ㄋㄏ → 你好）
-        if current.startsNew(with: kind) { finishSyllable(open: true) }
+        if current.hasSound && (current.startsNew(with: kind) || !fits(c)) { finishSyllable(open: true) }
         current.put(c)
         return true
+    }
+
+    /// 加上這個符號還是某個字的開頭嗎（例如 ㄘ＋ㄧ 不是，ㄘ 要自己算一個字）
+    private func fits(_ c: Character) -> Bool {
+        guard let set = validPrefixes else { return true }
+        var next = current
+        next.put(c)
+        return set.contains(next.reading)
     }
 
     /// 空白鍵＝一聲

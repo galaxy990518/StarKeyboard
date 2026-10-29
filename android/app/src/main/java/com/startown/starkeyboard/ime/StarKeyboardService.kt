@@ -31,6 +31,7 @@ import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
 import com.startown.starkeyboard.MainActivity
+import com.startown.starkeyboard.core.Bopomofo
 import com.startown.starkeyboard.core.ChineseConverter
 import com.startown.starkeyboard.core.Candidate
 import com.startown.starkeyboard.core.ClipboardStore
@@ -90,6 +91,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private var root: FrameLayout? = null
     private lateinit var bgImage: Backdrop
     private lateinit var tint: Backdrop
+    private var backgroundStamp = 0L
     private lateinit var topBar: TopBar
     private lateinit var content: FrameLayout
     private lateinit var keyboard: KeyboardView
@@ -116,9 +118,11 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         Thread {
             val source = SQLitePhraseSource.open(this)
             val plain = SQLitePhraseSource.open(this, "plain")
+            val prefixes = source?.let { Bopomofo.prefixes(it.syllables()) }?.takeIf { it.isNotEmpty() }
             mainHandler.post {
                 if (source != null) {
                     engine = ZhuyinEngine(source, UserPhraseModel(File(filesDir, "learned.txt"))).also { it.fuzzy = fuzzyOptions() }
+                    composer.validPrefixes = prefixes
                 }
                 if (plain != null) {
                     pinyinEngine = PinyinEngine(ZhuyinEngine(plain, UserPhraseModel(File(filesDir, "learned-pinyin.txt"))), plain.pinyinTable())
@@ -1066,12 +1070,20 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         styleKey = s.theme.id + s.shape.name
         r.background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(s.theme.top, s.theme.bottom))
         if (settings.hasBackground) {
-            bgImage.setImageBitmap(BitmapFactory.decodeFile(settings.backgroundFile.path))
+            // 拖滑桿時也會跑這裡：照片沒換就不用重新讀檔
+            val stamp = settings.backgroundFile.lastModified()
+            if (stamp != backgroundStamp || bgImage.drawable == null) {
+                bgImage.setImageBitmap(BitmapFactory.decodeFile(settings.backgroundFile.path))
+                backgroundStamp = stamp
+            }
+            bgImage.focusX = settings.backgroundFocusX
+            bgImage.focusY = settings.backgroundFocusY
             bgImage.visibility = View.VISIBLE
             tint.setBackgroundColor(s.theme.top.withAlpha(settings.backgroundFade))
             tint.visibility = View.VISIBLE
         } else {
             bgImage.setImageDrawable(null)
+            backgroundStamp = 0L
             bgImage.visibility = View.GONE
             tint.visibility = View.GONE
         }

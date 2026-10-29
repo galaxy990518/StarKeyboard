@@ -130,6 +130,13 @@ class KeyboardSettings(context: Context) {
     var backgroundFade: Float
         get() = p.getFloat("backgroundFade", 0.25f)
         set(v) = p.edit().putFloat("backgroundFade", v).apply()
+    /** 照片裁切時盡量放在中間的點（0～1）；挑照片時有找到臉就是臉的位置 */
+    var backgroundFocusX: Float
+        get() = p.getFloat("backgroundFocusX", 0.5f)
+        set(v) = p.edit().putFloat("backgroundFocusX", v).apply()
+    var backgroundFocusY: Float
+        get() = p.getFloat("backgroundFocusY", 0.5f)
+        set(v) = p.edit().putFloat("backgroundFocusY", v).apply()
     var heightScale: Float
         get() = p.getFloat("heightScale", 1f)
         set(v) = p.edit().putFloat("heightScale", v).apply()

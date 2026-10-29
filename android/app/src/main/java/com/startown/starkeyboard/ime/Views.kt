@@ -3,6 +3,8 @@ package com.startown.starkeyboard.ime
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.graphics.drawable.Drawable
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
@@ -27,11 +29,41 @@ fun roundRect(color: Int, radius: Float) = GradientDrawable().apply {
     cornerRadius = radius
 }
 
-/** 鍵盤後面的照片和淡化層：量大小時當作 0，不會把鍵盤撐高；鍵盤量好之後才照鍵盤的大小填滿 */
+/**
+ * 鍵盤後面的照片和淡化層：量大小時當作 0，不會把鍵盤撐高；鍵盤量好之後才照鍵盤的大小填滿。
+ * 照片放大到蓋滿鍵盤，focusX／focusY（0～1，例如臉的位置）盡量放在中間，超出的部分裁掉
+ */
 class Backdrop(context: Context) : ImageView(context) {
-    init { scaleType = ScaleType.CENTER_CROP }
+    var focusX = 0.5f
+        set(v) { field = v; fit() }
+    var focusY = 0.5f
+        set(v) { field = v; fit() }
+
+    init { scaleType = ScaleType.MATRIX }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         setMeasuredDimension(resolveSize(0, widthMeasureSpec), resolveSize(0, heightMeasureSpec))
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        fit()
+    }
+
+    override fun setImageDrawable(drawable: Drawable?) {
+        super.setImageDrawable(drawable)
+        fit()
+    }
+
+    private fun fit() {
+        val d = drawable ?: return
+        val iw = d.intrinsicWidth.toFloat()
+        val ih = d.intrinsicHeight.toFloat()
+        if (iw <= 0f || ih <= 0f || width == 0 || height == 0) return
+        val s = maxOf(width / iw, height / ih)
+        val dx = (width / 2f - focusX * iw * s).coerceIn(width - iw * s, 0f)
+        val dy = (height / 2f - focusY * ih * s).coerceIn(height - ih * s, 0f)
+        imageMatrix = Matrix().apply { setScale(s, s); postTranslate(dx, dy) }
     }
 }
 

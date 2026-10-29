@@ -32,6 +32,14 @@ final class ZhuyinComposerTests: XCTestCase {
         XCTAssertFalse(w.isComposing)
     }
 
+    func testOnlyRealSyllablesJoin() {
+        // 組不出存在的音（ㄘㄧ）就自動換下一個字
+        var c = ZhuyinComposer()
+        c.validPrefixes = ["ㄘ", "ㄘㄜ", "ㄧ", "ㄧㄝ"]
+        for ch in "ㄘㄧㄝ" { c.input(ch) }
+        XCTAssertEqual(c.readings, ["ㄘ*", "ㄧㄝ*"])
+    }
+
     func testNeutralToneAtEnd() {
         var c = ZhuyinComposer()
         for ch in "ㄉㄜ˙" { c.input(ch) }
@@ -123,6 +131,12 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertEqual(sentence(["ㄨㄛ*", "ㄏ*", "ㄓㄜ*", "ㄧ*"]), "我會這樣")
         XCTAssertEqual(e.candidates(for: ["ㄋㄧ*"]).map { $0.text }, ["你", "妳"])
         XCTAssertEqual(e.candidates(for: ["ㄅ*"]).first?.text, "ㄅ")
+    }
+
+    func testSyllablePrefixes() {
+        let p = makeEngine().syllablePrefixes()
+        XCTAssertTrue(p.isSuperset(of: ["ㄋ", "ㄋㄧ", "ㄐㄧㄝ"]))
+        XCTAssertFalse(p.contains("ㄘㄧ"))
     }
 
     func testAssociations() {

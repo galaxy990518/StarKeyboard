@@ -5,6 +5,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.PointF
+import android.media.FaceDetector
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
@@ -153,8 +155,12 @@ class MainActivity : Activity() {
             PICK_BACKGROUND -> {
                 val s = KeyboardSettings(this)
                 s.backgroundFile.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+                // 對準臉；找不到臉就偏上面一點（人像的頭通常在上面）
+                val face = faceCenter(bitmap)
+                s.backgroundFocusX = face?.first ?: 0.5f
+                s.backgroundFocusY = face?.second ?: 0.3f
                 s.hasBackground = true
-                toast("換好背景了！打開鍵盤看看")
+                toast(if (face != null) "換好背景了！已對準臉，打開鍵盤看看" else "換好背景了！打開鍵盤看看，位置可以在鍵盤設定調")
             }
             PICK_STICKER -> {
                 val out = ByteArrayOutputStream()
@@ -164,6 +170,19 @@ class MainActivity : Activity() {
             }
         }
     }
+
+    /** 照片裡最大那張臉的中心（0～1）；找不到回傳 null（手機內建的臉部偵測，畫的人物可能找不到） */
+    private fun faceCenter(bitmap: Bitmap): Pair<Float, Float>? = runCatching {
+        val w = bitmap.width and 1.inv()   // 偵測器要偶數寬
+        val img = Bitmap.createBitmap(bitmap, 0, 0, w, bitmap.height).copy(Bitmap.Config.RGB_565, false)
+        val faces = arrayOfNulls<FaceDetector.Face>(5)
+        val n = FaceDetector(img.width, img.height, faces.size).findFaces(img, faces)
+        val face = faces.take(n).filterNotNull().maxByOrNull { it.eyesDistance() } ?: return null
+        val eyes = PointF()
+        face.getMidPoint(eyes)
+        // 兩眼中間往下一點是臉的中間
+        (eyes.x / img.width).coerceIn(0f, 1f) to ((eyes.y + face.eyesDistance() * 0.4f) / img.height).coerceIn(0f, 1f)
+    }.getOrNull()
 
     /** 讀照片並縮小到最長邊 maxSide */
     private fun load(uri: Uri, maxSide: Int): Bitmap? = runCatching {
