@@ -125,6 +125,12 @@ struct ZhuyinComposer {
         pending.open = true
         return syllables.map { $0.key } + (current.hasSound ? [pending.key] : [])
     }
+    /// 給使用者核對實際輸入的注音；保留聲調與音節分隔，不顯示查詢用的 *／~。
+    var displayText: String {
+        let sounds = syllables.map { $0.reading } + (current.hasSound ? [current.reading] : [])
+        return sounds.joined(separator: " ")
+    }
+
     var isComposing: Bool { !syllables.isEmpty || !current.isEmpty }
     var hasPendingSyllable: Bool { !current.isEmpty }
 

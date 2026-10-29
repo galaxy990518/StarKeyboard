@@ -2,6 +2,35 @@ import XCTest
 @testable import KeyboardCore
 
 final class ZhuyinComposerTests: XCTestCase {
+    func testDisplayedReadingFollowsInputDeletionAndSelection() {
+        var c = ZhuyinComposer()
+        XCTAssertEqual(c.displayText, "")
+        for ch in "ㄋㄧˇㄏㄠ" { c.input(ch) }
+        XCTAssertEqual(c.displayText, "ㄋㄧˇ ㄏㄠ")
+        c.backspace()
+        XCTAssertEqual(c.displayText, "ㄋㄧˇ ㄏ")
+        c.removeFirst(1)
+        XCTAssertEqual(c.displayText, "ㄏ")
+        c.clear()
+        XCTAssertEqual(c.displayText, "")
+        XCTAssertFalse(c.input("ˇ"))
+        XCTAssertEqual(c.displayText, "")
+    }
+
+    func testDisplayedAbbreviationKeepsTypedSoundsWithoutQueryMarkers() {
+        var c = ZhuyinComposer()
+        for ch in "ㄏㄎㄞ" { c.input(ch) }
+        XCTAssertEqual(c.readings, ["ㄏ*", "ㄎㄞ*~"])
+        XCTAssertEqual(c.displayText, "ㄏ ㄎㄞ")
+        c.confirmSyllable()
+        XCTAssertEqual(c.displayText, "ㄏ ㄎㄞ")
+        c.removeFirst(1)
+        XCTAssertEqual(c.displayText, "ㄎㄞ")
+        c.clear()
+        for ch in "ㄉㄜ˙" { c.input(ch) }
+        XCTAssertEqual(c.displayText, "ㄉㄜ˙")
+    }
+
     func testTonesFinishSyllables() {
         var c = ZhuyinComposer()
         for ch in "ㄋㄧˇㄏㄠˇ" { XCTAssertTrue(c.input(ch)) }

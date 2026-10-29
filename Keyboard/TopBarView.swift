@@ -30,7 +30,9 @@ final class TopBarView: UIView {
     private var trailing: Trailing = .expand
     private let toolbar = UIStackView()
     private var toolbarButtons: [UIButton] = []
+    private let compositionScroll = UIScrollView()
     private let compositionLabel = UILabel()
+    private var scrollCompositionToEnd = false
     private let candidateScroll = UIScrollView()
     private var candidateButtons: [UIButton] = []
     private let trailingButton = UIButton(type: .system)
@@ -68,7 +70,9 @@ final class TopBarView: UIView {
         addSubview(toolbar)
 
         compositionLabel.font = .rounded(15, .bold)
-        addSubview(compositionLabel)
+        compositionScroll.showsHorizontalScrollIndicator = false
+        compositionScroll.addSubview(compositionLabel)
+        addSubview(compositionScroll)
         candidateScroll.showsHorizontalScrollIndicator = false
         candidateScroll.alwaysBounceHorizontal = true
         addSubview(candidateScroll)
@@ -113,6 +117,14 @@ final class TopBarView: UIView {
     }
 
     func show(_ newContent: Content) {
+        // 同一次更新完成文字與版面，避免快速輸入時按鈕標題淡出再出現。
+        UIView.performWithoutAnimation {
+            applyContent(newContent)
+            layoutIfNeeded()
+        }
+    }
+
+    private func applyContent(_ newContent: Content) {
         content = newContent
         var isToolbar = false, isCandidates = false, isEditor = false
         switch newContent {
@@ -120,7 +132,10 @@ final class TopBarView: UIView {
             isToolbar = true
         case let .candidates(composition, items, trailing):
             isCandidates = true
-            compositionLabel.text = composition
+            if compositionLabel.text != composition {
+                compositionLabel.text = composition
+                scrollCompositionToEnd = true
+            }
             self.trailing = trailing
             trailingButton.setImage(Self.icon(trailing == .expand ? "chevron.down" : "xmark"), for: .normal)
             trailingButton.isHidden = items.isEmpty && trailing == .expand
@@ -136,7 +151,7 @@ final class TopBarView: UIView {
         // 整條（工具列、選字區、編輯框）都墊一層半透明的底，放背景照片時圖示和字才看得清楚（深色主題墊深色）
         backgroundColor = (style.theme.isDark ? UIColor.black.withAlphaComponent(0.35) : UIColor.white.withAlphaComponent(0.6))
         toolbar.isHidden = !isToolbar
-        compositionLabel.isHidden = !isCandidates || (compositionLabel.text ?? "").isEmpty
+        compositionScroll.isHidden = !isCandidates || (compositionLabel.text ?? "").isEmpty
         candidateScroll.isHidden = !isCandidates
         trailingButton.isHidden = trailingButton.isHidden || !isCandidates
         editorLabel.isHidden = !isEditor
@@ -154,7 +169,8 @@ final class TopBarView: UIView {
         }
         while candidateButtons.count < items.count {
             let i = candidateButtons.count
-            let b = UIButton(type: .system)
+            // system 按鈕換標題會有轉場；候選字改用 custom，直接顯示新文字。
+            let b = UIButton(type: .custom)
             b.tag = i
             b.addAction(UIAction { [weak self] _ in self?.onCandidate?(i) }, for: .touchUpInside)
             candidateScroll.addSubview(b)
@@ -163,7 +179,7 @@ final class TopBarView: UIView {
         // Reuse existing buttons while typing instead of allocating up to 40 per refresh.
         for (i, text) in items.enumerated() {
             let b = candidateButtons[i]
-            b.setTitle(text, for: .normal)
+            if b.title(for: .normal) != text { b.setTitle(text, for: .normal) }
             // 字加粗；第一個（按空白會送出的）放在主題色的膠囊裡，一眼就看得到
             b.titleLabel?.font = KeyFonts.font(style.fontID, size: 24, weight: i == 0 ? .heavy : .semibold)
             if i == 0 {
@@ -186,9 +202,20 @@ final class TopBarView: UIView {
         toolbar.frame = CGRect(x: 4, y: 0, width: w - 8, height: h)
         separator.frame = CGRect(x: 0, y: h - 0.5, width: w, height: 0.5)
 
-        let hasComposition = !compositionLabel.isHidden
+        let hasComposition = !compositionScroll.isHidden
         let top: CGFloat = hasComposition ? 18 : 0
-        compositionLabel.frame = CGRect(x: 12, y: 1, width: w - 60, height: 17)
+        compositionScroll.frame = CGRect(x: 12, y: 1, width: max(0, w - 60), height: 17)
+        let readingWidth = ceil(compositionLabel.intrinsicContentSize.width)
+        compositionLabel.frame = CGRect(x: 0, y: 0, width: max(compositionScroll.bounds.width, readingWidth), height: 17)
+        compositionScroll.contentSize = compositionLabel.bounds.size
+        let lastOffset = max(0, compositionScroll.contentSize.width - compositionScroll.bounds.width)
+        if scrollCompositionToEnd {
+            // 新輸入保持最後按的音可見，也能往回滑查看整段未送出的注音。
+            compositionScroll.setContentOffset(CGPoint(x: lastOffset, y: 0), animated: false)
+            scrollCompositionToEnd = false
+        } else if compositionScroll.contentOffset.x > lastOffset && !compositionScroll.isDragging && !compositionScroll.isDecelerating {
+            compositionScroll.setContentOffset(CGPoint(x: lastOffset, y: 0), animated: false)
+        }
         let trailingW: CGFloat = trailingButton.isHidden ? 0 : 44
         trailingButton.frame = CGRect(x: w - 44, y: 0, width: 44, height: h)
         candidateScroll.frame = CGRect(x: 0, y: top, width: w - trailingW, height: h - top)

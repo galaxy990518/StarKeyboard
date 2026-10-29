@@ -702,9 +702,8 @@ final class KeyboardViewController: UIInputViewController {
             let r = Romaji.convert(kanaBuffer)
             return r.kana + r.rest
         }
-        // 正在打的字也先預覽成中文（還沒打聲調、只打開頭都可以）
-        if composer.readings.isEmpty { return "" }
-        return candidates.first?.text ?? ZhuyinEngine.display(composer.readings.joined())
+        // 上排顯示真正按過的注音，中文預覽留在下排候選字，方便找出按錯的音。
+        return composer.displayText
     }
 
     private func selectCandidate(at i: Int, learn: Bool) {
