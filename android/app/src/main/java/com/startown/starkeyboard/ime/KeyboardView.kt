@@ -70,7 +70,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     private val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
 
     private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+        setStyle(Paint.Style.STROKE); strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
     }
 
     private val Key.isLetter get() = spec.action is KeyAction.Text && spec.label.length == 1 && spec.label[0].lowercaseChar() in 'a'..'z'
