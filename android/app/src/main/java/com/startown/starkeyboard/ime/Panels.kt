@@ -1,0 +1,414 @@
+package com.startown.starkeyboard.ime
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.text.TextUtils
+import android.view.Gravity
+import android.view.View
+import android.widget.CompoundButton
+import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.SeekBar
+import android.widget.Switch
+import android.widget.TextView
+import com.startown.starkeyboard.core.ClipboardStore
+import com.startown.starkeyboard.core.EmoticonStore
+import com.startown.starkeyboard.core.SymbolData
+
+/** 表情符號、顏文字、特殊符號共用的面板（含「我的表符」和自製貼圖） */
+@SuppressLint("ViewConstructor")
+class EmojiPanel(
+    context: Context,
+    private val kind: PanelKind,
+    private val store: EmoticonStore,
+    private val style: KeyboardStyle,
+    private val onInsert: (String) -> Unit,
+    private val onSticker: (String) -> Unit,
+    private val onAdd: (AddOption) -> Unit,
+    onBack: () -> Unit,
+    onBackspace: () -> Unit,
+) : LinearLayout(context) {
+    enum class AddOption { TYPE, CLIPBOARD_TEXT, PICK_IMAGE }
+
+    private sealed class Tab(val title: String) {
+        class Recent(title: String) : Tab(title)
+        class Mine(title: String) : Tab(title)
+        class Items(title: String, val items: List<String>) : Tab(title)
+    }
+
+    private sealed class Ref {
+        data class Text(val s: String) : Ref()
+        data class Custom(val s: String) : Ref()
+        data class Sticker(val name: String) : Ref()
+        object Add : Ref()
+    }
+
+    private val key = kind.name
+    private val tabs = ArrayList<Tab>()
+    private val grid = ChipGrid(context, style)
+    private var refs: List<Ref> = emptyList()
+    private var current = 0
+    private val bitmaps = HashMap<String, Bitmap?>()
+    private val overlay = FrameLayout(context)
+    private val bar: PanelBottomBar
+
+    init {
+        orientation = VERTICAL
+        when (kind) {
+            PanelKind.EMOJI -> {
+                tabs.add(Tab.Recent("🕘")); tabs.add(Tab.Mine("⭐"))
+                SymbolData.emoji.forEach { tabs.add(Tab.Items(it.title, it.items)) }
+            }
+            PanelKind.KAOMOJI -> {
+                tabs.add(Tab.Recent("最近")); tabs.add(Tab.Mine("我的"))
+                SymbolData.kaomoji.forEach { tabs.add(Tab.Items(it.title, it.items)) }
+            }
+            else -> {
+                tabs.add(Tab.Recent("最近"))
+                SymbolData.symbols.forEach { tabs.add(Tab.Items(it.title, it.items)) }
+            }
+        }
+        val start = if (store.recents(key).isNotEmpty()) 0 else if (kind == PanelKind.SYMBOLS) 1 else 2
+        val frame = FrameLayout(context)
+        frame.addView(grid, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        frame.addView(overlay, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        overlay.visibility = View.GONE
+        addView(frame, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        bar = PanelBottomBar(context, style, tabs.map { it.title }, start, onBack = onBack, onTab = { select(it) }, onBackspace = onBackspace)
+        addView(bar, LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
+        grid.onSelect = { tapped(it) }
+        grid.canDelete = { i -> refs.getOrNull(i).let { it is Ref.Custom || it is Ref.Sticker } }
+        grid.onLongPress = { if (tabs[current] is Tab.Mine) grid.editing = !grid.editing }
+        buildOverlay()
+        select(start)
+    }
+
+    fun reload() {
+        store.load()
+        select(current)
+    }
+
+    private fun select(i: Int) {
+        current = i
+        grid.editing = false
+        val tab = tabs[i]
+        refs = when (tab) {
+            is Tab.Recent -> store.recents(key).map { Ref.Text(it) }
+            is Tab.Mine -> listOf(Ref.Add) + store.custom.map { Ref.Custom(it) } + store.stickers.map { Ref.Sticker(it) }
+            is Tab.Items -> tab.items.map { Ref.Text(it) }
+        }.filter { it !is Ref.Sticker || bitmap(it.name) != null }
+        val items = refs.map {
+            when (it) {
+                is Ref.Text -> ChipGrid.Item.Text(it.s)
+                is Ref.Custom -> ChipGrid.Item.Text(it.s)
+                is Ref.Sticker -> ChipGrid.Item.Image(bitmap(it.name)!!)
+                Ref.Add -> ChipGrid.Item.Add
+            }
+        }
+        val square = kind != PanelKind.KAOMOJI && tab !is Tab.Mine
+        grid.setItems(items, square)
+    }
+
+    private fun bitmap(name: String): Bitmap? = bitmaps.getOrPut(name) {
+        store.stickerFile(name)?.takeIf { it.exists() }?.let { BitmapFactory.decodeFile(it.path) }
+    }
+
+    private fun tapped(i: Int) {
+        val ref = refs.getOrNull(i) ?: return
+        if (grid.editing) {
+            when (ref) {
+                is Ref.Custom -> store.removeCustom(ref.s)
+                is Ref.Sticker -> { store.removeSticker(ref.name); bitmaps.remove(ref.name) }
+                else -> return
+            }
+            select(current)
+            grid.editing = true
+            return
+        }
+        when (ref) {
+            is Ref.Text -> { onInsert(ref.s); store.pushRecent(ref.s, key) }
+            is Ref.Custom -> { onInsert(ref.s); store.pushRecent(ref.s, key) }
+            is Ref.Sticker -> onSticker(ref.name)
+            Ref.Add -> overlay.visibility = View.VISIBLE
+        }
+    }
+
+    private fun buildOverlay() {
+        val t = style.theme
+        overlay.setBackgroundColor(t.top.withAlpha(0.94f))
+        val col = LinearLayout(context).apply { orientation = VERTICAL; setPadding(dpi(24f), dpi(10f), dpi(24f), dpi(10f)) }
+        val options = listOf(
+            "⌨️  用鍵盤打一個新的表符" to AddOption.TYPE,
+            "📋  把剪貼簿的文字加進來" to AddOption.CLIPBOARD_TEXT,
+            "🖼  挑一張照片做成貼圖" to AddOption.PICK_IMAGE,
+            "取消" to null,
+        )
+        for ((title, option) in options) {
+            col.addView(Tap(context, title, 15f, t.keyText, option != null) {
+                overlay.visibility = View.GONE
+                option?.let(onAdd)
+            }.apply { background = roundRect(t.key, dp(12f)) },
+                LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = dpi(6f) })
+        }
+        overlay.addView(col)
+    }
+}
+
+/** 展開的候選字（全部列出來） */
+@SuppressLint("ViewConstructor")
+class CandidatePanel(context: Context, style: KeyboardStyle, onSelect: (Int) -> Unit, onBack: () -> Unit, onBackspace: () -> Unit) : LinearLayout(context) {
+    private val grid = ChipGrid(context, style)
+
+    init {
+        orientation = VERTICAL
+        grid.onSelect = onSelect
+        addView(grid, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        addView(PanelBottomBar(context, style, emptyList(), -1, "▲", onBack = onBack, onTab = {}, onBackspace = onBackspace),
+            LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
+    }
+
+    fun setCandidates(texts: List<String>) = grid.setItems(texts.map { ChipGrid.Item.Text(it) }, false)
+}
+
+/** 剪貼簿紀錄：點一下貼上、📌 釘選、✕ 刪除 */
+@SuppressLint("ViewConstructor")
+class ClipboardPanel(
+    context: Context,
+    private val store: ClipboardStore,
+    private val style: KeyboardStyle,
+    private val onInsert: (String) -> Unit,
+    private val onAddCurrent: () -> Unit,
+    onBack: () -> Unit,
+    onBackspace: () -> Unit,
+) : LinearLayout(context) {
+    private val list = LinearLayout(context).apply { orientation = VERTICAL }
+    private var pinnedOnly = false
+    private var confirmClear = false
+    private lateinit var clearButton: TextView
+
+    init {
+        orientation = VERTICAL
+        val t = style.theme
+        val header = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        header.addView(TextView(context).apply { text = "剪貼簿"; textSize = 15f; setTextColor(t.keyText); paint.isFakeBoldText = true },
+            LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply { leftMargin = dpi(12f) })
+        header.addView(Tap(context, "＋ 加入目前複製的", 13f, if (t.dark) t.accent else t.specialText, true) { onAddCurrent() }.apply {
+            setPadding(dpi(8f), 0, dpi(8f), 0)
+        }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
+        clearButton = Tap(context, "清除", 13f, t.keyText.withAlpha(0.7f)) { clearTapped() }.apply { setPadding(dpi(10f), 0, dpi(12f), 0) }
+        header.addView(clearButton, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
+        addView(header, LayoutParams(LayoutParams.MATCH_PARENT, dpi(34f)))
+        val scroll = ScrollView(context)
+        scroll.addView(list)
+        addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        addView(PanelBottomBar(context, style, listOf("全部", "📌 釘選"), 0, onBack = onBack,
+            onTab = { pinnedOnly = it == 1; reload() }, onBackspace = onBackspace), LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
+        reload()
+    }
+
+    fun reload() {
+        list.removeAllViews()
+        val t = style.theme
+        val rows = if (pinnedOnly) store.ordered.filter { it.pinned } else store.ordered
+        if (rows.isEmpty()) {
+            list.addView(TextView(context).apply {
+                text = if (pinnedOnly) "還沒有釘選的內容\n點項目右邊的 📌 就能釘選" else "複製文字後就會記在這裡\n（要先把星星鍵盤設成預設鍵盤）"
+                textSize = 14f
+                gravity = Gravity.CENTER
+                setTextColor(t.keyText.withAlpha(0.7f))
+                setPadding(dpi(20f), dpi(30f), dpi(20f), dpi(20f))
+            })
+            return
+        }
+        for (item in rows) {
+            val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dpi(12f), dpi(6f), dpi(4f), dpi(6f)) }
+            row.addView(TextView(context).apply {
+                text = item.text.trim()
+                textSize = 15f
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(t.keyText)
+            }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+            row.addView(Tap(context, "📌", 15f, t.keyText) { store.togglePin(item.id); reload() }.apply {
+                alpha = if (item.pinned) 1f else 0.3f
+            }, LayoutParams(dpi(40f), dpi(40f)))
+            row.addView(Tap(context, "✕", 15f, t.keyText.withAlpha(0.5f)) { store.remove(item.id); reload() }, LayoutParams(dpi(40f), dpi(40f)))
+            row.setOnClickListener { onInsert(item.text) }
+            list.addView(row)
+            list.addView(View(context).apply { setBackgroundColor(t.shadow.withAlpha(0.4f)) }, LayoutParams(LayoutParams.MATCH_PARENT, maxOf(1, dpi(0.5f))))
+        }
+    }
+
+    private fun clearTapped() {
+        if (confirmClear) {
+            store.clearUnpinned()
+            confirmClear = false
+            clearButton.text = "清除"
+            reload()
+            return
+        }
+        confirmClear = true
+        clearButton.text = "確定清除？"
+        postDelayed({ confirmClear = false; clearButton.text = "清除" }, 3000)
+    }
+}
+
+/** 鍵盤裡的設定：主題、按鍵造型、大小、背景、輸入法、打錯字修正、聲音震動 */
+@SuppressLint("ViewConstructor", "UseSwitchCompatOrMaterialCode")
+class SettingsPanel(
+    context: Context,
+    private val settings: KeyboardSettings,
+    private val style: KeyboardStyle,
+    private val onChange: () -> Unit,
+    private val onOpenApp: () -> Unit,
+    private val onResetLearning: () -> Unit,
+    onBack: () -> Unit,
+) : LinearLayout(context) {
+    private val col = LinearLayout(context).apply { orientation = VERTICAL; setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(12f)) }
+    private val t = style.theme
+
+    init {
+        orientation = VERTICAL
+        val scroll = ScrollView(context)
+        scroll.addView(col)
+        addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        addView(PanelBottomBar(context, style, listOf("設定"), 0, showBackspace = false, onBack = onBack, onTab = {}, onBackspace = {}),
+            LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
+        build()
+    }
+
+    private fun header(s: String) = col.addView(TextView(context).apply {
+        text = s; textSize = 13f; setTextColor(t.keyText.withAlpha(0.8f)); paint.isFakeBoldText = true
+        setPadding(0, dpi(12f), 0, dpi(4f))
+    })
+
+    private fun note(s: String) = col.addView(TextView(context).apply {
+        text = s; textSize = 12f; setTextColor(t.keyText.withAlpha(0.65f)); setPadding(0, dpi(2f), 0, dpi(2f))
+    })
+
+    private fun button(title: String, action: () -> Unit) = col.addView(Tap(context, title, 14f, t.specialText, true, action).apply {
+        background = roundRect(t.special, dp(10f))
+    }, LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)).apply { topMargin = dpi(4f) })
+
+    private fun slider(title: String, value: Float, lo: Float, hi: Float, set: (Float) -> Unit) {
+        val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        row.addView(TextView(context).apply { text = title; textSize = 14f; setTextColor(t.keyText) }, LayoutParams(dpi(86f), LayoutParams.WRAP_CONTENT))
+        row.addView(SeekBar(context).apply {
+            this.max = 100
+            progress = (((value - lo) / (hi - lo)) * 100).toInt().coerceIn(0, 100)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar, p: Int, fromUser: Boolean) {
+                    if (fromUser) { set(lo + (hi - lo) * p / 100f); onChange() }
+                }
+                override fun onStartTrackingTouch(s: SeekBar) {}
+                override fun onStopTrackingTouch(s: SeekBar) {}
+            })
+        }, LayoutParams(0, dpi(40f), 1f))
+        col.addView(row)
+    }
+
+    private fun toggle(title: String, on: Boolean, set: (Boolean) -> Unit) {
+        col.addView(Switch(context).apply {
+            text = title; textSize = 14f; setTextColor(t.keyText); isChecked = on
+            setOnCheckedChangeListener { _: CompoundButton, v: Boolean -> set(v) }
+        }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dpi(4f) })
+    }
+
+    private fun build() {
+        header("主題")
+        val themes = LinearLayout(context).apply { orientation = HORIZONTAL }
+        for (theme in KeyboardTheme.all) {
+            val selected = theme.id == settings.themeId
+            val cell = LinearLayout(context).apply { orientation = VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dpi(4f), 0, dpi(4f), 0) }
+            cell.addView(View(context).apply {
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(theme.top)
+                    setStroke(if (selected) dpi(3f) else dpi(1f), if (selected) theme.accent else theme.shadow)
+                }
+            }, LayoutParams(dpi(46f), dpi(46f)))
+            cell.addView(TextView(context).apply { text = theme.name; textSize = 11f; setTextColor(t.keyText); gravity = Gravity.CENTER })
+            cell.setOnClickListener { settings.themeId = theme.id; onChange() }
+            themes.addView(cell)
+        }
+        col.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(themes) })
+
+        header("按鍵造型")
+        val shapes = LinearLayout(context).apply { orientation = HORIZONTAL }
+        for (shape in KeyShape.values()) {
+            val selected = shape == settings.shape
+            shapes.addView(Tap(context, shape.title, 14f, if (selected) t.accentText else t.keyText, selected) {
+                settings.shape = shape; onChange()
+            }.apply { background = roundRect(if (selected) t.accent else t.key.withAlpha(0.6f), dp(12f)) },
+                LayoutParams(0, dpi(40f), 1f).apply { rightMargin = dpi(6f) })
+        }
+        col.addView(shapes)
+
+        header("大小（邊拖邊看）")
+        slider("鍵盤高度", settings.heightScale, 0.8f, 1.3f) { settings.heightScale = it }
+        slider("字的大小", settings.fontScale, 0.8f, 1.4f) { settings.fontScale = it }
+        slider("按鍵間距", settings.gapScale, 0.3f, 1.6f) { settings.gapScale = it }
+        note("間距越小，按鍵越大、越好按。")
+        button("大小恢復預設") {
+            settings.heightScale = 1f; settings.fontScale = 1f; settings.gapScale = 1f; onChange()
+        }
+
+        header("背景照片")
+        button("打開星星鍵盤 App 挑照片") { onOpenApp() }
+        slider("照片淡化", settings.backgroundFade, 0f, 0.9f) { settings.backgroundFade = it }
+        slider("按鍵透明度", settings.keyAlpha, 0.35f, 1f) { settings.keyAlpha = it }
+
+        header("輸入法（按「中／英」鍵輪流切換，長按可換別的鍵盤）")
+        for (mode in InputMode.values()) {
+            toggle(mode.settingName, mode in settings.enabledModes) { on ->
+                val modes = settings.enabledModes.toMutableList()
+                if (on) { if (mode !in modes) modes.add(mode) } else modes.remove(mode)
+                settings.enabledModes = InputMode.values().filter { it in modes }
+                onChange()
+            }
+        }
+        toggle("聯想詞（打完字後推薦下一個字）", settings.associations) { settings.associations = it }
+
+        header("打錯字修正")
+        toggle("英文自動修正（按空白時修正，馬上按刪除可以復原）", settings.autocorrect) { settings.autocorrect = it }
+        toggle("注音：按到旁邊的鍵也猜得到", settings.fuzzyKeys) { settings.fuzzyKeys = it; onChange() }
+        toggle("注音：聲調打錯或忘了打", settings.fuzzyTones) { settings.fuzzyTones = it; onChange() }
+        toggle("注音模糊音：ㄣㄥ、ㄓㄗ、ㄔㄘ、ㄕㄙ 分不清", settings.fuzzyPhonetic) { settings.fuzzyPhonetic = it; onChange() }
+
+        header("翻譯")
+        note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。會先用 Google 的離線翻譯（第一次要下載語言資料），不行再用網路翻譯 MyMemory。")
+
+        header("聲音與震動")
+        toggle("按鍵聲音", settings.keySound) { settings.keySound = it }
+        toggle("按鍵震動", settings.haptics) { settings.haptics = it }
+
+        header("剪貼簿最多記幾筆")
+        val limits = LinearLayout(context).apply { orientation = HORIZONTAL }
+        for (n in listOf(50, 100, 200, 500)) {
+            val selected = settings.clipLimit == n
+            limits.addView(Tap(context, "$n", 14f, if (selected) t.accentText else t.keyText, selected) {
+                settings.clipLimit = n; onChange()
+            }.apply { background = roundRect(if (selected) t.accent else t.key.withAlpha(0.6f), dp(10f)) },
+                LayoutParams(0, dpi(36f), 1f).apply { rightMargin = dpi(6f) })
+        }
+        col.addView(limits)
+
+        header("其他")
+        button("清除選字學習紀錄") { onResetLearning() }
+        if (settings.latestBuild > BuildInfo.current(context)) {
+            note("🎉 有新版（Android 第 ${settings.latestBuild} 版）：打開「星星鍵盤」App 更新")
+        }
+        note("星星鍵盤 Android 第 ${BuildInfo.current(context)} 版 ・ 注音字典來自小麥注音（MIT 授權）")
+    }
+}
+
+object BuildInfo {
+    fun current(context: Context): Int = runCatching {
+        @Suppress("DEPRECATION")
+        context.packageManager.getPackageInfo(context.packageName, 0).versionCode
+    }.getOrDefault(0)
+}

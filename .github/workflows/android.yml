@@ -1,0 +1,91 @@
+name: 打包 Android 鍵盤
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - "tools/build_dict.py"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 連續推好幾次時，只留最新的那次打包
+concurrency:
+  group: android
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 下載並轉換注音字典（小麥注音，MIT 授權）
+        run: |
+          git clone --depth 1 https://github.com/openvanilla/McBopomofo.git "$RUNNER_TEMP/McBopomofo"
+          make -C "$RUNNER_TEMP/McBopomofo/Source/Data" data.txt
+          python3 tools/build_dict.py "$RUNNER_TEMP/McBopomofo/Source/Data/data.txt" android/app/src/main/assets/zhuyin.sqlite
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: 簽名金鑰
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::還沒設定簽名金鑰，這次用測試金鑰（之後換正式金鑰要先移除舊版再裝）"
+          fi
+
+      - name: 自動測試與打包
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: gradle -p android testReleaseUnitTest assembleRelease --no-daemon --stacktrace
+
+      - name: 整理安裝檔和更新說明
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk StarKeyboard.apk
+          ls -la StarKeyboard.apk
+          PREV=$(git describe --tags --abbrev=0 --match "android-*" 2>/dev/null || true)
+          if [ -n "$PREV" ]; then RANGE="$PREV..HEAD"; else RANGE="HEAD"; fi
+          {
+            echo "這次更新："
+            git log --no-merges --pretty="- %s" $RANGE -- android tools | head -20
+            echo
+            echo "在 Android 手機下載 StarKeyboard.apk，點開安裝（直接蓋過舊版，設定和資料會保留）。"
+          } > release_notes.md
+          cat release_notes.md
+
+      - name: 發佈（不會蓋掉 iPhone 版的「最新版」）
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-${{ github.run_number }}
+          name: 星星鍵盤 Android 第 ${{ github.run_number }} 版
+          body_path: release_notes.md
+          files: StarKeyboard.apk
+          make_latest: "false"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-build
+          path: |
+            StarKeyboard.apk
+            android/app/build/reports/tests/
+          if-no-files-found: ignore

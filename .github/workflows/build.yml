@@ -3,6 +3,9 @@ name: 打包 iOS 鍵盤
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "android/**"
+      - ".github/workflows/android.yml"
   workflow_dispatch:
 
 permissions:
@@ -66,7 +69,7 @@ jobs:
           if [ -n "$PREV" ]; then RANGE="$PREV..HEAD"; else RANGE="HEAD"; fi
           {
             echo "這次更新："
-            git log --no-merges --pretty="- %s" $RANGE | head -20
+            git log --no-merges --pretty="- %s" $RANGE -- . ":(exclude)android" | head -20
             echo
             echo "下載 StarKeyboard.ipa，用 Sideloadly 直接裝（不要先刪掉舊的，設定和資料會保留）。"
           } > release_notes.md
