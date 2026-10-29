@@ -18,7 +18,8 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    # ARM runners have repeatedly timed out while waiting for capacity.
+    runs-on: macos-15-intel
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
