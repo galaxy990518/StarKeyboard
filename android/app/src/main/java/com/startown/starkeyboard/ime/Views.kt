@@ -213,9 +213,8 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
     private fun redraw() {
         removeAllViews()
         val t = style.theme
-        // 選字區、編輯框墊一層半透明的底，放背景照片時字才看得清楚（深色主題墊深色）
-        setBackgroundColor(if (content is Content.Toolbar) android.graphics.Color.TRANSPARENT
-            else if (t.dark) android.graphics.Color.BLACK.withAlpha(0.35f) else android.graphics.Color.WHITE.withAlpha(0.6f))
+        // 整條（工具列、選字區、編輯框）都墊一層半透明的底，放背景照片時圖示和字才看得清楚（深色主題墊深色）
+        setBackgroundColor(if (t.dark) android.graphics.Color.BLACK.withAlpha(0.35f) else android.graphics.Color.WHITE.withAlpha(0.6f))
         when (val c = content) {
             is Content.Toolbar -> {
                 val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
