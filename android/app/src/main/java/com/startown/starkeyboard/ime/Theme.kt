@@ -110,6 +110,7 @@ enum class InputMode(val title: String, val short: String, val settingName: Stri
     HANDWRITING("手寫", "寫", "手寫"),
     KOREAN("한국어", "한", "韓文（한국어）"),
     JAPANESE("日本語", "あ", "日文（羅馬拼音→假名）"),
+    PINYIN("拼音", "拼", "拼音（馬來西亞、中國用，可出簡體）"),
 }
 
 /** 鍵盤設定（SharedPreferences） */
@@ -171,6 +172,10 @@ class KeyboardSettings(context: Context) {
     var clipLimit: Int
         get() = p.getInt("clipLimit", 200)
         set(v) = p.edit().putInt("clipLimit", v).apply()
+    /** 拼音模式輸出簡體字（馬來西亞、中國用簡體） */
+    var pinyinSimplified: Boolean
+        get() = p.getBoolean("pinyinSimplified", true)
+        set(v) = p.edit().putBoolean("pinyinSimplified", v).apply()
     var translateTarget: String
         get() = p.getString("translateTarget", "en")!!
         set(v) = p.edit().putString("translateTarget", v).apply()

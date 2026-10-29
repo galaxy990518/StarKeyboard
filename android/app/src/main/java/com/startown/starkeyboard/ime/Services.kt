@@ -19,27 +19,44 @@ import java.net.URL
 import java.net.URLEncoder
 
 /** 注音字典：打包時放在 assets，第一次用時複製到手機裡才能用 SQLite 開 */
-class SQLitePhraseSource private constructor(private val db: SQLiteDatabase) : PhraseSource {
+/// column：注音用 reading（有聲調），拼音用 plain（沒聲調）
+class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, private val column: String) : PhraseSource {
     companion object {
-        fun open(context: Context): SQLitePhraseSource? = runCatching {
+        fun open(context: Context, column: String = "reading"): SQLitePhraseSource? = runCatching {
             val file = File(context.filesDir, "zhuyin.sqlite")
             val stamp = File(context.filesDir, "zhuyin.version")
             val version = BuildInfo.current(context).toString()
-            if (!file.exists() || !stamp.exists() || stamp.readText() != version) {
-                context.assets.open("zhuyin.sqlite").use { input -> file.outputStream().use { input.copyTo(it) } }
-                stamp.writeText(version)
+            synchronized(this) {
+                if (!file.exists() || !stamp.exists() || stamp.readText() != version) {
+                    context.assets.open("zhuyin.sqlite").use { input -> file.outputStream().use { input.copyTo(it) } }
+                    stamp.writeText(version)
+                }
             }
-            SQLitePhraseSource(SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY))
+            SQLitePhraseSource(SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY), column)
         }.getOrNull()
     }
 
     override fun lookup(reading: String): List<Scored> {
         val out = ArrayList<Scored>()
-        db.rawQuery("SELECT phrase, score FROM phrases WHERE reading = ? ORDER BY score DESC LIMIT 80", arrayOf(reading)).use { c ->
+        db.rawQuery("SELECT phrase, score FROM phrases WHERE $column = ? ORDER BY score DESC LIMIT 80", arrayOf(reading)).use { c ->
             while (c.moveToNext()) out.add(Scored(c.getString(0), c.getDouble(1)))
         }
         return out
     }
+
+    /** 拼音音節 → 沒聲調的注音 */
+    fun pinyinTable(): Map<String, String> {
+        val map = HashMap<String, String>()
+        runCatching {
+            db.rawQuery("SELECT py, bpmf FROM pinyin", null).use { c -> while (c.moveToNext()) map[c.getString(0)] = c.getString(1) }
+        }
+        return map
+    }
+
+    /** 繁體 → 簡體（沒有對照就回傳 null） */
+    fun simplified(trad: String): String? = runCatching {
+        db.rawQuery("SELECT simp FROM t2s WHERE trad = ?", arrayOf(trad)).use { c -> if (c.moveToFirst()) c.getString(0) else null }
+    }.getOrNull()
 
     override fun startingWith(head: String, limit: Int): List<String> {
         val out = ArrayList<String>()

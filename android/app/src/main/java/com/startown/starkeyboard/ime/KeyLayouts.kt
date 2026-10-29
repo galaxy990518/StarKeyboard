@@ -11,6 +11,7 @@ sealed class KeyAction {
     data class Zhuyin(val c: Char) : KeyAction()
     data class Jamo(val c: Char) : KeyAction()      // 韓文字母
     data class Romaji(val c: Char) : KeyAction()    // 日文羅馬拼音
+    data class Pinyin(val c: Char) : KeyAction()    // 漢語拼音
     data class Layer(val layer: KeyboardLayer) : KeyAction()
     data class Panel(val kind: PanelKind) : KeyAction()
     object Backspace : KeyAction()
@@ -21,7 +22,7 @@ sealed class KeyAction {
     object ClearCanvas : KeyAction()
 
     /** 一般打字的鍵：可以滑動修正、快速連打 */
-    val isCharacter get() = this is Text || this is Zhuyin || this is Jamo || this is Romaji
+    val isCharacter get() = this is Text || this is Zhuyin || this is Jamo || this is Romaji || this is Pinyin
 }
 
 enum class KeyKind { NORMAL, SPECIAL, ACCENT }
@@ -54,6 +55,7 @@ object KeyLayouts {
                 InputMode.ZHUYIN -> zhuyin(c)
                 InputMode.KOREAN -> korean(c)
                 InputMode.JAPANESE -> japanese(c)
+                InputMode.PINYIN -> pinyin(c)
                 else -> english(c)
             }
             KeyboardLayer.NUMBERS -> if (chinese) chineseNumbers(c) else englishNumbers(c)
@@ -90,6 +92,7 @@ object KeyLayouts {
                 InputMode.HANDWRITING -> "手寫"
                 InputMode.KOREAN -> "한글"
                 InputMode.JAPANESE -> "かな"
+                InputMode.PINYIN -> "拼音"
             }
             KeySpec(title, KeyAction.Layer(KeyboardLayer.LETTERS), 1.3f * k, KeyKind.SPECIAL, 14f)
         }
@@ -128,6 +131,13 @@ object KeyLayouts {
     private fun japanese(c: Context): KeyboardLayout {
         fun letters(s: String) = s.map { KeySpec(it.toString(), KeyAction.Romaji(it), fontSize = 24f) }
         val row3 = listOf(KeySpec("ー", KeyAction.Romaji('-'), 1.4f, KeyKind.SPECIAL, 20f)) + letters("zxcvbnm") + backspace()
+        return KeyboardLayout(listOf(letters("qwertyuiop"), letters("asdfghjkl"), row3, bottomRow(c, 10f)), 10f)
+    }
+
+    /** 漢語拼音：左下角是分音節的「'」（例如 xi'an） */
+    private fun pinyin(c: Context): KeyboardLayout {
+        fun letters(s: String) = s.map { KeySpec(it.toString(), KeyAction.Pinyin(it), fontSize = 24f) }
+        val row3 = listOf(KeySpec("'", KeyAction.Pinyin('\''), 1.4f, KeyKind.SPECIAL, 22f)) + letters("zxcvbnm") + backspace()
         return KeyboardLayout(listOf(letters("qwertyuiop"), letters("asdfghjkl"), row3, bottomRow(c, 10f)), 10f)
     }
 

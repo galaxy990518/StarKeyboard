@@ -371,6 +371,7 @@ class SettingsPanel(
                 onChange()
             }
         }
+        toggle("拼音輸出簡體字", settings.pinyinSimplified) { settings.pinyinSimplified = it }
         toggle("聯想詞（打完字後推薦下一個字）", settings.associations) { settings.associations = it }
 
         header("打錯字修正")

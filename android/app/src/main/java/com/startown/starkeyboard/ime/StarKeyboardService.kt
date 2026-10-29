@@ -32,10 +32,12 @@ import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
 import com.startown.starkeyboard.MainActivity
+import com.startown.starkeyboard.core.ChineseConverter
 import com.startown.starkeyboard.core.Candidate
 import com.startown.starkeyboard.core.ClipboardStore
 import com.startown.starkeyboard.core.EmoticonStore
 import com.startown.starkeyboard.core.HangulComposer
+import com.startown.starkeyboard.core.PinyinEngine
 import com.startown.starkeyboard.core.Romaji
 import com.startown.starkeyboard.core.Spelling
 import com.startown.starkeyboard.core.UserPhraseModel
@@ -52,6 +54,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private lateinit var clipStore: ClipboardStore
     private lateinit var emoStore: EmoticonStore
     private var engine: ZhuyinEngine? = null
+    private var pinyinEngine: PinyinEngine? = null
+    private var converter: ChineseConverter? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // 狀態
@@ -62,6 +66,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private var lastSpaceTime = 0L
     private val composer = ZhuyinComposer()
     private var kanaBuffer = ""
+    private var pinyinBuffer = ""                          // 拼音：還沒送出的字母
+    private var candidateOriginals: List<String> = emptyList()   // 拼音候選轉簡體前的原文
     private val hangul = HangulComposer()
     private var hangulComposing = false
     private var candidates: List<Candidate> = emptyList()
@@ -95,7 +101,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private val ink by lazy { InkRecognizer { toast(it) } }
 
     private val style get() = settings.style
-    private val isComposing get() = composer.isComposing || kanaBuffer.isNotEmpty()
+    private val isComposing get() = composer.isComposing || kanaBuffer.isNotEmpty() || pinyinBuffer.isNotEmpty()
     private val dp get() = resources.displayMetrics.density
 
     private val clipListener = ClipboardManager.OnPrimaryClipChangedListener { captureClipboard() }
@@ -110,9 +116,14 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         mode = settings.lastMode.takeIf { it in settings.enabledModes } ?: settings.enabledModes.first()
         Thread {
             val source = SQLitePhraseSource.open(this)
+            val plain = SQLitePhraseSource.open(this, "plain")
             mainHandler.post {
                 if (source != null) {
                     engine = ZhuyinEngine(source, UserPhraseModel(File(filesDir, "learned.txt"))).also { it.fuzzy = fuzzyOptions() }
+                }
+                if (plain != null) {
+                    pinyinEngine = PinyinEngine(ZhuyinEngine(plain, UserPhraseModel(File(filesDir, "learned-pinyin.txt"))), plain.pinyinTable())
+                    converter = ChineseConverter { plain.simplified(it) }
                 }
             }
         }.start()
@@ -193,6 +204,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun resetComposition() {
         composer.clear()
         kanaBuffer = ""
+        pinyinBuffer = ""
         hangul.reset()
         hangulComposing = false
         candidates = emptyList()
@@ -249,6 +261,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             is KeyAction.Zhuyin -> typeZhuyin(action.c)
             is KeyAction.Jamo -> typeJamo(action.c)
             is KeyAction.Romaji -> typeRomaji(action.c)
+            is KeyAction.Pinyin -> typePinyin(action.c)
             is KeyAction.Layer -> { layer = action.layer; rebuildKeys() }
             is KeyAction.Panel -> openPanel(action.kind)
             KeyAction.Backspace -> backspace()
@@ -284,6 +297,23 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             return
         }
         updateCandidates()
+    }
+
+    private fun typePinyin(c: Char) {
+        suggestions = emptyList()
+        if (c == '\'' &&(pinyinBuffer.isEmpty() || pinyinBuffer.endsWith("'"))) return
+        pinyinBuffer += c
+        if (pinyinBuffer.length >= 60) {
+            commitAll()
+            return
+        }
+        updateCandidates()
+    }
+
+    /** 拼音模式要不要轉成簡體 */
+    private fun simplify(s: String): String {
+        val c = converter
+        return if (mode == InputMode.PINYIN && settings.pinyinSimplified && c != null) c.convert(s) else s
     }
 
     private fun typeRomaji(c: Char) {
@@ -328,6 +358,11 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     private fun backspace() {
+        if (pinyinBuffer.isNotEmpty()) {
+            pinyinBuffer = pinyinBuffer.dropLast(1)
+            updateCandidates()
+            return
+        }
         if (kanaBuffer.isNotEmpty()) {
             kanaBuffer = kanaBuffer.dropLast(1)
             updateCandidates()
@@ -488,7 +523,22 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     // ===== 選字（注音、日文） =====
 
     private fun updateCandidates() {
+        candidateOriginals = emptyList()
         candidates = when {
+            pinyinBuffer.isNotEmpty() -> {
+                // 拼音：查到的是繁體，要的話轉成簡體；轉完一樣的只留一個
+                val seen = HashSet<String>()
+                val list = ArrayList<Candidate>()
+                val originals = ArrayList<String>()
+                for (c in pinyinEngine?.candidates(pinyinBuffer) ?: emptyList()) {
+                    val shown = simplify(c.text)
+                    if (!seen.add(shown)) continue
+                    list.add(c.copy(text = shown))
+                    originals.add(c.text)
+                }
+                candidateOriginals = originals
+                list
+            }
             kanaBuffer.isNotEmpty() -> {
                 val hira = Romaji.finalize(kanaBuffer)
                 listOf(hira, Romaji.katakana(hira), kanaBuffer).distinct().map { Candidate(it, 0, Candidate.Kind.PHRASE) }
@@ -509,6 +559,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private val compositionText: String
         get() {
+            if (pinyinBuffer.isNotEmpty()) return pinyinEngine?.display(pinyinBuffer) ?: pinyinBuffer
             if (kanaBuffer.isNotEmpty()) {
                 val (kana, rest) = Romaji.convert(kanaBuffer)
                 return kana + rest
@@ -528,6 +579,30 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             } else {
                 translation = null
                 refreshTopBar()
+            }
+            return
+        }
+        if (pinyinBuffer.isNotEmpty()) {
+            val c = candidates.getOrNull(i) ?: return
+            val original = candidateOriginals.getOrNull(i) ?: c.text
+            val p = pinyinEngine
+            if (p != null) {
+                if (learn && c.kind != Candidate.Kind.LITERAL) {
+                    p.engine.learn(p.readings(p.segment(pinyinBuffer)).take(c.span), original)
+                }
+                pinyinBuffer = pinyinBuffer.drop(p.consumedLength(pinyinBuffer, c.span)).trimStart('\'')
+            } else {
+                pinyinBuffer = ""
+            }
+            output(c.text)
+            if (pinyinBuffer.isNotEmpty()) {
+                updateCandidates()
+            } else {
+                candidates = emptyList()
+                candidateOriginals = emptyList()
+                closeCandidatePanel()
+                showAssociations(original)
+                refreshReturnTitle()
             }
             return
         }
@@ -578,7 +653,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun commitAll() {
         if (!isComposing) return
         val text: String
-        if (kanaBuffer.isNotEmpty()) {
+        if (pinyinBuffer.isNotEmpty()) {
+            // 拼音：送出整句（第一個候選）；完全查不到就照打的字母送出
+            text = candidates.firstOrNull()?.text ?: pinyinBuffer.replace("'", "")
+            pinyinBuffer = ""
+            candidateOriginals = emptyList()
+        } else if (kanaBuffer.isNotEmpty()) {
             text = Romaji.finalize(kanaBuffer)
             kanaBuffer = ""
         } else {
@@ -597,6 +677,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun showAssociations(text: String) {
         suggestions = if (settings.associations && editorText == null && (mode == InputMode.ZHUYIN || mode == InputMode.HANDWRITING)) {
             engine?.associations(text) ?: emptyList()
+        } else if (settings.associations && editorText == null && mode == InputMode.PINYIN) {
+            // 拼音：用繁體原文查，結果再轉簡體
+            (pinyinEngine?.engine?.associations(text) ?: emptyList()).map { simplify(it) }.distinct()
         } else emptyList()
         suggestionSource = SuggestionSource.ASSOCIATION
         refreshTopBar()
@@ -920,6 +1003,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun endEditor() {
         composer.clear()
         kanaBuffer = ""
+        pinyinBuffer = ""
         hangul.reset()
         hangulComposing = false
         candidates = emptyList()
