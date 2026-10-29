@@ -685,7 +685,7 @@ final class KeyboardViewController: UIInputViewController {
     /// 快捷片語：打的字（整句）或注音（例如 ㄉㄓ）和縮寫一樣，就把片語放在第二個
     private func withShortcuts(_ list: [Candidate]) -> [Candidate] {
         guard !shortcutStore.items.isEmpty else { return list }
-        let typed = composer.readings.map { r in String(r.filter { !Bopomofo.tones.contains($0) && $0 != "*" }) }.joined()
+        let typed = composer.readings.map { r in String(r.filter { !Bopomofo.tones.contains($0) && $0 != "*" && $0 != "~" }) }.joined()
         var seen = Set<String>()
         let phrases = ([list.first?.text, typed].compactMap { $0 }).flatMap { shortcutStore.matching($0) }.filter { seen.insert($0).inserted }
         guard !phrases.isEmpty else { return list }
@@ -760,7 +760,8 @@ final class KeyboardViewController: UIInputViewController {
         if composer.isComposing {
             guard i < candidates.count else { return }
             let c = candidates[i]
-            let used = Array(composer.readings.prefix(c.span))
+            // 預測的詞記成它完整的讀音（只打了 ㄏㄠˇ 選「好可愛」，記成 ㄏㄠˇ-ㄎㄜˇ-ㄞˋ）
+            let used = c.reading.map { $0.components(separatedBy: "-") } ?? Array(composer.readings.prefix(c.span))
             // 點的字都記；按空白送出的單一個詞也記（整句只有點了才記，免得記住猜錯的句子）
             if c.kind != .literal && (learn || c.kind == .phrase) {
                 engine?.learn(readings: used, text: c.text)

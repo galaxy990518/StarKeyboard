@@ -203,6 +203,8 @@ final class TopBarView: UIView {
                 let pill = CGRect(x: x, y: 4, width: bw, height: max(20, ch - 8))
                 b.frame = pill
                 b.layer.cornerRadius = pill.height / 2
+                // 給陰影現成的形狀，iPhone 才不用每一幀從按鈕內容重算陰影（打字時會卡）
+                b.layer.shadowPath = UIBezierPath(roundedRect: b.bounds, cornerRadius: pill.height / 2).cgPath
                 x += bw + 4
             } else {
                 b.frame = CGRect(x: x, y: 0, width: bw, height: ch)

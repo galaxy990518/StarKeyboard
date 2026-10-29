@@ -24,7 +24,8 @@ final class ZhuyinComposerTests: XCTestCase {
         XCTAssertEqual(c.readings, ["ㄅ*", "ㄆㄚˋ"])
         var w = ZhuyinComposer()
         for ch in "ㄨㄛㄏㄓㄜㄧ" { w.input(ch) }
-        XCTAssertEqual(w.readings, ["ㄨㄛ*", "ㄏ*", "ㄓㄜ*", "ㄧ*"])
+        // ㄓㄜ 前面是只打聲母的 ㄏ：也可能是簡拼的 ㄓ＋ㄜ，加 ~ 記號
+        XCTAssertEqual(w.readings, ["ㄨㄛ*", "ㄏ*", "ㄓㄜ*~", "ㄧ*"])
         w.backspace()
         w.backspace()
         XCTAssertEqual(w.readings, ["ㄨㄛ*", "ㄏ*", "ㄓ*"])
@@ -38,6 +39,24 @@ final class ZhuyinComposerTests: XCTestCase {
         c.validPrefixes = ["ㄘ", "ㄘㄜ", "ㄧ", "ㄧㄝ"]
         for ch in "ㄘㄧㄝ" { c.input(ch) }
         XCTAssertEqual(c.readings, ["ㄘ*", "ㄧㄝ*"])
+    }
+
+    func testAbbreviationMarksPossibleSplit() {
+        // 前一個字只打了聲母（ㄏ），這個 ㄎㄞ 也可能是 ㄎ＋ㄞ：加 ~，選了前面的字之後還記得
+        var c = ZhuyinComposer()
+        for ch in "ㄏㄎㄞ" { c.input(ch) }
+        XCTAssertEqual(c.readings, ["ㄏ*", "ㄎㄞ*~"])
+        c.removeFirst(1)
+        XCTAssertEqual(c.readings, ["ㄎㄞ*~"])
+        c.backspace()
+        XCTAssertEqual(c.readings, ["ㄎ*"])
+        // 前一個字打完整、或這個字打了聲調：不是簡拼
+        var full = ZhuyinComposer()
+        for ch in "ㄏㄠㄎㄞ" { full.input(ch) }
+        XCTAssertEqual(full.readings, ["ㄏㄠ*", "ㄎㄞ*"])
+        var toned = ZhuyinComposer()
+        for ch in "ㄏㄎㄞˋ" { toned.input(ch) }
+        XCTAssertEqual(toned.readings, ["ㄏ*", "ㄎㄞˋ"])
     }
 
     func testNeutralToneAtEnd() {
@@ -94,8 +113,9 @@ final class ZhuyinEngineTests: XCTestCase {
         let c = e.candidates(for: ["ㄋㄧˇ", "ㄏㄠˇ"])
         XCTAssertEqual(c.first, Candidate(text: "你好", span: 2, kind: .sentence))
         XCTAssertTrue(c.contains(Candidate(text: "妳", span: 1, kind: .phrase)))
+        // 打完整的字：第一個還是「是」，接著預測以 ㄕˋ 開頭的詞（世界）
         let single = e.candidates(for: ["ㄕˋ"])
-        XCTAssertEqual(single.map { $0.text }, ["是", "事", "世"])
+        XCTAssertEqual(single.map { $0.text }, ["是", "世界", "事", "世"])
     }
 
     func testUnknownSyllableStaysAsSymbols() {
@@ -163,6 +183,43 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertEqual(sentence(["ㄨㄛ*", "ㄏ*", "ㄓㄜ*", "ㄧ*"]), "我會這樣")
         XCTAssertEqual(e.candidates(for: ["ㄋㄧ*"]).map { $0.text }, ["你", "妳"])
         XCTAssertEqual(e.candidates(for: ["ㄅ*"]).first?.text, "ㄅ")
+    }
+
+    func testSplitAbbreviation() {
+        // 簡拼 ㄏㄎㄞ：ㄎㄞ 也當成 ㄎ＋ㄞ（可愛）；後面接完整打的字就不拆（好開心）
+        let e = makeEngine(extra: [("ㄎㄞ", "開", -3.0), ("ㄎㄜˇ-ㄞˋ", "可愛", -4.3), ("ㄒㄧㄣ", "心", -3.5),
+                                   ("ㄎㄞ-ㄒㄧㄣ", "開心", -4.0)])
+        func sentence(_ r: [String]) -> String { e.bestSegments(r).map { $0.text }.joined() }
+        XCTAssertEqual(ZhuyinEngine.splitAbbreviation("ㄎㄞ*~"), ["ㄎ*", "ㄞ*"])
+        XCTAssertNil(ZhuyinEngine.splitAbbreviation("ㄎㄞ*"))
+        XCTAssertEqual(e.candidates(for: ["ㄎㄞ*~"]).first?.text, "可愛")
+        XCTAssertEqual(e.candidates(for: ["ㄎㄞ*"]).first?.text, "開")
+        XCTAssertEqual(sentence(["ㄏ*", "ㄎㄞ*~"]), "好可愛")
+        XCTAssertEqual(sentence(["ㄏ*", "ㄎㄞ*~", "ㄒㄧㄣ*"]), "好開心")
+        XCTAssertEqual(ZhuyinEngine.display("ㄎㄞ*~"), "ㄎㄞ")
+    }
+
+    func testLearnSplitAbbreviation() {
+        let e = makeEngine(extra: [("ㄎㄞ", "開", -3.0), ("ㄎㄜˇ-ㄞˋ", "可愛", -4.3)])
+        // ㄎㄞ*~ 選了三個字的「好可愛」：記成拆開的 ㄏ*-ㄎ*-ㄞ*；選了「開」就是沒拆，記成 ㄎㄞ*
+        e.learn(readings: ["ㄏ*", "ㄎㄞ*~"], text: "好可愛")
+        XCTAssertTrue(e.userModel.phrases(for: "ㄏ*-ㄎ*-ㄞ*").contains("好可愛"))
+        e.learn(readings: ["ㄎㄞ*~"], text: "開")
+        XCTAssertTrue(e.userModel.phrases(for: "ㄎㄞ*").contains("開"))
+    }
+
+    func testPredictions() {
+        let e = makeEngine()
+        // 打完 ㄋㄧˇ：第一個還是「你」，接著預測以它開頭的詞，選了要記成完整讀音
+        let c = e.candidates(for: ["ㄋㄧˇ"])
+        XCTAssertEqual(c.map { $0.text }, ["你", "你好", "你們", "妳"])
+        XCTAssertEqual(c[1].reading, "ㄋㄧˇ-ㄏㄠˇ")
+        XCTAssertEqual(c[1].span, 1)
+        // 還沒打完（沒聲調）不預測
+        XCTAssertFalse(e.candidates(for: ["ㄋㄧ*"]).contains { $0.reading != nil })
+        // 學過的詞排在預測的最前面
+        e.learn(readings: ["ㄋㄧˇ", "ㄇㄣ˙"], text: "你們")
+        XCTAssertEqual(e.candidates(for: ["ㄋㄧˇ"])[1].text, "你們")
     }
 
     func testSyllablePrefixes() {

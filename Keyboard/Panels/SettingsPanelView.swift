@@ -26,6 +26,8 @@ final class SettingsPanelView: UIView {
     private let scroll = UIScrollView()
     private let stack = UIStackView()
     private let bar: PanelBottomBar
+    // 換主題會重建，要記住主題那排橫向捲到哪
+    private weak var themeScroll: UIScrollView?
 
     init(settings: KeyboardSettings, hasFullAccess: Bool, style: KeyboardStyle, shortcuts: ShortcutStore) {
         self.settings = settings
@@ -66,6 +68,7 @@ final class SettingsPanelView: UIView {
     private func rebuild() {
         bar.style = style
         let offset = scroll.contentOffset
+        let themeX = themeScroll?.contentOffset.x ?? 0
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         stack.addArrangedSubview(header("主題"))
@@ -236,6 +239,9 @@ final class SettingsPanelView: UIView {
         setNeedsLayout()
         layoutIfNeeded()
         scroll.contentOffset = CGPoint(x: 0, y: min(offset.y, max(0, scroll.contentSize.height - scroll.bounds.height)))
+        if let s = themeScroll {
+            s.contentOffset = CGPoint(x: min(themeX, max(0, s.contentSize.width - s.bounds.width)), y: 0)
+        }
     }
 
     private static func modeName(_ mode: InputMode) -> String {
@@ -313,6 +319,7 @@ final class SettingsPanelView: UIView {
             x += 68
         }
         scrollRow.contentSize = CGSize(width: x, height: 76)
+        themeScroll = scrollRow
         return scrollRow
     }
 
