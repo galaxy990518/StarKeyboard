@@ -120,6 +120,38 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertEqual(e.phrases(["ㄏㄠˇ", "ㄕˋ"]).first?.text, "好事")
     }
 
+    func testLearningSurvivesPartialReadings() {
+        let e = makeEngine()
+        // Populate the caches before selecting a different word.
+        _ = e.candidates(for: ["ㄋㄧ*"])
+        e.learn(readings: ["ㄋㄧˇ"], text: "妳")
+        XCTAssertEqual(e.candidates(for: ["ㄋㄧ*"]).first?.text, "妳")
+        e.learn(readings: ["ㄋ*", "ㄏ*"], text: "妳好")
+        XCTAssertTrue(e.phrases(["ㄋㄧˇ", "ㄏㄠˇ"]).contains { $0.text == "妳好" })
+        XCTAssertFalse(e.phrases(["ㄕˋ", "ㄏㄠˇ"]).contains { $0.text == "妳好" })
+        e.resetLearning()
+        XCTAssertEqual(e.candidates(for: ["ㄋㄧ*"]).first?.text, "你")
+    }
+
+    func testSpecificPrefixIsFilteredBeforeRowLimit() {
+        let common = (0..<450).map { ("ㄋㄚˋ", "那\($0)", -2.0) }
+        let e = makeEngine(extra: common)
+        XCTAssertEqual(e.phrases(["ㄋㄧ*"]).first?.text, "你")
+    }
+
+    func testLearnedPhrasePersistsAcrossReloadAndAbbreviation() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("learned.json")
+        let model = UserPhraseModel(fileURL: url)
+        model.record(reading: "ㄋㄧˇ-ㄏㄠˇ", phrase: "妳好")
+        let reloaded = UserPhraseModel(fileURL: url)
+        XCTAssertEqual(reloaded.phrases(for: "ㄋ*-ㄏ*"), ["妳好"])
+        XCTAssertGreaterThan(reloaded.boost(reading: "ㄋ*-ㄏ*", phrase: "妳好"), 0)
+        XCTAssertTrue(reloaded.phrases(for: "ㄋㄧˋ-ㄏㄠˇ").isEmpty)
+    }
+
     func testPreviewAndAbbreviation() {
         let e = makeEngine(extra: [("ㄨㄛˇ", "我", -2.5), ("ㄏㄨㄟˋ", "會", -2.8), ("ㄓㄜˋ", "這", -2.6),
                                    ("ㄧㄤˋ", "樣", -3.0), ("ㄓㄜˋ-ㄧㄤˋ", "這樣", -3.5)])
@@ -145,6 +177,18 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertTrue(a.contains("好"))
         XCTAssertTrue(a.contains("們"))
         XCTAssertEqual(e.associations(after: "世"), ["界"])
+    }
+}
+
+final class PunctuationSuggestionTests: XCTestCase {
+    func testQuestionsAndStatements() {
+        XCTAssertEqual(PunctuationSuggestions.after("你要去哪裡吃飯").first, "？")
+        XCTAssertEqual(PunctuationSuggestions.after("你怎么知道的").first, "？")
+        XCTAssertEqual(PunctuationSuggestions.after("你好嗎").first, "？")
+        XCTAssertEqual(PunctuationSuggestions.after("我們走吧").first, "，")
+        XCTAssertEqual(PunctuationSuggestions.after("你去哪裡？我回家").first, "，")
+        XCTAssertTrue(PunctuationSuggestions.after("已經好了。").isEmpty)
+        XCTAssertTrue(PunctuationSuggestions.after("").isEmpty)
     }
 }
 

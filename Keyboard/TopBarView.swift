@@ -148,9 +148,21 @@ final class TopBarView: UIView {
     }
 
     private func rebuildCandidates(_ items: [String]) {
-        candidateButtons.forEach { $0.removeFromSuperview() }
-        candidateButtons = items.enumerated().map { (i, text) in
+        let changed = candidateButtons.map { $0.title(for: .normal) ?? "" } != items
+        while candidateButtons.count > items.count {
+            candidateButtons.removeLast().removeFromSuperview()
+        }
+        while candidateButtons.count < items.count {
+            let i = candidateButtons.count
             let b = UIButton(type: .system)
+            b.tag = i
+            b.addAction(UIAction { [weak self] _ in self?.onCandidate?(i) }, for: .touchUpInside)
+            candidateScroll.addSubview(b)
+            candidateButtons.append(b)
+        }
+        // Reuse existing buttons while typing instead of allocating up to 40 per refresh.
+        for (i, text) in items.enumerated() {
+            let b = candidateButtons[i]
             b.setTitle(text, for: .normal)
             // 字加粗；第一個（按空白會送出的）放在主題色的膠囊裡，一眼就看得到
             b.titleLabel?.font = KeyFonts.font(style.fontID, size: 24, weight: i == 0 ? .heavy : .semibold)
@@ -164,12 +176,8 @@ final class TopBarView: UIView {
             } else {
                 b.setTitleColor(style.theme.keyText, for: .normal)
             }
-            b.tag = i
-            b.addAction(UIAction { [weak self] _ in self?.onCandidate?(i) }, for: .touchUpInside)
-            candidateScroll.addSubview(b)
-            return b
         }
-        candidateScroll.contentOffset = .zero
+        if changed { candidateScroll.contentOffset = .zero }
     }
 
     override func layoutSubviews() {

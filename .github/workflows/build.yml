@@ -18,7 +18,8 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    # ARM runners have repeatedly timed out while waiting for capacity.
+    runs-on: macos-15-intel
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -97,7 +98,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name == 'main' && 'build' || 'dev' }}-${{ github.run_number }}
-          name: 星星鍵盤 ${{ github.ref_name != 'main' && '開發版 ' || '' }}第 ${{ github.run_number }} 版
+          name: 糯糯鍵盤 ${{ github.ref_name != 'main' && '開發版 ' || '' }}第 ${{ github.run_number }} 版
           body_path: release_notes.md
           files: StarKeyboard.ipa
           prerelease: ${{ github.ref_name != 'main' }}

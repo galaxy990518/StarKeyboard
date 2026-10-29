@@ -4,6 +4,9 @@ import com.startown.starkeyboard.core.Pt
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.LinearGradient
+import android.graphics.Shader
+import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
@@ -39,6 +42,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     private class Key(val spec: KeySpec, val frame: RectF) {
         var path: Path = Path()
         var shadow: Path = Path()
+        var detail: Path = Path()
+        var shading: LinearGradient? = null
         var body: RectF = RectF()
         var scale = 1f
         var pressed = false
@@ -145,6 +150,10 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             val outer = RectF(k.frame).apply { inset(3 * dp * style.gapScale, 4.5f * dp * style.gapScale) }
             if (outer.width() < 4 || outer.height() < 4) continue
             k.path = style.shape.path(outer, dp)
+            k.detail = style.shape.detailPath(outer, dp)
+            k.shading = if (style.shape.isSoftShape) LinearGradient(0f, outer.top, 0f, outer.bottom,
+                intArrayOf(Color.WHITE.withAlpha(style.keyAlpha * 0.30f), Color.TRANSPARENT, Color.BLACK.withAlpha(style.keyAlpha * 0.04f)),
+                floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP) else null
             k.shadow = Path(k.path).apply { offset(0f, 1.5f * dp) }
             k.body = style.shape.bodyRect(outer, dp)
         }
@@ -162,7 +171,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             }
             canvas.save()
             if (k.scale != 1f) canvas.scale(k.scale, k.scale, k.frame.centerX(), k.frame.centerY())
-            fillPaint.color = t.shadow.withAlpha(minOf(1f, style.keyAlpha + 0.1f))
+            fillPaint.color = t.shadow.withAlpha(if (style.shape.isSoftShape) style.keyAlpha * 0.32f else minOf(1f, style.keyAlpha + 0.1f))
             canvas.drawPath(k.shadow, fillPaint)
             fillPaint.color = fill.withAlpha(style.keyAlpha)
             canvas.drawPath(k.path, fillPaint)
@@ -173,6 +182,14 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 val gloss = RectF(b.left + b.width() * 0.2f, b.top + 2.5f * dp, b.right - b.width() * 0.2f, b.top + 2.5f * dp + gh)
                 canvas.drawRoundRect(gloss, gh / 2, gh / 2, fillPaint)
             }
+            k.shading?.let { shader ->
+                fillPaint.color = Color.WHITE
+                fillPaint.shader = shader
+                canvas.drawPath(k.path, fillPaint)
+                fillPaint.shader = null
+            }
+            fillPaint.color = style.shape.detailColor(t).withAlpha(style.keyAlpha * (if (style.shape == KeyShape.PUDDING || style.shape == KeyShape.DUCK) 0.85f else 0.4f))
+            canvas.drawPath(k.detail, fillPaint)
             drawLabel(canvas, k, text)
             canvas.restore()
         }
@@ -185,6 +202,9 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         textPaint.typeface = KeyFonts.get(context, style.fontId)
             ?: if (k.spec.kind == KeyKind.NORMAL) Typeface.DEFAULT else Typeface.DEFAULT_BOLD
         var size = k.spec.fontSize * dp * style.fontScale
+        if (style.shape.isSoftShape) {
+            size = minOf(size, k.body.height() * 0.85f)
+        }
         textPaint.textSize = size
         val maxW = k.body.width() - 4 * dp
         val w = textPaint.measureText(k.spec.label)

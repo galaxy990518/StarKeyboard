@@ -79,7 +79,7 @@ class MainActivity : Activity() {
 
     private fun build() {
         col.addView(TextView(this).apply {
-            text = "⭐ 星星鍵盤"; textSize = 30f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.parseColor("#43262F"))
+            text = "糯糯鍵盤"; textSize = 30f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.parseColor("#43262F"))
         })
         text("注音、手寫、英文、韓文、日文、表符、顏文字、剪貼簿、翻譯，還有可愛的主題。")
         text("目前是 Android 第 ${BuildInfo.current(this)} 版")
@@ -96,7 +96,7 @@ class MainActivity : Activity() {
                 setPadding(0, px(16f), 0, px(4f))
             })
             text(info.notes, updateBox)
-            text("按下面的按鈕下載 APK。目前要先移除舊版（長按星星鍵盤圖示 › 解除安裝）再點開新的安裝檔安裝，裝好後要重新選一次鍵盤。", updateBox)
+            text("按下面的按鈕下載 APK。目前要先移除舊版（長按糯糯鍵盤圖示 › 解除安裝）再點開新的安裝檔安裝，裝好後要重新選一次鍵盤。", updateBox)
             button("下載新版", updateBox) {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl ?: info.pageUrl)))
             }
@@ -105,10 +105,10 @@ class MainActivity : Activity() {
         showCrashLog()
 
         title("第一次使用：打開鍵盤")
-        text("1. 按下面的按鈕，在清單裡打開「星星鍵盤」（手機會提醒第三方鍵盤可能讀取你打的字，按確定）")
+        text("1. 按下面的按鈕，在清單裡打開「糯糯鍵盤」（手機會提醒第三方鍵盤可能讀取你打的字，按確定）")
         button("① 打開鍵盤設定") { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) }
-        text("2. 再按一次，選「星星鍵盤」當目前的鍵盤")
-        button("② 切換成星星鍵盤") { (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() }
+        text("2. 再按一次，選「糯糯鍵盤」當目前的鍵盤")
+        button("② 切換成糯糯鍵盤") { (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() }
         text("3. 在下面試打看看")
         tryBox = EditText(this).apply {
             hint = "在這裡試試新鍵盤"
@@ -133,7 +133,7 @@ class MainActivity : Activity() {
         text("• 按住「中／英」鍵可以換回別的鍵盤。按住空白鍵左右滑可以移動游標。")
         text("• 手寫：第一次用會下載 Google 的手寫辨識資料（約 20MB），之後不用網路。")
         text("• 翻譯：工具列的「譯」。第一次翻譯某個語言要下載資料。")
-        text("• 剪貼簿：星星鍵盤是目前的鍵盤時，複製的文字都會記下來。")
+        text("• 剪貼簿：糯糯鍵盤是目前的鍵盤時，複製的文字都會記下來。")
         text("• 大小、主題、按鍵造型都在鍵盤的 ⚙ 設定裡調。")
         text("• 所有版本：${ReleaseChecker.PAGE}")
     }
@@ -151,7 +151,7 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = px(6f) })
         button("複製紀錄") {
             (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager)
-                .setPrimaryClip(android.content.ClipData.newPlainText("星星鍵盤紀錄", log))
+                .setPrimaryClip(android.content.ClipData.newPlainText("糯糯鍵盤紀錄", log))
             toast("已複製")
         }
         button("清除紀錄") {

@@ -13,18 +13,20 @@ struct StarKeyboardApp: App {
 
 struct ContentView: View {
     @State private var testText = ""
-    @State private var photoItem: PhotosPickerItem?
+    @State private var showingPhotoPicker = false
     @State private var message: String?
     @State private var latest: ReleaseInfo?
 
     private let pink = Color(red: 1.0, green: 0.5, blue: 0.65)
 
     var body: some View {
-        NavigationStack {
+        NavigationView {
             List {
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("⭐️ 星星鍵盤")
+                        Image("BrandMark")
+                            .resizable().frame(width: 64, height: 64).clipShape(RoundedRectangle(cornerRadius: 17))
+                        Text("糯糯鍵盤")
                             .font(.system(.largeTitle, design: .rounded).bold())
                         Text("注音、手寫、英文、表符、顏文字、剪貼簿，還有可愛的主題。")
                             .font(.system(.subheadline, design: .rounded))
@@ -54,9 +56,9 @@ struct ContentView: View {
 
                 Section("第一次使用：打開鍵盤") {
                     step(1, "打開「設定」App › 一般 › 鍵盤 › 鍵盤 › 新增鍵盤…")
-                    step(2, "在「第三方鍵盤」選「星星鍵盤」")
-                    step(3, "點「星星鍵盤」，打開「允許完整取用」（剪貼簿、聲音、震動、貼圖、背景圖都需要）")
-                    step(4, "打字時長按 🌐 地球鍵，切換到星星鍵盤")
+                    step(2, "在「第三方鍵盤」選「糯糯鍵盤」")
+                    step(3, "點「糯糯鍵盤」，打開「允許完整取用」（剪貼簿、聲音、震動、貼圖、背景圖都需要）")
+                    step(4, "打字時長按 🌐 地球鍵，切換到糯糯鍵盤")
                     Button("打開本 App 的設定頁") {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             UIApplication.shared.open(url)
@@ -65,12 +67,14 @@ struct ContentView: View {
                 }
 
                 Section("試打看看") {
-                    TextField("在這裡試試新鍵盤", text: $testText, axis: .vertical)
-                        .lineLimit(3...8)
+                    Text("在這裡試試新鍵盤").font(.caption).foregroundStyle(.secondary)
+                    TextEditor(text: $testText)
+                        .frame(minHeight: 90, maxHeight: 180)
+                        .accessibilityLabel("在這裡試試新鍵盤")
                 }
 
                 Section {
-                    PhotosPicker(selection: $photoItem, matching: .images) {
+                    Button { showingPhotoPicker = true } label: {
                         Label("挑一張照片", systemImage: "photo.on.rectangle.angled")
                     }
                     Text("照片會被複製到剪貼簿。接著打開鍵盤：\n• 當背景：⚙️ 設定 › 背景圖片 › 從剪貼簿貼上圖片\n• 做成貼圖：☺ 表符 › ⭐ 我的 › ＋ › 把剪貼簿的圖片做成貼圖")
@@ -93,15 +97,18 @@ struct ContentView: View {
                     tip("免費 Apple ID", "用免費帳號安裝的話，每 7 天要用 Sideloadly 重新安裝一次（資料不會不見）。")
                 }
             }
-            .navigationTitle("星星鍵盤")
+            .navigationTitle("糯糯鍵盤")
             .navigationBarTitleDisplayMode(.inline)
             .tint(pink)
             .task {
                 ReleaseChecker.fetchLatest { info in latest = info }
             }
-            .onChange(of: photoItem) { item in
-                guard let item = item else { return }
-                Task { await copyPhoto(item) }
+            .sheet(isPresented: $showingPhotoPicker) {
+                KeyboardPhotoPicker { image in
+                    showingPhotoPicker = false
+                    guard let image = image else { return }
+                    copyPhoto(image)
+                }
             }
             .alert(message ?? "", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
                 Button("好") {}
@@ -130,11 +137,7 @@ struct ContentView: View {
     }
 
     @MainActor
-    private func copyPhoto(_ item: PhotosPickerItem) async {
-        guard let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) else {
-            message = "讀不到這張照片"
-            return
-        }
+    private func copyPhoto(_ image: UIImage) {
         let longest = max(image.size.width, image.size.height)
         let scale = min(1, 1000 / longest)
         let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
@@ -144,7 +147,6 @@ struct ContentView: View {
             image.draw(in: CGRect(origin: .zero, size: size))
         }
         UIPasteboard.general.image = resized
-        photoItem = nil
         message = "已經複製好了！現在打開鍵盤，到 ⚙️ 設定貼上當背景，或到 ⭐ 我的 做成貼圖。"
     }
 }

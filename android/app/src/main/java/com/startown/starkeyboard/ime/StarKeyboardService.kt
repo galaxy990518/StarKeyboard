@@ -1047,7 +1047,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun startPhotoAdjust() {
         val r = root ?: return
         if (!settings.hasBackground) {
-            toast("先到星星鍵盤 App 挑一張照片")
+            toast("先到糯糯鍵盤 App 挑一張照片")
             return
         }
         if (photoAdjust != null) return
@@ -1464,6 +1464,6 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val latest = settings.latestBuild
         if (latest <= BuildInfo.current(this) || latest <= settings.notifiedBuild) return
         settings.notifiedBuild = latest
-        toast("有新版（Android 第 $latest 版）！打開星星鍵盤 App 更新")
+        toast("有新版（Android 第 $latest 版）！打開糯糯鍵盤 App 更新")
     }
 }

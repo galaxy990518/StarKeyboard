@@ -22,9 +22,10 @@ final class KeyButton: UIView {
     private let content = UIView()
     private let shadowLayer = CAShapeLayer()
     private let bodyLayer = CAShapeLayer()
-    private let decorLayer = CAShapeLayer()   // 造型的小細節（兔耳內側、焦糖…）
-    private var decorRect = CGRect.zero       // 細節顏色要看是不是寬鍵，記住上次排版的範圍
     private let glossLayer = CAShapeLayer()
+    private let detailLayer = CAShapeLayer()
+    private let cushionLayer = CAGradientLayer()
+    private let cushionMask = CAShapeLayer()
     private let label = UILabel()
     private let icon = UIImageView()
 
@@ -36,8 +37,11 @@ final class KeyButton: UIView {
         addSubview(content)
         content.layer.addSublayer(shadowLayer)
         content.layer.addSublayer(bodyLayer)
-        content.layer.addSublayer(decorLayer)
         content.layer.addSublayer(glossLayer)
+        cushionLayer.mask = cushionMask
+        cushionLayer.locations = [0, 0.55, 1]
+        content.layer.addSublayer(cushionLayer)
+        content.layer.addSublayer(detailLayer)
         label.textAlignment = .center
         label.adjustsFontSizeToFitWidth = true
         label.minimumScaleFactor = 0.5
@@ -62,10 +66,11 @@ final class KeyButton: UIView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         bodyLayer.path = path
+        cushionLayer.frame = bounds
+        cushionMask.path = path
+        cushionLayer.isHidden = !style.shape.isSoftShape
+        detailLayer.path = style.shape.detailPath(in: outer)
         shadowLayer.path = path.copy(using: &shift)
-        decorRect = outer
-        decorLayer.path = style.shape.decorPath(in: outer)
-        decorLayer.fillColor = decorFill()
         if style.shape == .jelly {
             let body = style.shape.bodyRect(in: outer)
             let gloss = CGRect(x: body.minX + body.width * 0.2, y: body.minY + 2.5,
@@ -76,6 +81,15 @@ final class KeyButton: UIView {
         }
         CATransaction.commit()
         let textRect = style.shape.bodyRect(in: outer)
+        if style.shape.isSoftShape {
+            // Keep the glyph inside the smaller body when keyboard height is reduced.
+            label.font = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, textRect.height * 0.85),
+                                       weight: spec.kind == .normal ? .regular : .semibold)
+            if case .symbol(let name) = spec.face {
+                icon.image = UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(
+                    pointSize: min(18 * style.fontScale, textRect.height * 0.85), weight: .medium))
+            }
+        }
         label.frame = textRect.insetBy(dx: 2, dy: 0)
         icon.frame = textRect
     }
@@ -115,16 +129,14 @@ final class KeyButton: UIView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         bodyLayer.fillColor = fill.withAlphaComponent(style.keyAlpha).cgColor
-        shadowLayer.fillColor = t.shadow.withAlphaComponent(min(1, style.keyAlpha + 0.1)).cgColor
-        decorLayer.fillColor = decorFill()
+        shadowLayer.fillColor = t.shadow.withAlphaComponent(style.shape.isSoftShape ? style.keyAlpha * 0.32 : min(1, style.keyAlpha + 0.1)).cgColor
+        cushionLayer.colors = [UIColor.white.withAlphaComponent(style.keyAlpha * 0.30).cgColor,
+                               UIColor.clear.cgColor, UIColor.black.withAlphaComponent(style.keyAlpha * 0.04).cgColor]
+        detailLayer.fillColor = style.shape.detailColor(theme: t).withAlphaComponent(style.keyAlpha * (style.shape == .pudding || style.shape == .duck ? 0.85 : 0.4)).cgColor
         glossLayer.fillColor = UIColor.white.withAlphaComponent(t.isDark ? 0.18 : 0.55).cgColor
         CATransaction.commit()
         label.textColor = text
         icon.tintColor = text
-    }
-
-    private func decorFill() -> CGColor? {
-        style.shape.decorTint(in: decorRect)?.withAlphaComponent(style.keyAlpha).cgColor
     }
 
     private func pressChanged() {

@@ -70,9 +70,9 @@ final class ZhuyinEngine {
 
     static func createSchema(in db: SQLiteDB) {
         db.execute("CREATE TABLE IF NOT EXISTS phrases(reading TEXT NOT NULL, plain TEXT NOT NULL, abbr TEXT NOT NULL, phrase TEXT NOT NULL, score REAL NOT NULL)")
-        db.execute("CREATE INDEX IF NOT EXISTS idx_reading ON phrases(reading)")
-        db.execute("CREATE INDEX IF NOT EXISTS idx_plain ON phrases(plain)")
-        db.execute("CREATE INDEX IF NOT EXISTS idx_abbr ON phrases(abbr)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_reading ON phrases(reading, score DESC)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_plain ON phrases(plain, score DESC)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_abbr ON phrases(abbr, score DESC)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_phrase ON phrases(phrase)")
     }
 
@@ -117,8 +117,8 @@ final class ZhuyinEngine {
         let abbr = String(pattern.compactMap { $0.first })
         var best: [String: Double] = [:]
         let toneless = column == "plain"
-        // 只拿最常用的 400 筆來比（只打開頭注音時可能有上千筆，每打一個字都全部比會卡）
-        db.run("SELECT reading, phrase, score FROM phrases WHERE abbr = ?1 ORDER BY score DESC LIMIT 400", [.text(abbr)]) { stmt in
+        // 先按完整的輸入條件過濾，再限制筆數，避免常見但不符合的字把要找的字擠掉。
+        db.run("SELECT reading, phrase, score FROM phrases WHERE abbr = ?1 AND \(column) GLOB ?2 ORDER BY score DESC LIMIT 400", [.text(abbr), .text(key)]) { stmt in
             guard let penalty = Self.matchPenalty(pattern, SQLiteDB.text(stmt, 0).split(separator: "-"), ignoreTones: toneless) else { return }
             let phrase = SQLiteDB.text(stmt, 1)
             let s = SQLiteDB.double(stmt, 2) + penalty
@@ -340,12 +340,14 @@ final class ZhuyinEngine {
         userModel.record(reading: readings.joined(separator: "-"), phrase: text)
         cache.removeAll()
         fuzzyCache.removeAll()
+        alternativeCache.removeAll()
     }
 
     func resetLearning() {
         userModel.reset()
         cache.removeAll()
         fuzzyCache.removeAll()
+        alternativeCache.removeAll()
     }
 }
 
@@ -353,6 +355,7 @@ final class ZhuyinEngine {
 final class UserPhraseModel {
     private var counts: [String: [String: Int]] = [:]
     private let fileURL: URL?
+    private var matchingCache: [String: [String: Int]] = [:]
 
     init(fileURL: URL?) {
         self.fileURL = fileURL
@@ -361,24 +364,54 @@ final class UserPhraseModel {
         }
     }
 
-    /// 每選一次加 0.8（log10，大約變成 6 倍常用），最多算 5 次
+    /// 只記字、不管怎麼拼的那一欄（key 是空字串）
+    private static let anyReading = ""
+
+    /// 同樣的打法選過：每次加 0.8（log10，大約變成 6 倍常用），最多算 5 次；
+    /// 不管用什麼打法，這個字詞選過就再加一點（每次 0.4，最多 5 次）
     func boost(reading: String, phrase: String) -> Double {
-        guard let c = counts[reading]?[phrase] else { return 0 }
-        return min(Double(c), 5) * 0.8
+        let same = min(Double(matchingCounts(for: reading)[phrase] ?? 0), 5) * 0.8
+        let any = min(Double(counts[Self.anyReading]?[phrase] ?? 0), 5) * 0.4
+        return same + any
     }
 
     func phrases(for reading: String) -> [String] {
-        guard let dict = counts[reading] else { return [] }
-        return dict.keys.sorted()
+        guard !reading.isEmpty else { return [] }
+        return matchingCounts(for: reading).keys.sorted()
+    }
+
+    // 完整讀音和省略聲調／只打開頭的讀音也共用已選字詞；不混用不同的聲調。
+    private func matchingCounts(for reading: String) -> [String: Int] {
+        if let cached = matchingCache[reading] { return cached }
+        let query = reading.split(separator: "-")
+        var result: [String: Int] = [:]
+        for (saved, phrases) in counts where !saved.isEmpty {
+            let parts = saved.split(separator: "-")
+            guard parts.count == query.count else { continue }
+            let matches = zip(query, parts).allSatisfy { want, have in
+                want == have ||
+                ZhuyinEngine.matchPenalty([want], [have]) != nil ||
+                ZhuyinEngine.matchPenalty([have], [want]) != nil
+            }
+            if matches {
+                for (phrase, count) in phrases { result[phrase] = max(result[phrase] ?? 0, count) }
+            }
+        }
+        matchingCache[reading] = result
+        return result
     }
 
     func record(reading: String, phrase: String) {
+        guard !reading.isEmpty, !phrase.isEmpty else { return }
+        matchingCache.removeAll()
         counts[reading, default: [:]][phrase, default: 0] += 1
+        counts[Self.anyReading, default: [:]][phrase, default: 0] += 1
         save()
     }
 
     func reset() {
         counts = [:]
+        matchingCache.removeAll()
         save()
     }
 

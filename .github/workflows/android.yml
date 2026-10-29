@@ -95,7 +95,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-${{ github.run_number }}
-          name: 星星鍵盤 Android 第 ${{ github.run_number }} 版
+          name: 糯糯鍵盤 Android 第 ${{ github.run_number }} 版
           body_path: release_notes.md
           files: StarKeyboard.apk
           make_latest: "false"
@@ -104,7 +104,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view android-latest >/dev/null 2>&1 || gh release create android-latest --title "星星鍵盤 Android 最新版（固定網址）" --notes "這裡永遠是最新的 Android 安裝檔，每次打包會自動換新。各版本的更新內容請看 android-數字 的版本。" --prerelease --latest=false
+          gh release view android-latest >/dev/null 2>&1 || gh release create android-latest --title "糯糯鍵盤 Android 最新版（固定網址）" --notes "這裡永遠是最新的 Android 安裝檔，每次打包會自動換新。各版本的更新內容請看 android-數字 的版本。" --prerelease --latest=false
+          gh release edit android-latest --title "糯糯鍵盤 Android 最新版（固定網址）"
           gh release upload android-latest StarKeyboard.apk --clobber
 
       - uses: actions/upload-artifact@v4

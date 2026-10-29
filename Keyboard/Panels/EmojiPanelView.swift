@@ -229,6 +229,7 @@ final class CandidatePanelView: UIView {
         didSet {
             grid.style = style
             bar.style = style
+            backgroundColor = style.theme.backgroundBottom.withAlphaComponent(1)
         }
     }
 
@@ -240,6 +241,7 @@ final class CandidatePanelView: UIView {
         grid = ChipGridView(style: style)
         bar = PanelBottomBar(style: style, backTitle: "▲")
         super.init(frame: .zero)
+        backgroundColor = style.theme.backgroundBottom.withAlphaComponent(1)
         grid.cellStyle = .chip
         grid.onSelect = { [weak self] i in self?.onSelect?(i) }
         bar.onBack = { [weak self] in self?.onBack?() }

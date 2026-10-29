@@ -1,16 +1,19 @@
 <!doctype html><html lang="zh-Hant"><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>星星鍵盤安裝說明</title>
+<title>糯糯鍵盤｜下載與安裝</title>
+<link rel="icon" type="image/png" href="assets/app-icon.png">
+<link rel="apple-touch-icon" href="assets/app-icon.png">
+<meta name="description" content="糯糯鍵盤：奶油軟萌的手機鍵盤，11 款按鍵造型。下載 iPhone 與 Android 最新已發布版本。">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
   /* 版面：一欄的說明書。最上面切 iPhone／Android，各自從準備、下載、安裝、設定到更新；下面是兩邊共用的「怎麼用」和常見問題 */
   :root {
-    --bg: #fff7f9;
-    --fg: #43262f;
-    --muted: #8a6470;
-    --accent: #d9466f;
-    --soft: #ffe4ec;
+    --bg: #fff9f0;
+    --fg: #4a3327;
+    --muted: #806455;
+    --accent: #aa4e2f;
+    --soft: #ffead5;
     --card: #ffffff;
-    --line: #f2cfda;
+    --line: #efd6c1;
     --ok: #2f8f6b;
     --warn: #b5612a;
     --display: "Fredoka", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
@@ -45,7 +48,10 @@
   }
   h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.3; }
   h1 { font-size: 30px; }
-  h1 .star { color: var(--accent); }
+  .brand { display:flex; align-items:center; gap:16px; }
+  .brand img { width:76px; height:76px; border-radius:22px; flex:none; }
+  .brand small { display:block; color:var(--muted); font-size:13px; margin-top:4px; }
+  @media (max-width:420px) { h1 { font-size:26px; } .brand img { width:64px; height:64px; border-radius:18px; } }
   h2 { font-size: 22px; }
   h3 { font-size: 17px; }
   p { margin: 0; }
@@ -117,7 +123,8 @@
 
 <div class="wrap">
   <header style="display:flex;flex-direction:column;gap:8px">
-    <h1><span class="star">★</span> 星星鍵盤安裝說明</h1>
+    <div class="brand"><img src="assets/app-icon.png" alt="微笑的奶油麻糬鍵帽" width="76" height="76"><div><h1>糯糯鍵盤</h1><small>軟軟的按鍵，記住你的每一句。</small></div></div>
+    <p class="note">原「星星鍵盤」・下載與安裝說明</p>
     <p class="lead">自己做的手機鍵盤：注音（不打聲調也能出字）、拼音、手寫、英文、韓文、日文、表符、顏文字、花式文字、快捷片語、剪貼簿、翻譯、可愛主題和自己的背景照片。還沒上架商店，照下面的步驟自己安裝。</p>
   </header>
 
@@ -135,7 +142,7 @@
     <section>
       <h2>先準備</h2>
       <div class="need">
-        <div><b>iPhone</b>iOS 16 以上</div>
+        <div><b>iPhone</b>iOS 15 以上</div>
         <div><b>傳輸線</b>能接電腦的線（充電線不一定能傳資料）</div>
         <div><b>電腦</b>Windows 或 Mac</div>
         <div><b>Apple ID</b>免費的就可以</div>
@@ -146,9 +153,11 @@
     <section>
       <h2>下載安裝檔（在電腦上）</h2>
       <div class="download">
-        <a class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/latest">前往 iPhone 下載頁</a>
-        <span class="note">捲到最下面的 Assets，點 <span class="path">StarKeyboard.ipa</span> 存到電腦上</span>
+        <a id="download-iphone" class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/build-27/StarKeyboard.ipa">下載 iPhone 安裝檔</a>
+        <span id="version-iphone" class="note" aria-live="polite">已發布：第 27 版</span>
+        <a id="release-iphone" href="https://github.com/z3332111-cloud/StarKeyboard/releases/tag/build-27">更新內容</a>
       </div>
+      <p class="note">安裝檔會直接下載到電腦。這裡只提供已完成打包的版本；新版完成後重新開啟此頁即可。舊版 App 名稱可能仍顯示「星星鍵盤」。</p>
     </section>
 
     <section>
@@ -199,11 +208,11 @@
         <li><div><b>打開開發者模式</b>：<span class="path">設定 › 隱私權與安全性 › 開發者模式</span>，打開後手機會重新開機，開機後再按一次「開啟」並輸入密碼。<br>
           <span class="note">要先用 Sideloadly 裝好 App，這個選項才會出現。</span></div></li>
         <li><div><b>信任開發者</b>：<span class="path">設定 › 一般 › VPN 與裝置管理</span>，點你的 Apple ID（開發者 App 下面那一個），按「信任」。</div></li>
-        <li><div><b>加入鍵盤</b>：<span class="path">設定 › 一般 › 鍵盤 › 鍵盤 › 新增鍵盤…</span>，往下找到「第三方鍵盤」，選<b>星星鍵盤</b>。</div></li>
-        <li><div><b>允許完整取用</b>：回到鍵盤清單點「星星鍵盤」，打開「允許完整取用」，跳出提醒時按「允許」。<br>
+        <li><div><b>加入鍵盤</b>：<span class="path">設定 › 一般 › 鍵盤 › 鍵盤 › 新增鍵盤…</span>，往下找到「第三方鍵盤」，選<b>糯糯鍵盤</b>。</div></li>
+        <li><div><b>允許完整取用</b>：回到鍵盤清單點「糯糯鍵盤」，打開「允許完整取用」，跳出提醒時按「允許」。<br>
           <span class="note">剪貼簿紀錄、按鍵聲音、震動、貼圖、背景照片、翻譯、檢查新版都需要它。</span></div></li>
-        <li><div><b>開始打字</b>：到任何能打字的地方（LINE、備忘錄都可以），<b>按住</b>左下角的 🌐 地球鍵，在跳出的清單選「星星鍵盤」。之後按一下地球鍵就能在鍵盤之間切換。</div></li>
-        <li><div>想看說明或試打，打開桌面上的「星星鍵盤」App。</div></li>
+        <li><div><b>開始打字</b>：到任何能打字的地方（LINE、備忘錄都可以），<b>按住</b>左下角的 🌐 地球鍵，在跳出的清單選「糯糯鍵盤」。之後按一下地球鍵就能在鍵盤之間切換。</div></li>
+        <li><div>想看說明或試打，打開桌面上的「糯糯鍵盤」App。</div></li>
       </ol>
     </section>
 
@@ -211,7 +220,7 @@
       <h2>放自己的背景照片（iPhone）</h2>
       <ol class="steps">
         <li><div>打開「照片」App，點開想用的照片，按左下角的分享 › <b>拷貝</b>。</div></li>
-        <li><div>叫出星星鍵盤，按上面工具列的 <span class="key">⚙</span> 設定 › 背景照片 › <b>從剪貼簿貼上圖片</b>。</div></li>
+        <li><div>叫出糯糯鍵盤，按上面工具列的 <span class="key">⚙</span> 設定 › 背景照片 › <b>從剪貼簿貼上圖片</b>。</div></li>
         <li><div>鍵盤會直接進入調整：<b>一指拖拉</b>移動照片、<b>兩指捏合</b>放大縮小，看到的就是之後的樣子。調好按<b>完成</b>。</div></li>
         <li><div>之後想再調：<span class="path">⚙ 設定 › 調整照片位置和大小</span>。「照片淡化」和「按鍵透明度」可以讓字更清楚。</div></li>
         <li><div><b>可以放好幾張</b>：再拷貝別張照片，按「＋ 從剪貼簿新增照片」。設定裡點縮圖換照片，也可以選<b>固定這張、每次打開換、每天換</b>。每張照片的位置和大小各自記住。</div></li>
@@ -241,15 +250,17 @@
 
     <section>
       <h2>已經裝過舊版？先移除</h2>
-      <p class="warn">目前的測試版每一版的簽名都不一樣，<b>不能直接蓋過舊版</b>，會顯示「未安裝應用程式」或「套件與現有套件衝突」。請先移除舊版：<b>長按</b>桌面上的「星星鍵盤」圖示 › <b>解除安裝</b>（或 <span class="path">設定 › 應用程式 › 星星鍵盤 › 解除安裝</span>）。移除後設定和背景照片會不見，裝好要重新設定。</p>
+      <p class="warn">目前的測試版每一版的簽名都不一樣，<b>不能直接蓋過舊版</b>，會顯示「未安裝應用程式」或「套件與現有套件衝突」。請先移除舊版：<b>長按</b>桌面上的「糯糯鍵盤」圖示 › <b>解除安裝</b>（或 <span class="path">設定 › 應用程式 › 糯糯鍵盤 › 解除安裝</span>）。移除後設定和背景照片會不見，裝好要重新設定。</p>
       <p class="note">第一次安裝的人跳過這一步。</p>
     </section>
 
     <section>
       <h2>下載並安裝</h2>
       <div class="download">
-        <a class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/android-latest/StarKeyboard.apk">下載 Android 安裝檔</a>
-        <span class="note">這個按鈕永遠是最新版。各版本的更新內容在 <a href="https://github.com/z3332111-cloud/StarKeyboard/releases">所有版本</a>（名稱有「Android 第幾版」的）。</span>
+        <a id="download-android" class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/android-26/StarKeyboard.apk">下載 Android 安裝檔</a>
+        <span id="version-android" class="note" aria-live="polite">已發布：第 26 版</span>
+        <a id="release-android" href="https://github.com/z3332111-cloud/StarKeyboard/releases/tag/android-26">更新內容</a>
+        <span class="note">本頁會自動取得最新已發布版本；新版打包完成後，重新開啟此頁即可。各版本的更新內容在 <a href="https://github.com/z3332111-cloud/StarKeyboard/releases">所有版本</a>（名稱有「Android 第幾版」的）。</span>
       </div>
       <ol class="steps">
         <li><div>用 Android 手機打開這一頁，按上面的「下載 Android 安裝檔」。瀏覽器如果問「要下載嗎？」或說「這類檔案可能有害」，按<b>下載</b>／<b>仍要下載</b>。</div></li>
@@ -270,11 +281,11 @@
     <section>
       <h2>打開鍵盤（只要做一次）</h2>
       <ol class="steps">
-        <li><div>打開「星星鍵盤」App，按 <b>① 打開鍵盤設定</b>。</div></li>
-        <li><div>在跳出來的清單裡，把<b>星星鍵盤</b>的開關打開。手機會提醒「這個輸入法可能會收集你輸入的所有文字」，按<b>確定</b>。<br>
-          <span class="note">每一個第三方鍵盤都會跳這個提醒。星星鍵盤只把你的設定、剪貼簿紀錄存在你自己的手機裡。</span></div></li>
-        <li><div>按返回回到 App，按 <b>② 切換成星星鍵盤</b>，在清單裡點「星星鍵盤」。</div></li>
-        <li><div>在 App 下面的試打框打幾個字，看到星星鍵盤就完成了。</div></li>
+        <li><div>打開「糯糯鍵盤」App，按 <b>① 打開鍵盤設定</b>。</div></li>
+        <li><div>在跳出來的清單裡，把<b>糯糯鍵盤</b>的開關打開。手機會提醒「這個輸入法可能會收集你輸入的所有文字」，按<b>確定</b>。<br>
+          <span class="note">每一個第三方鍵盤都會跳這個提醒。糯糯鍵盤只把你的設定、剪貼簿紀錄存在你自己的手機裡。</span></div></li>
+        <li><div>按返回回到 App，按 <b>② 切換成糯糯鍵盤</b>，在清單裡點「糯糯鍵盤」。</div></li>
+        <li><div>在 App 下面的試打框打幾個字，看到糯糯鍵盤就完成了。</div></li>
       </ol>
       <details>
         <summary>按 ① 沒反應，或想自己去設定裡找</summary>
@@ -286,13 +297,13 @@
           <b>其他</b><span>在設定最上面的搜尋框打「鍵盤」或「輸入法」</span>
         </div>
       </details>
-      <p class="tip">要換回原本的鍵盤：按住星星鍵盤的 <span class="key">中／英</span> 鍵，或點螢幕右下角的小鍵盤圖示，選別的鍵盤。</p>
+      <p class="tip">要換回原本的鍵盤：按住糯糯鍵盤的 <span class="key">中／英</span> 鍵，或點螢幕右下角的小鍵盤圖示，選別的鍵盤。</p>
     </section>
 
     <section>
       <h2>放自己的背景照片（Android）</h2>
       <ol class="steps">
-        <li><div>打開「星星鍵盤」App，按<b>新增一張背景照片</b>，選照片。</div></li>
+        <li><div>打開「糯糯鍵盤」App，按<b>新增一張背景照片</b>，選照片。</div></li>
         <li><div>選好後鍵盤會自動跳出來並進入調整：<b>一指拖拉</b>移動照片、<b>兩指捏合</b>放大縮小，看到的就是之後的樣子。調好按<b>完成</b>。<br>
           <span class="note">有找到臉的話，照片會先自動對準臉。</span></div></li>
         <li><div>之後想再調：鍵盤的 <span class="path">⚙ 設定 › 調整照片位置和大小</span>。「照片淡化」和「按鍵透明度」可以讓字更清楚。</div></li>
@@ -302,10 +313,10 @@
 
     <section>
       <h2>裝新版</h2>
-      <p>有新版時，打開「星星鍵盤」App 最上面會出現「有新版」和下載按鈕；或直接按這一頁的「下載 Android 安裝檔」。</p>
+      <p>有新版時，打開「糯糯鍵盤」App 最上面會出現「有新版」和下載按鈕；或直接按這一頁的「下載 Android 安裝檔」。</p>
       <ol class="steps">
         <li><div>先下載新的安裝檔（還不要點開）。</div></li>
-        <li><div>移除舊版：長按「星星鍵盤」圖示 › 解除安裝。</div></li>
+        <li><div>移除舊版：長按「糯糯鍵盤」圖示 › 解除安裝。</div></li>
         <li><div>到「檔案」App 的<b>下載</b>資料夾點新的 <span class="path">StarKeyboard.apk</span> 安裝。資料夾裡有好幾個檔案的話，點最新的那個。</div></li>
         <li><div>重新做一次「打開鍵盤」的 ① ②，背景照片要重新挑。</div></li>
       </ol>
@@ -340,7 +351,7 @@
       </div>
       <div class="feature">
         <h3>字體、主題、特效、按鍵音</h3>
-        <p><span class="path">⚙</span> 裡可以換主題顏色、按鍵造型（果凍、貓耳…）、字體（粉圓、芫荽、文楷）、<b>按鍵特效</b>（按下去冒出星星、愛心、花花…），還有<b>可愛按鍵音</b>（泡泡、木琴、叮鈴、啵啵，點一下就試聽）。字體只改變你鍵盤上的樣子。</p>
+        <p><span class="path">⚙</span> 裡可以換主題顏色、按鍵造型（圓角、果凍、貓耳、雲朵、兔兔、狗狗、布丁、水母、火焰、水滴、鴨鴨）、字體（粉圓、芫荽、文楷）、<b>按鍵特效</b>（按下去冒出星星、愛心、花花…），還有<b>可愛按鍵音</b>（iPhone：系統聲、柔和叮叮；Android：泡泡、木琴、叮鈴、啵啵）。字體只改變你鍵盤上的樣子。</p>
       </div>
       <div class="feature">
         <h3>剪貼簿、表符、翻譯、手寫</h3>
@@ -358,16 +369,16 @@
         <dd>換一條線或換一個 USB 孔，手機保持解鎖，重新按一次「信任」。Windows 可以先打開 iTunes，看看有沒有出現手機。</dd></div>
       <div><dt>iPhone：Sideloadly 說 App ID 數量到上限</dt>
         <dd>免費帳號 7 天內最多建立 10 個 App ID。等幾天，或改用另一個 Apple ID。</dd></div>
-      <div><dt>iPhone：鍵盤清單裡找不到星星鍵盤</dt>
-        <dd>先打開一次「星星鍵盤」App，再把手機重新開機。</dd></div>
+      <div><dt>iPhone：鍵盤清單裡找不到糯糯鍵盤</dt>
+        <dd>先打開一次「糯糯鍵盤」App，再把手機重新開機。</dd></div>
       <div><dt>iPhone：打密碼的時候變回原本的鍵盤</dt>
         <dd>這是 iOS 的規定，所有第三方鍵盤在密碼欄都會被換掉，不是壞掉。</dd></div>
       <div><dt>Android：顯示「未安裝應用程式」</dt>
         <dd>手機裡還有舊版。先長按圖示解除安裝，再點新的安裝檔。</dd></div>
       <div><dt>Android：鍵盤突然叫不出來、變回原本的鍵盤</dt>
-        <dd>鍵盤當掉或清除過資料時，手機會自動換回內建鍵盤。打開「星星鍵盤」App 再按一次 ① ②。如果 App 最上面出現「⚠️ 鍵盤出過問題」，按「複製紀錄」傳給把這頁給你的人。</dd></div>
+        <dd>鍵盤當掉或清除過資料時，手機會自動換回內建鍵盤。打開「糯糯鍵盤」App 再按一次 ① ②。如果 App 最上面出現「⚠️ 鍵盤出過問題」，按「複製紀錄」傳給把這頁給你的人。</dd></div>
       <div><dt>剪貼簿沒有記到</dt>
-        <dd>iPhone 要打開「允許完整取用」，而且只會在鍵盤打開的時候記，所以是複製完、切到要打字的地方時才記錄。Android 是星星鍵盤是目前的鍵盤時才會記。</dd></div>
+        <dd>iPhone 要打開「允許完整取用」，而且只會在鍵盤打開的時候記，所以是複製完、切到要打字的地方時才記錄。Android 是糯糯鍵盤是目前的鍵盤時才會記。</dd></div>
       <div><dt>注音一直跳出奇怪的字</dt>
         <dd>點正確的候選字，鍵盤會記住你常選的字，越用越順。也可以多打一點注音或打聲調，會更準。</dd></div>
     </dl>
@@ -402,4 +413,5 @@
   })();
 </script>
 
+<script src="downloads.js" defer></script>
 </body></html>

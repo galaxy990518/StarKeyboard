@@ -33,8 +33,6 @@ struct KeyboardTheme {
     let shadow: UIColor
     let decoration: String
     let isDark: Bool
-    /// 成套的主題（奶油軟萌系列）：選這個主題時按鍵造型也一起換
-    var shape: KeyShape? = nil
 
     static let all: [KeyboardTheme] = [
         KeyboardTheme(id: "strawberry", name: "草莓牛奶",
@@ -67,43 +65,6 @@ struct KeyboardTheme {
                       specialKey: UIColor(hex: 0xFFDD6B), specialText: UIColor(hex: 0x6B4E0A),
                       accent: UIColor(hex: 0xFFA928), accentText: .white,
                       shadow: UIColor(hex: 0xE9CB6A), decoration: "🐥", isDark: false),
-        // 奶油軟萌系列：空白鍵左邊有造型徽章，所以不放 emoji；陰影比較淡
-        KeyboardTheme(id: "bunny", name: "兔兔",
-                      backgroundTop: UIColor(hex: 0xFFE3EC), backgroundBottom: UIColor(hex: 0xFFD6E2),
-                      key: .white, keyText: UIColor(hex: 0x8A4B5C),
-                      specialKey: UIColor(hex: 0xFFC9D9), specialText: UIColor(hex: 0x7A3045),
-                      accent: UIColor(hex: 0xFF8FB1), accentText: .white,
-                      shadow: UIColor(hex: 0xEBC3CF), decoration: "", isDark: false, shape: .bunny),
-        KeyboardTheme(id: "puppy", name: "狗狗",
-                      backgroundTop: UIColor(hex: 0xF3E6D7), backgroundBottom: UIColor(hex: 0xEBDAC6),
-                      key: UIColor(hex: 0xFFF9F0), keyText: UIColor(hex: 0x6B4A33),
-                      specialKey: UIColor(hex: 0xE3CCB2), specialText: UIColor(hex: 0x5A3B24),
-                      accent: UIColor(hex: 0xC79A74), accentText: .white,
-                      shadow: UIColor(hex: 0xD8C2AA), decoration: "", isDark: false, shape: .puppy),
-        KeyboardTheme(id: "pudding", name: "布丁",
-                      backgroundTop: UIColor(hex: 0xFFF6CF), backgroundBottom: UIColor(hex: 0xFFEFB0),
-                      key: UIColor(hex: 0xFFFCF0), keyText: UIColor(hex: 0x7A5B12),
-                      specialKey: UIColor(hex: 0xF5DFA0), specialText: UIColor(hex: 0x6B4E0A),
-                      accent: UIColor(hex: 0xD9A441), accentText: .white,
-                      shadow: UIColor(hex: 0xE6D3A0), decoration: "", isDark: false, shape: .pudding),
-        KeyboardTheme(id: "jellyfish", name: "水母",
-                      backgroundTop: UIColor(hex: 0xECE5FF), backgroundBottom: UIColor(hex: 0xE0D6FF),
-                      key: .white, keyText: UIColor(hex: 0x5B4B8A),
-                      specialKey: UIColor(hex: 0xD3C8F7), specialText: UIColor(hex: 0x4A3B78),
-                      accent: UIColor(hex: 0x9C86EC), accentText: .white,
-                      shadow: UIColor(hex: 0xC9BEEE), decoration: "", isDark: false, shape: .jellyfish),
-        KeyboardTheme(id: "flame", name: "火焰",
-                      backgroundTop: UIColor(hex: 0xFFE8DB), backgroundBottom: UIColor(hex: 0xFFDCCB),
-                      key: UIColor(hex: 0xFFFAF4), keyText: UIColor(hex: 0x8A5040),
-                      specialKey: UIColor(hex: 0xF9CDB4), specialText: UIColor(hex: 0x7A3F2C),
-                      accent: UIColor(hex: 0xF59A6B), accentText: .white,
-                      shadow: UIColor(hex: 0xEBC6B2), decoration: "", isDark: false, shape: .flame),
-        KeyboardTheme(id: "droplet", name: "水滴",
-                      backgroundTop: UIColor(hex: 0xDFF7EF), backgroundBottom: UIColor(hex: 0xCDF0E4),
-                      key: .white, keyText: UIColor(hex: 0x2F6B5E),
-                      specialKey: UIColor(hex: 0xB5E6D8), specialText: UIColor(hex: 0x2F6B5E),
-                      accent: UIColor(hex: 0x4CC3A5), accentText: .white,
-                      shadow: UIColor(hex: 0xB3DDD0), decoration: "", isDark: false, shape: .droplet),
         KeyboardTheme(id: "night", name: "星空夜",
                       backgroundTop: UIColor(hex: 0x1E2245), backgroundBottom: UIColor(hex: 0x2B2F63),
                       key: UIColor(hex: 0x3A3F7A), keyText: UIColor(hex: 0xF3F0FF),
@@ -131,9 +92,7 @@ struct KeyboardTheme {
 
 /// 按鍵造型
 enum KeyShape: String, CaseIterable {
-    case rounded, jelly, catEar, cloud, duck
-    // 奶油軟萌系列：按鍵上有第二種顏色的小細節，寬的鍵改成長條＋小徽章
-    case bunny, puppy, pudding, jellyfish, flame, droplet
+    case rounded, jelly, catEar, cloud, bunny, puppy, pudding, jellyfish, flame, droplet, duck
 
     var title: String {
         switch self {
@@ -141,49 +100,41 @@ enum KeyShape: String, CaseIterable {
         case .jelly: return "果凍"
         case .catEar: return "貓耳"
         case .cloud: return "雲朵"
-        case .duck: return "小鴨"
         case .bunny: return "兔兔"
         case .puppy: return "狗狗"
         case .pudding: return "布丁"
         case .jellyfish: return "水母"
         case .flame: return "火焰"
         case .droplet: return "水滴"
+        case .duck: return "鴨鴨"
         }
     }
 
-    /// 細節的顏色（兔耳內側、焦糖、傘紋…）；nil 表示這個造型沒有細節
-    var decorColor: UIColor? {
+    var isSoftShape: Bool {
         switch self {
-        case .bunny: return UIColor(hex: 0xFFB8CF)
-        case .puppy: return UIColor(hex: 0xD9B79A)
-        case .pudding: return UIColor(hex: 0xB5764A)
-        case .jellyfish: return UIColor(hex: 0xC9BBF5)
-        case .flame: return UIColor(hex: 0xF6B98E)
-        case .droplet: return UIColor(hex: 0x9ED3EA)
-        default: return nil
+        case .bunny, .puppy, .pudding, .jellyfish, .flame, .droplet, .duck: return true
+        default: return false
         }
+    }
+
+    private func isWide(_ r: CGRect) -> Bool { isSoftShape && r.width > r.height * 1.65 }
+
+    private func wideBody(in r: CGRect) -> CGRect { r.insetBy(dx: 0, dy: r.height * 0.08) }
+
+    private func badgeRect(in r: CGRect) -> CGRect {
+        let size = r.height * 0.54
+        return CGRect(x: r.minX + r.height * 0.17, y: r.midY - size / 2, width: size, height: size)
     }
 
     private func earSize(_ r: CGRect) -> CGFloat { min(r.width * 0.24, r.height * 0.24, 9) }
     private func bumpSize(_ r: CGRect) -> CGFloat { min(r.height * 0.16, 6) }
-    private func headSize(_ r: CGRect) -> CGFloat { min(r.width * 0.2, r.height * 0.2, 7) }
-    private func bunnyEar(_ r: CGRect) -> CGFloat { min(r.height * 0.3, 13) }
-    private func puppyEar(_ r: CGRect) -> CGFloat { min(r.width * 0.24, 10) }
-    private func jellyHead(_ r: CGRect) -> CGFloat { r.height * 0.74 }
-
-    /// 空白鍵這種很寬的鍵：造型拉長會變形，改畫圓角長條，左邊放一個小徽章
-    private func isWide(_ r: CGRect) -> Bool { decorColor != nil && r.width > r.height * 2.4 }
-
-    /// 實際要塗的細節顏色：寬鍵的徽章是整個造型縮小，布丁整塊塗焦糖色太深，改用淺奶茶色
-    func decorTint(in r: CGRect) -> UIColor? {
-        if self == .pudding && isWide(r) { return UIColor(hex: 0xDDBBA0) }
-        return decorColor
-    }
 
     /// 按鍵本體（文字畫在這裡面）
     func bodyRect(in r: CGRect) -> CGRect {
-        // 寬鍵左右都讓出徽章的寬度，字才會置中又不壓到徽章
-        if isWide(r) { return r.insetBy(dx: r.height * 0.9, dy: 0) }
+        if isWide(r) {
+            return CGRect(x: r.minX + r.height * 0.82, y: r.minY + r.height * 0.15,
+                          width: r.width - r.height * 0.96, height: r.height * 0.70)
+        }
         switch self {
         case .catEar:
             let ear = earSize(r) * 0.6
@@ -191,36 +142,132 @@ enum KeyShape: String, CaseIterable {
         case .cloud:
             let b = bumpSize(r)
             return CGRect(x: r.minX, y: r.minY + b, width: r.width, height: r.height - b)
-        case .duck:
-            let h = headSize(r) * 1.2
-            return CGRect(x: r.minX, y: r.minY + h, width: r.width, height: r.height - h)
         case .bunny:
-            let ear = bunnyEar(r) * 0.7
-            return CGRect(x: r.minX, y: r.minY + ear, width: r.width, height: r.height - ear)
+            return CGRect(x: r.minX + r.width * 0.08, y: r.minY + r.height * 0.32, width: r.width * 0.84, height: r.height * 0.58)
         case .puppy:
-            let ear = puppyEar(r)
-            return CGRect(x: r.minX + ear * 0.5, y: r.minY, width: r.width - ear, height: r.height)
+            return CGRect(x: r.minX + r.width * 0.2, y: r.minY + r.height * 0.24, width: r.width * 0.6, height: r.height * 0.64)
         case .pudding:
-            return CGRect(x: r.minX, y: r.minY + r.height * 0.2, width: r.width, height: r.height * 0.8)
+            return CGRect(x: r.minX + r.width * 0.12, y: r.minY + r.height * 0.32, width: r.width * 0.76, height: r.height * 0.55)
         case .jellyfish:
-            // 字往下一點，讓開傘頂的條紋
-            let head = jellyHead(r)
-            return CGRect(x: r.minX, y: r.minY + head * 0.2, width: r.width, height: head * 0.8)
+            return CGRect(x: r.minX + r.width * 0.09, y: r.minY + r.height * 0.19, width: r.width * 0.82, height: r.height * 0.54)
         case .flame:
-            return CGRect(x: r.minX, y: r.minY + r.height * 0.28, width: r.width, height: r.height * 0.7)
+            return CGRect(x: r.minX + r.width * 0.13, y: r.minY + r.height * 0.35, width: r.width * 0.74, height: r.height * 0.55)
         case .droplet:
-            return CGRect(x: r.minX, y: r.minY + r.height * 0.36, width: r.width, height: r.height * 0.64)
+            return CGRect(x: r.minX + r.width * 0.13, y: r.minY + r.height * 0.34, width: r.width * 0.74, height: r.height * 0.53)
+        case .duck:
+            return CGRect(x: r.minX + r.width * 0.14, y: r.minY + r.height * 0.40, width: r.width * 0.70, height: r.height * 0.50)
         default:
             return r
         }
     }
 
+    func detailPath(in r: CGRect) -> CGPath? {
+        if isWide(r) { return path(in: badgeRect(in: r)) }
+        let p = UIBezierPath()
+        switch self {
+        case .bunny:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            p.move(to: point(0.22, 0.11))
+            p.addCurve(to: point(0.28, 0.3), controlPoint1: point(0.18, 0.14), controlPoint2: point(0.24, 0.29))
+            p.addCurve(to: point(0.22, 0.11), controlPoint1: point(0.32, 0.3), controlPoint2: point(0.27, 0.1))
+            p.close()
+            p.move(to: point(0.78, 0.11))
+            p.addCurve(to: point(0.72, 0.3), controlPoint1: point(0.73, 0.1), controlPoint2: point(0.68, 0.3))
+            p.addCurve(to: point(0.78, 0.11), controlPoint1: point(0.76, 0.29), controlPoint2: point(0.82, 0.14))
+            p.close()
+        case .puppy:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            p.move(to: point(0.17, 0.27))
+            p.addCurve(to: point(0.12, 0.57), controlPoint1: point(0.1, 0.28), controlPoint2: point(0.06, 0.49))
+            p.addCurve(to: point(0.22, 0.37), controlPoint1: point(0.17, 0.61), controlPoint2: point(0.21, 0.48))
+            p.addQuadCurve(to: point(0.17, 0.27), controlPoint: point(0.23, 0.25))
+            p.close()
+            p.move(to: point(0.83, 0.27))
+            p.addQuadCurve(to: point(0.78, 0.37), controlPoint: point(0.77, 0.25))
+            p.addCurve(to: point(0.88, 0.57), controlPoint1: point(0.79, 0.48), controlPoint2: point(0.83, 0.61))
+            p.addCurve(to: point(0.83, 0.27), controlPoint1: point(0.94, 0.49), controlPoint2: point(0.9, 0.28))
+            p.close()
+        case .pudding:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            p.move(to: point(0.24, 0.14))
+            p.addQuadCurve(to: point(0.76, 0.14), controlPoint: point(0.5, 0.08))
+            p.addQuadCurve(to: point(0.85, 0.29), controlPoint: point(0.83, 0.16))
+            p.addCurve(to: point(0.6, 0.29), controlPoint1: point(0.77, 0.35), controlPoint2: point(0.69, 0.24))
+            p.addCurve(to: point(0.15, 0.3), controlPoint1: point(0.43, 0.38), controlPoint2: point(0.34, 0.27))
+            p.addQuadCurve(to: point(0.24, 0.14), controlPoint: point(0.17, 0.16))
+            p.close()
+        case .jellyfish:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            p.move(to: point(0.22, 0.26))
+            p.addCurve(to: point(0.78, 0.26), controlPoint1: point(0.32, 0.11), controlPoint2: point(0.65, 0.1))
+            p.addCurve(to: point(0.22, 0.26), controlPoint1: point(0.56, 0.2), controlPoint2: point(0.43, 0.2))
+            p.close()
+        case .flame:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            p.move(to: point(0.18, 0.59))
+            p.addCurve(to: point(0.23, 0.84), controlPoint1: point(0.11, 0.67), controlPoint2: point(0.14, 0.8))
+            p.addQuadCurve(to: point(0.23, 0.78), controlPoint: point(0.27, 0.84))
+            p.addQuadCurve(to: point(0.18, 0.59), controlPoint: point(0.17, 0.7))
+            p.close()
+            p.move(to: point(0.84, 0.61))
+            p.addQuadCurve(to: point(0.78, 0.81), controlPoint: point(0.85, 0.73))
+            p.addQuadCurve(to: point(0.8, 0.84), controlPoint: point(0.75, 0.86))
+            p.addCurve(to: point(0.84, 0.61), controlPoint1: point(0.9, 0.79), controlPoint2: point(0.9, 0.67))
+            p.close()
+        case .droplet:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            p.move(to: point(0.24, 0.4))
+            p.addCurve(to: point(0.21, 0.72), controlPoint1: point(0.13, 0.47), controlPoint2: point(0.13, 0.66))
+            p.addQuadCurve(to: point(0.23, 0.67), controlPoint: point(0.25, 0.74))
+            p.addCurve(to: point(0.27, 0.42), controlPoint1: point(0.19, 0.55), controlPoint2: point(0.22, 0.47))
+            p.addQuadCurve(to: point(0.24, 0.4), controlPoint: point(0.29, 0.38))
+            p.close()
+        case .duck:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            p.move(to: point(0.78, 0.26))
+            p.addQuadCurve(to: point(0.97, 0.31), controlPoint: point(0.96, 0.25))
+            p.addQuadCurve(to: point(0.79, 0.36), controlPoint: point(0.96, 0.36))
+            p.addQuadCurve(to: point(0.78, 0.26), controlPoint: point(0.74, 0.31))
+            p.close()
+            p.move(to: point(0.64, 0.22))
+            p.addCurve(to: point(0.7, 0.22), controlPoint1: point(0.64, 0.19), controlPoint2: point(0.7, 0.19))
+            p.addCurve(to: point(0.64, 0.22), controlPoint1: point(0.7, 0.25), controlPoint2: point(0.64, 0.25))
+            p.close()
+        default: return nil
+        }
+        return p.cgPath
+    }
+
+    func detailColor(theme: KeyboardTheme) -> UIColor {
+        switch self {
+        case .pudding: return UIColor(hex: theme.isDark ? 0xD7A15F : 0xA86635)
+        case .flame: return UIColor(hex: theme.isDark ? 0xFFD46B : 0xED914A)
+        case .droplet: return UIColor(hex: theme.isDark ? 0xB8EFFF : 0x4AADD5)
+        case .duck: return UIColor(hex: theme.isDark ? 0xFFD276 : 0xD78A32)
+        default: return theme.accent
+        }
+    }
+
     func path(in r: CGRect) -> CGPath {
         if isWide(r) {
-            return UIBezierPath(roundedRect: r, cornerRadius: min(r.height * 0.4, 14)).cgPath
+            let body = wideBody(in: r)
+            return UIBezierPath(roundedRect: body, cornerRadius: body.height * 0.36).cgPath
         }
         let body = bodyRect(in: r)
-        let m = min(r.width, r.height)
         switch self {
         case .rounded:
             return UIBezierPath(roundedRect: body, cornerRadius: min(7, body.height * 0.22)).cgPath
@@ -228,7 +275,7 @@ enum KeyShape: String, CaseIterable {
             return UIBezierPath(roundedRect: body, cornerRadius: min(body.width, body.height) * 0.42).cgPath
         case .catEar:
             let ear = earSize(r)
-            var path = UIBezierPath(roundedRect: body, cornerRadius: min(body.width, body.height) * 0.34).cgPath
+            let path = UIBezierPath(roundedRect: body, cornerRadius: min(body.width, body.height) * 0.34)
             let left = UIBezierPath()
             left.move(to: CGPoint(x: body.minX + ear * 0.2, y: body.minY + ear * 1.1))
             left.addLine(to: CGPoint(x: body.minX + ear * 0.45, y: r.minY))
@@ -239,212 +286,140 @@ enum KeyShape: String, CaseIterable {
             right.addLine(to: CGPoint(x: body.maxX - ear * 0.45, y: r.minY))
             right.addLine(to: CGPoint(x: body.maxX - ear * 0.2, y: body.minY + ear * 1.1))
             right.close()
-            path = path.union(left.cgPath).union(right.cgPath)
-            return path
+            path.append(left)
+            path.append(right)
+            return path.cgPath
         case .cloud:
             let b = bumpSize(r)
-            var path = UIBezierPath(roundedRect: body, cornerRadius: min(body.width, body.height) * 0.38).cgPath
+            let path = UIBezierPath(roundedRect: body, cornerRadius: min(body.width, body.height) * 0.38)
             let count = max(2, Int(body.width / 20))
             let step = body.width / CGFloat(count + 1)
             for i in 1...count {
                 let c = CGPoint(x: body.minX + step * CGFloat(i), y: body.minY + b * 0.5)
                 let circle = UIBezierPath(arcCenter: c, radius: b * 1.5, startAngle: 0, endAngle: .pi * 2, clockwise: true)
-                path = path.union(circle.cgPath)
+                path.append(circle)
             }
-            return path
+            return path.cgPath
+        case .bunny:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            let p = UIBezierPath()
+            p.move(to: point(0.2, 0.32))
+            p.addCurve(to: point(0.23, 0.03), controlPoint1: point(0.13, 0.15), controlPoint2: point(0.13, 0.03))
+            p.addCurve(to: point(0.37, 0.28), controlPoint1: point(0.33, 0.03), controlPoint2: point(0.34, 0.19))
+            p.addQuadCurve(to: point(0.63, 0.28), controlPoint: point(0.5, 0.24))
+            p.addCurve(to: point(0.77, 0.03), controlPoint1: point(0.66, 0.19), controlPoint2: point(0.67, 0.03))
+            p.addCurve(to: point(0.8, 0.32), controlPoint1: point(0.87, 0.03), controlPoint2: point(0.87, 0.15))
+            p.addCurve(to: point(0.97, 0.67), controlPoint1: point(0.96, 0.37), controlPoint2: point(0.98, 0.51))
+            p.addCurve(to: point(0.5, 0.97), controlPoint1: point(0.97, 0.91), controlPoint2: point(0.83, 0.97))
+            p.addCurve(to: point(0.03, 0.67), controlPoint1: point(0.17, 0.97), controlPoint2: point(0.03, 0.91))
+            p.addCurve(to: point(0.2, 0.32), controlPoint1: point(0.02, 0.51), controlPoint2: point(0.04, 0.37))
+            p.close()
+            return p.cgPath
+        case .puppy:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            let p = UIBezierPath()
+            p.move(to: point(0.24, 0.21))
+            p.addCurve(to: point(0.77, 0.21), controlPoint1: point(0.35, 0.09), controlPoint2: point(0.66, 0.09))
+            p.addCurve(to: point(0.98, 0.39), controlPoint1: point(0.9, 0.16), controlPoint2: point(0.96, 0.25))
+            p.addCurve(to: point(0.86, 0.67), controlPoint1: point(1, 0.55), controlPoint2: point(0.95, 0.69))
+            p.addLine(to: point(0.83, 0.66))
+            p.addCurve(to: point(0.5, 0.96), controlPoint1: point(0.82, 0.88), controlPoint2: point(0.73, 0.96))
+            p.addCurve(to: point(0.17, 0.66), controlPoint1: point(0.27, 0.96), controlPoint2: point(0.18, 0.88))
+            p.addLine(to: point(0.14, 0.67))
+            p.addCurve(to: point(0.02, 0.39), controlPoint1: point(0.05, 0.69), controlPoint2: point(0, 0.55))
+            p.addCurve(to: point(0.24, 0.21), controlPoint1: point(0.04, 0.25), controlPoint2: point(0.1, 0.16))
+            p.close()
+            return p.cgPath
+        case .pudding:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            let p = UIBezierPath()
+            p.move(to: point(0.24, 0.13))
+            p.addQuadCurve(to: point(0.76, 0.13), controlPoint: point(0.5, 0.06))
+            p.addCurve(to: point(0.89, 0.45), controlPoint1: point(0.86, 0.16), controlPoint2: point(0.86, 0.28))
+            p.addLine(to: point(0.96, 0.77))
+            p.addCurve(to: point(0.5, 0.97), controlPoint1: point(1, 0.94), controlPoint2: point(0.79, 0.97))
+            p.addCurve(to: point(0.04, 0.77), controlPoint1: point(0.21, 0.97), controlPoint2: point(0, 0.94))
+            p.addLine(to: point(0.11, 0.45))
+            p.addCurve(to: point(0.24, 0.13), controlPoint1: point(0.14, 0.28), controlPoint2: point(0.14, 0.16))
+            p.close()
+            return p.cgPath
+        case .jellyfish:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            let p = UIBezierPath()
+            p.move(to: point(0.07, 0.67))
+            p.addCurve(to: point(0.5, 0.08), controlPoint1: point(0.03, 0.35), controlPoint2: point(0.19, 0.08))
+            p.addCurve(to: point(0.93, 0.67), controlPoint1: point(0.81, 0.08), controlPoint2: point(0.97, 0.35))
+            p.addQuadCurve(to: point(0.82, 0.77), controlPoint: point(0.94, 0.77))
+            p.addCurve(to: point(0.83, 0.94), controlPoint1: point(0.82, 0.83), controlPoint2: point(0.89, 0.89))
+            p.addCurve(to: point(0.69, 0.79), controlPoint1: point(0.74, 1), controlPoint2: point(0.69, 0.88))
+            p.addLine(to: point(0.58, 0.8))
+            p.addCurve(to: point(0.5, 0.98), controlPoint1: point(0.57, 0.88), controlPoint2: point(0.6, 0.98))
+            p.addCurve(to: point(0.42, 0.8), controlPoint1: point(0.4, 0.98), controlPoint2: point(0.43, 0.88))
+            p.addLine(to: point(0.31, 0.79))
+            p.addCurve(to: point(0.17, 0.94), controlPoint1: point(0.31, 0.88), controlPoint2: point(0.26, 1))
+            p.addCurve(to: point(0.18, 0.77), controlPoint1: point(0.11, 0.89), controlPoint2: point(0.18, 0.83))
+            p.addQuadCurve(to: point(0.07, 0.67), controlPoint: point(0.06, 0.77))
+            p.close()
+            return p.cgPath
+        case .flame:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            let p = UIBezierPath()
+            p.move(to: point(0.6, 0.05))
+            p.addCurve(to: point(0.7, 0.23), controlPoint1: point(0.65, 0.04), controlPoint2: point(0.63, 0.17))
+            p.addCurve(to: point(0.82, 0.43), controlPoint1: point(0.77, 0.31), controlPoint2: point(0.81, 0.34))
+            p.addQuadCurve(to: point(0.92, 0.41), controlPoint: point(0.9, 0.32))
+            p.addCurve(to: point(0.83, 0.9), controlPoint1: point(1, 0.63), controlPoint2: point(0.97, 0.81))
+            p.addCurve(to: point(0.16, 0.9), controlPoint1: point(0.68, 1), controlPoint2: point(0.31, 1))
+            p.addCurve(to: point(0.09, 0.43), controlPoint1: point(0.02, 0.81), controlPoint2: point(0, 0.63))
+            p.addQuadCurve(to: point(0.16, 0.43), controlPoint: point(0.13, 0.35))
+            p.addQuadCurve(to: point(0.24, 0.48), controlPoint: point(0.19, 0.48))
+            p.addCurve(to: point(0.47, 0.16), controlPoint1: point(0.37, 0.47), controlPoint2: point(0.35, 0.21))
+            p.addQuadCurve(to: point(0.6, 0.05), controlPoint: point(0.54, 0.13))
+            p.close()
+            return p.cgPath
+        case .droplet:
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
+            }
+            let p = UIBezierPath()
+            p.move(to: point(0.58, 0.06))
+            p.addCurve(to: point(0.7, 0.24), controlPoint1: point(0.63, 0.03), controlPoint2: point(0.6, 0.14))
+            p.addCurve(to: point(0.95, 0.63), controlPoint1: point(0.79, 0.33), controlPoint2: point(0.95, 0.42))
+            p.addCurve(to: point(0.5, 0.97), controlPoint1: point(0.98, 0.88), controlPoint2: point(0.78, 0.97))
+            p.addCurve(to: point(0.05, 0.63), controlPoint1: point(0.22, 0.97), controlPoint2: point(0.02, 0.88))
+            p.addCurve(to: point(0.38, 0.22), controlPoint1: point(0.06, 0.41), controlPoint2: point(0.24, 0.3))
+            p.addQuadCurve(to: point(0.58, 0.06), controlPoint: point(0.5, 0.16))
+            p.close()
+            return p.cgPath
         case .duck:
-            // 左上鴨頭＋往左的嘴，右上翹尾巴
-            let h = headSize(r)
-            var path = UIBezierPath(roundedRect: body, cornerRadius: min(body.width, body.height) * 0.4).cgPath
-            let head = CGPoint(x: body.minX + h * 1.9, y: body.minY + h * 0.1)
-            let headCircle = UIBezierPath(arcCenter: head, radius: h, startAngle: 0, endAngle: .pi * 2, clockwise: true)
-            let beak = UIBezierPath(ovalIn: CGRect(x: body.minX, y: head.y - h * 0.05, width: h * 1.1, height: h * 0.55))
-            let tail = UIBezierPath()
-            tail.move(to: CGPoint(x: body.maxX - h * 1.6, y: body.minY + h * 0.4))
-            tail.addLine(to: CGPoint(x: body.maxX - h * 0.1, y: body.minY - h * 0.9))
-            tail.addLine(to: CGPoint(x: body.maxX - h * 0.3, y: body.minY + h * 1.0))
-            tail.close()
-            path = path.union(headCircle.cgPath).union(beak.cgPath).union(tail.cgPath)
-            return path
-        case .bunny:
-            var path = UIBezierPath(roundedRect: body, cornerRadius: m * 0.38).cgPath
-            for ear in bunnyEars(r) { path = path.union(ear.outer) }
-            return path
-        case .puppy:
-            var path = UIBezierPath(roundedRect: body, cornerRadius: min(body.width, body.height) * 0.42).cgPath
-            for ear in puppyEars(r) { path = path.union(ear.outer) }
-            return path
-        case .pudding:
-            // 上窄下寬的布丁杯
-            let top = r.width * 0.1
-            return roundedPolygon([
-                (CGPoint(x: r.minX + top, y: r.minY), m * 0.12),
-                (CGPoint(x: r.maxX - top, y: r.minY), m * 0.12),
-                (CGPoint(x: r.maxX, y: r.maxY), m * 0.3),
-                (CGPoint(x: r.minX, y: r.maxY), m * 0.3),
-            ])
-        case .jellyfish:
-            // 圓傘頭＋四隻短觸手
-            let head = CGRect(x: r.minX, y: r.minY, width: r.width, height: jellyHead(r))
-            let dome = min(head.width, head.height) * 0.48
-            let rim = m * 0.14
-            var path = roundedPolygon([
-                (CGPoint(x: head.minX, y: head.minY), dome),
-                (CGPoint(x: head.maxX, y: head.minY), dome),
-                (CGPoint(x: head.maxX, y: head.maxY), rim),
-                (CGPoint(x: head.minX, y: head.maxY), rim),
-            ])
-            let tw = max(2.5, r.width * 0.1)
-            let legs: [(x: CGFloat, length: CGFloat, tilt: CGFloat)] = [(0.22, 0.8, 0.18), (0.41, 1, 0), (0.59, 1, 0), (0.78, 0.8, -0.18)]
-            for leg in legs {
-                let top = CGPoint(x: r.minX + r.width * leg.x, y: head.maxY - 3)
-                let rect = CGRect(x: top.x - tw / 2, y: top.y, width: tw, height: (r.maxY - top.y) * leg.length)
-                path = path.union(turned(UIBezierPath(roundedRect: rect, cornerRadius: tw / 2), leg.tilt, around: top))
+            func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
             }
-            return path
-        case .flame:
-            return flamePath(in: r)
-        case .droplet:
-            return dropletPath(in: r)
+            let p = UIBezierPath()
+            p.move(to: point(0.32, 0.43))
+            p.addCurve(to: point(0.44, 0.1), controlPoint1: point(0.26, 0.32), controlPoint2: point(0.3, 0.14))
+            p.addCurve(to: point(0.8, 0.25), controlPoint1: point(0.59, 0.04), controlPoint2: point(0.79, 0.12))
+            p.addQuadCurve(to: point(0.98, 0.31), controlPoint: point(0.98, 0.25))
+            p.addQuadCurve(to: point(0.8, 0.38), controlPoint: point(0.98, 0.38))
+            p.addLine(to: point(0.78, 0.47))
+            p.addCurve(to: point(0.91, 0.82), controlPoint1: point(0.93, 0.53), controlPoint2: point(0.98, 0.68))
+            p.addCurve(to: point(0.45, 0.97), controlPoint1: point(0.84, 0.97), controlPoint2: point(0.64, 0.98))
+            p.addCurve(to: point(0.04, 0.66), controlPoint1: point(0.19, 0.97), controlPoint2: point(0.05, 0.84))
+            p.addQuadCurve(to: point(0.1, 0.57), controlPoint: point(0.02, 0.54))
+            p.addQuadCurve(to: point(0.32, 0.43), controlPoint: point(0.23, 0.64))
+            p.close()
+            return p.cgPath
         }
-    }
-
-    /// 細節（用 decorColor 疊在本體上面畫）
-    func decorPath(in r: CGRect) -> CGPath? {
-        guard decorColor != nil else { return nil }
-        if isWide(r) {
-            // 徽章就是這個造型本身縮小
-            let s = r.height * 0.56
-            return path(in: CGRect(x: r.minX + r.height * 0.32, y: r.midY - s / 2, width: s, height: s))
-        }
-        let m = min(r.width, r.height)
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { point(r, x, y) }
-        switch self {
-        case .bunny:
-            let path = CGMutablePath()
-            for ear in bunnyEars(r) { path.addPath(ear.inner) }
-            return path
-        case .puppy:
-            let path = CGMutablePath()
-            for ear in puppyEars(r) { path.addPath(ear.inner) }
-            return path
-        case .pudding:
-            // 頂上一層焦糖，下緣三段波浪（中間那段垂比較深）
-            let cap = r.minY + r.height * 0.17
-            var caramel = CGPath(rect: CGRect(x: r.minX - 1, y: r.minY - 1, width: r.width + 2, height: cap - r.minY + 1), transform: nil)
-            for (x, depth) in [(CGFloat(0.18), CGFloat(0.1)), (0.5, 0.14), (0.82, 0.1)] {
-                let drip = CGRect(x: r.minX + r.width * (x - 0.19), y: cap - r.height * depth / 2,
-                                  width: r.width * 0.38, height: r.height * depth)
-                caramel = caramel.union(UIBezierPath(ovalIn: drip).cgPath)
-            }
-            return caramel.intersection(path(in: r))
-        case .jellyfish:
-            // 傘頂一道彎彎的條紋
-            let head = jellyHead(r)
-            let arc = CGRect(x: r.minX + r.width * 0.16, y: r.minY + head * 0.06, width: r.width * 0.68, height: head * 0.36)
-            return UIBezierPath(ovalIn: arc).cgPath
-                .subtracting(UIBezierPath(ovalIn: arc.offsetBy(dx: 0, dy: head * 0.08)).cgPath)
-        case .flame:
-            // 左右兩道內焰
-            let line = CGMutablePath()
-            line.move(to: p(0.17, 0.5))
-            line.addQuadCurve(to: p(0.28, 0.92), control: p(0.08, 0.78))
-            line.move(to: p(0.83, 0.5))
-            line.addQuadCurve(to: p(0.72, 0.92), control: p(0.92, 0.78))
-            return line.copy(strokingWithWidth: m * 0.08, lineCap: .round, lineJoin: .round, miterLimit: 1)
-        case .droplet:
-            // 左邊一道反光
-            let line = CGMutablePath()
-            line.move(to: p(0.22, 0.5))
-            line.addQuadCurve(to: p(0.2, 0.82), control: p(0.08, 0.64))
-            return line.copy(strokingWithWidth: m * 0.08, lineCap: .round, lineJoin: .round, miterLimit: 1)
-        default:
-            return nil
-        }
-    }
-
-    // MARK: 畫造型用的小工具
-
-    /// 0～1 的比例座標，按鍵長寬不同也會跟著縮放
-    private func point(_ r: CGRect, _ x: CGFloat, _ y: CGFloat) -> CGPoint {
-        CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
-    }
-
-    /// 繞著某一點轉一個角度（耳朵、觸手往外撇）
-    private func turned(_ path: UIBezierPath, _ angle: CGFloat, around c: CGPoint) -> CGPath {
-        path.apply(CGAffineTransform(translationX: c.x, y: c.y).rotated(by: angle).translatedBy(x: -c.x, y: -c.y))
-        return path.cgPath
-    }
-
-    /// 多邊形，每個角有自己的圓角半徑
-    private func roundedPolygon(_ corners: [(CGPoint, CGFloat)]) -> CGPath {
-        let path = CGMutablePath()
-        let first = corners[0].0, last = corners[corners.count - 1].0
-        path.move(to: CGPoint(x: (first.x + last.x) / 2, y: (first.y + last.y) / 2))
-        for (i, corner) in corners.enumerated() {
-            path.addArc(tangent1End: corner.0, tangent2End: corners[(i + 1) % corners.count].0, radius: corner.1)
-        }
-        path.closeSubpath()
-        return path
-    }
-
-    /// 兩隻短短的兔耳朵（往外撇），inner 是粉紅色內側
-    private func bunnyEars(_ r: CGRect) -> [(outer: CGPath, inner: CGPath)] {
-        let h = bunnyEar(r) * 1.4
-        let w = min(r.width * 0.24, 9)
-        let ears: [(x: CGFloat, tilt: CGFloat)] = [(0.3, -0.18), (0.7, 0.18)]
-        return ears.map { ear -> (outer: CGPath, inner: CGPath) in
-            let rect = CGRect(x: r.minX + r.width * ear.x - w / 2, y: r.minY, width: w, height: h)
-            let base = CGPoint(x: rect.midX, y: rect.maxY)
-            let inner = CGRect(x: rect.minX + w * 0.25, y: rect.minY + w * 0.3, width: w * 0.5, height: h * 0.45)
-            return (turned(UIBezierPath(roundedRect: rect, cornerRadius: w / 2), ear.tilt, around: base),
-                    turned(UIBezierPath(roundedRect: inner, cornerRadius: w * 0.25), ear.tilt, around: base))
-        }
-    }
-
-    /// 兩側圓圓的垂耳，inner 那塊放在靠外側，才不會蓋到臉
-    private func puppyEars(_ r: CGRect) -> [(outer: CGPath, inner: CGPath)] {
-        let w = puppyEar(r)
-        let h = r.height * 0.5
-        let ears: [(x: CGFloat, tilt: CGFloat)] = [(r.minX + 1, 0.12), (r.maxX - 1 - w, -0.12)]
-        return ears.map { ear -> (outer: CGPath, inner: CGPath) in
-            let rect = CGRect(x: ear.x, y: r.minY + r.height * 0.1, width: w, height: h)
-            let top = CGPoint(x: rect.midX, y: rect.minY)
-            let innerX = ear.tilt > 0 ? rect.minX + w * 0.15 : rect.maxX - w * 0.55
-            let inner = CGRect(x: innerX, y: rect.minY + h * 0.2, width: w * 0.4, height: h * 0.62)
-            return (turned(UIBezierPath(ovalIn: rect), ear.tilt, around: top),
-                    turned(UIBezierPath(ovalIn: inner), ear.tilt, around: top))
-        }
-    }
-
-    /// 圓底的小火苗：中間一個主火尖，左右各一個短短的小火尖
-    private func flamePath(in r: CGRect) -> CGPath {
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { point(r, x, y) }
-        let path = CGMutablePath()
-        path.move(to: p(0.5, 1))
-        path.addCurve(to: p(0.03, 0.62), control1: p(0.2, 1), control2: p(0.03, 0.82))
-        path.addCurve(to: p(0.15, 0.3), control1: p(0.03, 0.48), control2: p(0.08, 0.37))
-        path.addCurve(to: p(0.32, 0.42), control1: p(0.22, 0.34), control2: p(0.28, 0.38))
-        path.addCurve(to: p(0.57, 0.04), control1: p(0.32, 0.24), control2: p(0.44, 0.1))
-        path.addCurve(to: p(0.72, 0.36), control1: p(0.6, 0.17), control2: p(0.66, 0.28))
-        path.addCurve(to: p(0.88, 0.25), control1: p(0.78, 0.33), control2: p(0.84, 0.3))
-        path.addCurve(to: p(0.97, 0.62), control1: p(0.95, 0.36), control2: p(0.97, 0.5))
-        path.addCurve(to: p(0.5, 1), control1: p(0.97, 0.82), control2: p(0.8, 1))
-        path.closeSubpath()
-        return path
-    }
-
-    /// 飽滿的水珠，尖端短短的
-    private func dropletPath(in r: CGRect) -> CGPath {
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { point(r, x, y) }
-        let path = CGMutablePath()
-        path.move(to: p(0.54, 0.06))
-        path.addCurve(to: p(0.97, 0.64), control1: p(0.64, 0.24), control2: p(0.97, 0.38))
-        path.addCurve(to: p(0.5, 1), control1: p(0.97, 0.86), control2: p(0.77, 1))
-        path.addCurve(to: p(0.03, 0.64), control1: p(0.23, 1), control2: p(0.03, 0.86))
-        path.addCurve(to: p(0.54, 0.06), control1: p(0.03, 0.38), control2: p(0.44, 0.24))
-        path.closeSubpath()
-        return path
     }
 }
 
@@ -485,17 +460,14 @@ enum KeyEffect: String, CaseIterable {
     }
 }
 
-/// 按鍵音：系統的喀喀聲，或 App 附的合成音（tools/make_sounds.js）
+/// 系統鍵盤聲與短促柔和的叮叮聲；舊音效選項會回到系統聲。
 enum KeySound: String, CaseIterable {
-    case system, bubble, marimba, bell, pop
+    case system, tink
 
     var title: String {
         switch self {
-        case .system: return "系統"
-        case .bubble: return "泡泡"
-        case .marimba: return "木琴"
-        case .bell: return "叮鈴"
-        case .pop: return "啵啵"
+        case .system: return "iPhone 原本"
+        case .tink: return "叮叮"
         }
     }
 }

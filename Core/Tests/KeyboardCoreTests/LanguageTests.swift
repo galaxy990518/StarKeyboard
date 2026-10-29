@@ -82,10 +82,10 @@ final class ReleaseTests: XCTestCase {
     }
 
     func testParse() {
-        let json = #"{"tag_name":"build-7","name":"星星鍵盤 第 7 版","body":"這次更新：\n- 修好按鍵","html_url":"https://github.com/z3332111-cloud/StarKeyboard/releases/tag/build-7"}"#
+        let json = #"{"tag_name":"build-7","name":"糯糯鍵盤 第 7 版","body":"這次更新：\n- 修好按鍵","html_url":"https://github.com/z3332111-cloud/StarKeyboard/releases/tag/build-7"}"#
         let info = ReleaseChecker.parse(Data(json.utf8))
         XCTAssertEqual(info?.build, 7)
-        XCTAssertEqual(info?.title, "星星鍵盤 第 7 版")
+        XCTAssertEqual(info?.title, "糯糯鍵盤 第 7 版")
         XCTAssertTrue(info?.notes.contains("修好按鍵") ?? false)
     }
 }
