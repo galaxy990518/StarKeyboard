@@ -38,6 +38,7 @@ class MainActivity : Activity() {
     private val pink = Color.parseColor("#E8577E")
     private lateinit var col: LinearLayout
     private lateinit var updateBox: LinearLayout
+    private lateinit var tryBox: EditText
     private val dp get() = resources.displayMetrics.density
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -109,11 +110,12 @@ class MainActivity : Activity() {
         text("2. 再按一次，選「星星鍵盤」當目前的鍵盤")
         button("② 切換成星星鍵盤") { (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() }
         text("3. 在下面試打看看")
-        col.addView(EditText(this).apply {
+        tryBox = EditText(this).apply {
             hint = "在這裡試試新鍵盤"
             minLines = 2
             gravity = Gravity.TOP
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = px(6f) })
+        }
+        col.addView(tryBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = px(6f) })
 
         title("背景照片與自製貼圖")
         button("挑一張照片當鍵盤背景") { pick(PICK_BACKGROUND) }
@@ -183,8 +185,16 @@ class MainActivity : Activity() {
                 val face = faceCenter(bitmap)
                 s.backgroundFocusX = face?.first ?: 0.5f
                 s.backgroundFocusY = face?.second ?: 0.3f
+                s.backgroundZoom = 1f
                 s.hasBackground = true
-                toast(if (face != null) "換好背景了！已對準臉，打開鍵盤看看" else "換好背景了！打開鍵盤看看，位置可以在鍵盤設定調")
+                // 接著叫出鍵盤，直接在鍵盤上拖拉、縮放照片
+                s.adjustPhotoPending = true
+                tryBox.requestFocus()
+                tryBox.post {
+                    (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(tryBox, 0)
+                    (col.parent as? ScrollView)?.smoothScrollTo(0, tryBox.top)
+                }
+                toast("換好背景了！在鍵盤上拖拉、兩指縮放照片，好了按「完成」")
             }
             PICK_STICKER -> {
                 val out = ByteArrayOutputStream()

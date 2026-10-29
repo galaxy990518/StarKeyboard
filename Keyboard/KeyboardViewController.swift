@@ -72,6 +72,7 @@ final class KeyboardViewController: UIInputViewController {
     // 畫面
     private let gradientLayer = CAGradientLayer()
     private let backgroundImageView = UIImageView()
+    private var photoAdjustView: PhotoAdjustView?
     private let tintOverlay = UIView()
     private var topBar: TopBarView!
     private let contentView = UIView()
@@ -141,6 +142,7 @@ final class KeyboardViewController: UIInputViewController {
         clipboardTimer?.invalidate()
         clipboardTimer = nil
         finishHangul()
+        finishPhotoAdjust()
     }
 
     override func viewDidLayoutSubviews() {
@@ -151,6 +153,7 @@ final class KeyboardViewController: UIInputViewController {
         gradientLayer.frame = b
         CATransaction.commit()
         backgroundImageView.frame = backgroundFrame(in: b)
+        photoAdjustView?.frame = b
         tintOverlay.frame = b
         topBar.frame = CGRect(x: 0, y: 0, width: b.width, height: Metrics.barHeight)
         contentView.frame = CGRect(x: 0, y: Metrics.barHeight, width: b.width, height: max(0, b.height - Metrics.barHeight))
@@ -850,6 +853,7 @@ final class KeyboardViewController: UIInputViewController {
             p.onChange = { [weak self] in self?.settingsChanged() }
             p.onPasteBackground = { [weak self] in self?.pasteBackground() }
             p.onClearBackground = { [weak self] in self?.clearBackground() }
+            p.onAdjustPhoto = { [weak self] in self?.startPhotoAdjust() }
             p.onResetLearning = { [weak self] in
                 self?.engine?.resetLearning()
                 self?.toast("已清除選字學習紀錄")
@@ -1043,7 +1047,7 @@ final class KeyboardViewController: UIInputViewController {
     /// 照片放大到蓋滿鍵盤，對準的點（例如臉）盡量放在中間，超出的部分裁掉
     private func backgroundFrame(in b: CGRect) -> CGRect {
         guard let img = backgroundImage, img.size.width > 0, img.size.height > 0 else { return b }
-        let s = max(b.width / img.size.width, b.height / img.size.height)
+        let s = max(b.width / img.size.width, b.height / img.size.height) * CGFloat(settings.backgroundZoom)
         let w = img.size.width * s
         let h = img.size.height * s
         let x = min(0, max(b.width - w, b.width / 2 - CGFloat(settings.backgroundFocusX) * w))
@@ -1074,6 +1078,67 @@ final class KeyboardViewController: UIInputViewController {
         return CGPoint(x: box.midX, y: 1 - box.midY)
     }
 
+    // MARK: - 調整背景照片（直接在鍵盤上拖拉、縮放，看到的就是實際的樣子）
+
+    private func startPhotoAdjust() {
+        guard backgroundImage != nil else {
+            toast("先貼上一張照片")
+            return
+        }
+        guard photoAdjustView == nil else { return }
+        commitAll()
+        closePanel()
+        topBar.alpha = 0.35
+        contentView.alpha = 0.35
+        let v = PhotoAdjustView(style: style)
+        v.onPan = { [weak self] d in self?.panPhoto(by: d) }
+        v.onPinch = { [weak self] f in
+            guard let self = self else { return }
+            self.settings.backgroundZoom *= Double(f)
+            self.panPhoto(by: .zero)
+        }
+        v.onReset = { [weak self] in
+            guard let self = self else { return }
+            self.settings.backgroundZoom = 1
+            self.settings.backgroundFocusX = 0.5
+            self.settings.backgroundFocusY = 0.3
+            self.panPhoto(by: .zero)
+        }
+        v.onDone = { [weak self] in self?.finishPhotoAdjust() }
+        v.frame = view.bounds
+        view.addSubview(v)
+        photoAdjustView = v
+    }
+
+    private func finishPhotoAdjust() {
+        guard let v = photoAdjustView else { return }
+        v.removeFromSuperview()
+        photoAdjustView = nil
+        topBar.alpha = 1
+        contentView.alpha = 1
+        toast("照片位置存好了")
+    }
+
+    /// 手指拖了 d 點：照片跟著手指走（對準點不能太靠邊，不然拖了沒反應）
+    private func panPhoto(by d: CGPoint) {
+        guard let img = backgroundImage, img.size.width > 0, img.size.height > 0 else { return }
+        let b = view.bounds
+        guard b.width > 0, b.height > 0 else { return }
+        let s = max(b.width / img.size.width, b.height / img.size.height) * CGFloat(settings.backgroundZoom)
+        let w = img.size.width * s
+        let h = img.size.height * s
+        func clamp(_ f: CGFloat, visible: CGFloat) -> Double {
+            let half = visible / 2
+            return half >= 0.5 ? 0.5 : Double(min(max(f, half), 1 - half))
+        }
+        settings.backgroundFocusX = clamp(CGFloat(settings.backgroundFocusX) - d.x / w, visible: b.width / w)
+        settings.backgroundFocusY = clamp(CGFloat(settings.backgroundFocusY) - d.y / h, visible: b.height / h)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        backgroundImageView.frame = backgroundFrame(in: b)
+        CATransaction.commit()
+    }
+
     private func loadBackground() {
         backgroundImage = settings.hasBackground ? UIImage(contentsOfFile: Storage.url("background.jpg").path) : nil
     }
@@ -1095,10 +1160,12 @@ final class KeyboardViewController: UIInputViewController {
             let face = faceCenter(in: small)
             settings.backgroundFocusX = Double(face?.x ?? 0.5)
             settings.backgroundFocusY = Double(face?.y ?? 0.3)
+            settings.backgroundZoom = 1
             settings.hasBackground = true
             loadBackground()
             applyStyle()
-            toast(face != nil ? "換好背景了，已對準臉" : "換好背景了，位置可以在設定調")
+            // 貼上後直接在鍵盤上拖拉、縮放照片
+            startPhotoAdjust()
         } catch {
             toast("存檔失敗")
         }

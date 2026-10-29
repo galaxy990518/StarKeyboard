@@ -137,6 +137,14 @@ class KeyboardSettings(context: Context) {
     var backgroundFocusY: Float
         get() = p.getFloat("backgroundFocusY", 0.5f)
         set(v) = p.edit().putFloat("backgroundFocusY", v).apply()
+    /** 照片放大倍數（1 = 剛好蓋滿鍵盤） */
+    var backgroundZoom: Float
+        get() = p.getFloat("backgroundZoom", 1f)
+        set(v) = p.edit().putFloat("backgroundZoom", v).apply()
+    /** 剛在 App 挑了照片：下次打開鍵盤直接進入調整照片 */
+    var adjustPhotoPending: Boolean
+        get() = p.getBoolean("adjustPhotoPending", false)
+        set(v) = p.edit().putBoolean("adjustPhotoPending", v).apply()
     var heightScale: Float
         get() = p.getFloat("heightScale", 1f)
         set(v) = p.edit().putFloat("heightScale", v).apply()

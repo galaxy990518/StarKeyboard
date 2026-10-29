@@ -198,6 +198,11 @@ final class KeyboardSettings {
         get { double("backgroundFocusY", 0.5) }
         set { d.set(newValue, forKey: "backgroundFocusY") }
     }
+    /// 照片放大倍數（1 = 剛好蓋滿鍵盤）
+    var backgroundZoom: Double {
+        get { double("backgroundZoom", 1) }
+        set { d.set(min(max(newValue, 1), 5), forKey: "backgroundZoom") }
+    }
     var hasBackground: Bool {
         get { bool("hasBackground", false) }
         set { d.set(newValue, forKey: "hasBackground") }

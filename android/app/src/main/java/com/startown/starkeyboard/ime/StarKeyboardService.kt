@@ -92,6 +92,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private var root: FrameLayout? = null
     private lateinit var bgImage: Backdrop
     private lateinit var tint: Backdrop
+    private lateinit var column: LinearLayout
+    private var photoAdjust: PhotoAdjustOverlay? = null
     private var backgroundStamp = 0L
     private lateinit var topBar: TopBar
     private lateinit var content: FrameLayout
@@ -155,7 +157,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         tint = Backdrop(this)
         r.addView(bgImage, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         r.addView(tint, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         topBar = TopBar(this, style)
         content = FrameLayout(this)
         keyboard = KeyboardView(this, style)
@@ -193,9 +195,15 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         rebuildKeys()
         updateAutoShift()
         refreshTopBar()
+        // 剛在 App 挑了照片：直接進入調整照片（等版面排好才知道鍵盤多大）
+        if (settings.adjustPhotoPending && settings.hasBackground) {
+            settings.adjustPhotoPending = false
+            root?.post { startPhotoAdjust() }
+        }
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        finishPhotoAdjust()
         resetComposition()
         super.onFinishInputView(finishingInput)
     }
@@ -893,6 +901,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             PanelKind.SETTINGS -> SettingsPanel(this, settings, style,
                 onChange = { settingsChanged() },
                 onOpenApp = { openApp() },
+                onAdjustPhoto = { startPhotoAdjust() },
                 onResetLearning = { engine?.resetLearning(); toast("已清除選字學習紀錄") },
                 onBack = { closePanel() })
         }
@@ -900,6 +909,38 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         panelView = v
         keyboard.visibility = View.GONE
         handwriting?.visibility = View.GONE
+    }
+
+    // ===== 調整背景照片（直接在鍵盤上拖拉、縮放，看到的就是實際的樣子） =====
+
+    private fun startPhotoAdjust() {
+        val r = root ?: return
+        if (!settings.hasBackground) {
+            toast("先到星星鍵盤 App 挑一張照片")
+            return
+        }
+        if (photoAdjust != null) return
+        commitAll()
+        closePanel()
+        column.alpha = 0.35f
+        val overlay = PhotoAdjustOverlay(this, style,
+            onPan = { dx, dy -> bgImage.pan(dx, dy) },
+            onScale = { f -> bgImage.zoomBy(f) },
+            onReset = { bgImage.zoom = 1f; bgImage.focusX = 0.5f; bgImage.focusY = 0.3f; bgImage.pan(0f, 0f) },
+            onDone = { finishPhotoAdjust() })
+        r.addView(overlay, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        photoAdjust = overlay
+    }
+
+    private fun finishPhotoAdjust() {
+        val overlay = photoAdjust ?: return
+        root?.removeView(overlay)
+        photoAdjust = null
+        column.alpha = 1f
+        settings.backgroundZoom = bgImage.zoom
+        settings.backgroundFocusX = bgImage.focusX
+        settings.backgroundFocusY = bgImage.focusY
+        toast("照片位置存好了")
     }
 
     private fun closePanel() {
@@ -1085,8 +1126,11 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 bgImage.setImageBitmap(BitmapFactory.decodeFile(settings.backgroundFile.path))
                 backgroundStamp = stamp
             }
-            bgImage.focusX = settings.backgroundFocusX
-            bgImage.focusY = settings.backgroundFocusY
+            if (photoAdjust == null) {
+                bgImage.zoom = settings.backgroundZoom
+                bgImage.focusX = settings.backgroundFocusX
+                bgImage.focusY = settings.backgroundFocusY
+            }
             bgImage.visibility = View.VISIBLE
             tint.setBackgroundColor(s.theme.top.withAlpha(settings.backgroundFade))
             tint.visibility = View.VISIBLE

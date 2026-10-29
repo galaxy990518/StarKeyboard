@@ -31,13 +31,47 @@ fun roundRect(color: Int, radius: Float) = GradientDrawable().apply {
 
 /**
  * 鍵盤後面的照片和淡化層：量大小時當作 0，不會把鍵盤撐高；鍵盤量好之後才照鍵盤的大小填滿。
- * 照片放大到蓋滿鍵盤，focusX／focusY（0～1，例如臉的位置）盡量放在中間，超出的部分裁掉
+ * 照片放大到蓋滿鍵盤（再乘上 zoom），focusX／focusY（0～1，例如臉的位置）盡量放在中間，超出的部分裁掉
  */
 class Backdrop(context: Context) : ImageView(context) {
     var focusX = 0.5f
         set(v) { field = v; fit() }
     var focusY = 0.5f
         set(v) { field = v; fit() }
+    var zoom = 1f
+        set(v) { field = v.coerceIn(1f, MAX_ZOOM); fit() }
+
+    companion object {
+        const val MAX_ZOOM = 5f
+    }
+
+    /** 手指拖了 (dx, dy) 像素：照片跟著手指走 */
+    fun pan(dx: Float, dy: Float) {
+        val s = scale() ?: return
+        focusX = clampFocus(focusX - dx / (s.first * s.third), width / (s.first * s.third))
+        focusY = clampFocus(focusY - dy / (s.second * s.third), height / (s.second * s.third))
+    }
+
+    /** 兩指縮放 */
+    fun zoomBy(f: Float) {
+        zoom *= f
+        pan(0f, 0f)   // 縮小後對準點可能跑出照片外，拉回來
+    }
+
+    /** 照片寬、高、放大倍數 */
+    private fun scale(): Triple<Float, Float, Float>? {
+        val d = drawable ?: return null
+        val iw = d.intrinsicWidth.toFloat()
+        val ih = d.intrinsicHeight.toFloat()
+        if (iw <= 0f || ih <= 0f || width == 0 || height == 0) return null
+        return Triple(iw, ih, maxOf(width / iw, height / ih) * zoom)
+    }
+
+    /** 看得到的範圍佔照片的比例是 visible：對準點不能太靠邊，不然拖了沒反應 */
+    private fun clampFocus(f: Float, visible: Float): Float {
+        val half = visible / 2f
+        return if (half >= 0.5f) 0.5f else f.coerceIn(half, 1f - half)
+    }
 
     init { scaleType = ScaleType.MATRIX }
 
@@ -56,14 +90,69 @@ class Backdrop(context: Context) : ImageView(context) {
     }
 
     private fun fit() {
-        val d = drawable ?: return
-        val iw = d.intrinsicWidth.toFloat()
-        val ih = d.intrinsicHeight.toFloat()
-        if (iw <= 0f || ih <= 0f || width == 0 || height == 0) return
-        val s = maxOf(width / iw, height / ih)
+        val (iw, ih, s) = scale() ?: return
         val dx = (width / 2f - focusX * iw * s).coerceIn(width - iw * s, 0f)
         val dy = (height / 2f - focusY * ih * s).coerceIn(height - ih * s, 0f)
         imageMatrix = Matrix().apply { setScale(s, s); postTranslate(dx, dy) }
+    }
+}
+
+/** 調整背景照片：蓋在整個鍵盤上，一指拖拉移動、兩指縮放，下面有「重設」「完成」 */
+@SuppressLint("ViewConstructor", "ClickableViewAccessibility")
+class PhotoAdjustOverlay(
+    context: Context,
+    style: KeyboardStyle,
+    private val onPan: (Float, Float) -> Unit,
+    private val onScale: (Float) -> Unit,
+    onReset: () -> Unit,
+    onDone: () -> Unit,
+) : FrameLayout(context) {
+    private var lastX = 0f
+    private var lastY = 0f
+    private val scaler = android.view.ScaleGestureDetector(context, object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScale(detector: android.view.ScaleGestureDetector): Boolean {
+            onScale(detector.scaleFactor)
+            return true
+        }
+    })
+
+    init {
+        val t = style.theme
+        addView(TextView(context).apply {
+            text = "拖拉移動照片・兩指縮放"
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setTextColor(t.accentText)
+            background = roundRect(t.accent.withAlpha(0.92f), dp(16f))
+            setPadding(dpi(14f), dpi(6f), dpi(14f), dpi(6f))
+        }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL or Gravity.TOP).apply { topMargin = dpi(10f) })
+        val bar = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        bar.addView(Tap(context, "重設", 15f, t.specialText, true) { onReset() }.apply { background = roundRect(t.special, dp(14f)) },
+            LinearLayout.LayoutParams(0, dpi(44f), 1f).apply { rightMargin = dpi(10f) })
+        bar.addView(Tap(context, "完成", 15f, t.accentText, true) { onDone() }.apply { background = roundRect(t.accent, dp(14f)) },
+            LinearLayout.LayoutParams(0, dpi(44f), 2f))
+        addView(bar, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM).apply {
+            leftMargin = dpi(16f); rightMargin = dpi(16f); bottomMargin = dpi(12f)
+        })
+    }
+
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        scaler.onTouchEvent(e)
+        // 用所有手指的中心點算拖拉，兩指縮放時也能一起移動
+        val lifted = if (e.actionMasked == MotionEvent.ACTION_POINTER_UP) e.actionIndex else -1
+        var x = 0f
+        var y = 0f
+        var n = 0
+        for (i in 0 until e.pointerCount) {
+            if (i == lifted) continue
+            x += e.getX(i); y += e.getY(i); n++
+        }
+        if (n == 0) return true
+        x /= n; y /= n
+        if (e.actionMasked == MotionEvent.ACTION_MOVE) onPan(x - lastX, y - lastY)
+        lastX = x
+        lastY = y
+        return true
     }
 }
 
