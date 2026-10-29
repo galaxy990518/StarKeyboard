@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+# 連續推好幾次時，只留最新的那次打包（避免舊的版本後完成、變成「最新版」）
+concurrency:
+  group: build
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-15
