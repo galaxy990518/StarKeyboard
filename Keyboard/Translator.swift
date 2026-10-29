@@ -19,6 +19,7 @@ enum Translator {
         Language(code: "fr", name: "法文"),
         Language(code: "de", name: "德文"),
         Language(code: "es", name: "西班牙文"),
+        Language(code: "it", name: "義大利文"),
         Language(code: "th", name: "泰文"),
         Language(code: "vi", name: "越南文"),
         Language(code: "id", name: "印尼文"),

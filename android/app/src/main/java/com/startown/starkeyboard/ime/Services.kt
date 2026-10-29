@@ -99,7 +99,7 @@ object Translator {
 
     val targets = listOf(
         Language("en", "英文"), Language("ja", "日文"), Language("ko", "韓文"), Language("zh-TW", "繁中"),
-        Language("zh-CN", "簡中"), Language("fr", "法文"), Language("de", "德文"), Language("es", "西班牙文"),
+        Language("zh-CN", "簡中"), Language("fr", "法文"), Language("de", "德文"), Language("es", "西班牙文"), Language("it", "義大利文"),
         Language("th", "泰文"), Language("vi", "越南文"), Language("id", "印尼文"),
     )
 
