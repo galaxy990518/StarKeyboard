@@ -109,7 +109,7 @@ class HandwritingPanel(context: Context, style: KeyboardStyle, private val recog
     private val canvasView = object : View(context) {
         private val bg = Paint(Paint.ANTI_ALIAS_FLAG)
         private val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+            setStyle(Paint.Style.STROKE); strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
         }
         private val hint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
 
