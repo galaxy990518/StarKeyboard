@@ -160,6 +160,8 @@ struct KeyboardStyle {
     var theme: KeyboardTheme
     var shape: KeyShape
     var keyAlpha: CGFloat
+    var fontScale: CGFloat = 1   // 按鍵上的字放大縮小
+    var gapScale: CGFloat = 1    // 按鍵之間的空隙（越小按鍵越大）
 }
 
 /// 鍵盤自己的設定（存在鍵盤擴充功能自己的空間，不需要 App Group）
@@ -230,6 +232,21 @@ final class KeyboardSettings {
     var fuzzyPhonetic: Bool {
         get { bool("fuzzyPhonetic", false) }
         set { d.set(newValue, forKey: "fuzzyPhonetic") }
+    }
+    /// 鍵盤高度倍率（0.8～1.3）
+    var heightScale: CGFloat {
+        get { CGFloat(double("heightScale", 1)) }
+        set { d.set(Double(newValue), forKey: "heightScale") }
+    }
+    /// 按鍵字的大小倍率（0.8～1.4）
+    var fontScale: CGFloat {
+        get { CGFloat(double("fontScale", 1)) }
+        set { d.set(Double(newValue), forKey: "fontScale") }
+    }
+    /// 按鍵間距倍率（0.3～1.6）
+    var gapScale: CGFloat {
+        get { CGFloat(double("gapScale", 1)) }
+        set { d.set(Double(newValue), forKey: "gapScale") }
     }
     var translateTarget: String {
         get { d.string(forKey: "translateTarget") ?? "en" }

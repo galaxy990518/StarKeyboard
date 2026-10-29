@@ -70,6 +70,31 @@ final class SettingsPanelView: UIView {
         stack.addArrangedSubview(header("按鍵造型"))
         stack.addArrangedSubview(shapeRow())
 
+        stack.addArrangedSubview(header("大小（邊拖邊看）"))
+        stack.addArrangedSubview(sliderRow("鍵盤高度", value: Float(settings.heightScale), range: 0.8...1.3) { [weak self] v in
+            self?.settings.heightScale = CGFloat(v)
+            self?.onChange?()
+        })
+        stack.addArrangedSubview(sliderRow("字的大小", value: Float(settings.fontScale), range: 0.8...1.4) { [weak self] v in
+            self?.settings.fontScale = CGFloat(v)
+            self?.onChange?()
+        })
+        stack.addArrangedSubview(sliderRow("按鍵間距", value: Float(settings.gapScale), range: 0.3...1.6) { [weak self] v in
+            self?.settings.gapScale = CGFloat(v)
+            self?.onChange?()
+        })
+        stack.addArrangedSubview(note("間距越小，按鍵越大、越好按。"))
+        stack.addArrangedSubview(buttonRow([
+            ("大小恢復預設", { [weak self] in
+                guard let self = self else { return }
+                self.settings.heightScale = 1
+                self.settings.fontScale = 1
+                self.settings.gapScale = 1
+                self.onChange?()
+                self.rebuild()
+            }),
+        ]))
+
         stack.addArrangedSubview(header("背景圖片"))
         stack.addArrangedSubview(note("先在相簿把照片「拷貝」，再按下面的按鈕。也可以用「星星鍵盤」App 挑照片。"))
         stack.addArrangedSubview(buttonRow([

@@ -52,7 +52,7 @@ final class KeyButton: UIView {
         super.layoutSubviews()
         content.bounds = bounds
         content.center = CGPoint(x: bounds.midX, y: bounds.midY)
-        let outer = bounds.insetBy(dx: 3, dy: 4.5)
+        let outer = bounds.insetBy(dx: 3 * style.gapScale, dy: 4.5 * style.gapScale)
         guard outer.width > 4, outer.height > 4 else { return }
         let path = style.shape.path(in: outer)
         var shift = CGAffineTransform(translationX: 0, y: 1.5)
@@ -80,11 +80,11 @@ final class KeyButton: UIView {
             label.isHidden = false
             icon.isHidden = true
             label.text = s
-            label.font = .rounded(spec.fontSize, spec.kind == .normal ? .regular : .semibold)
+            label.font = .rounded(spec.fontSize * style.fontScale, spec.kind == .normal ? .regular : .semibold)
         case .symbol(let name):
             label.isHidden = true
             icon.isHidden = false
-            icon.image = UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .medium))
+            icon.image = UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(pointSize: 18 * style.fontScale, weight: .medium))
         }
     }
 

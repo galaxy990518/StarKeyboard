@@ -67,7 +67,8 @@ final class KeyboardViewController: UIInputViewController {
     private let toastLabel = UILabel()
 
     private var style: KeyboardStyle {
-        KeyboardStyle(theme: KeyboardTheme.named(settings.themeID), shape: settings.keyShape, keyAlpha: settings.keyAlpha)
+        KeyboardStyle(theme: KeyboardTheme.named(settings.themeID), shape: settings.keyShape, keyAlpha: settings.keyAlpha,
+                      fontScale: settings.fontScale, gapScale: settings.gapScale)
     }
 
     /// 注音或日文正在組字
@@ -1082,7 +1083,9 @@ final class KeyboardViewController: UIInputViewController {
         } else {
             content = fiveRows ? 252 : 216
         }
-        let h = Metrics.barHeight + content
+        // 使用者自己調的高度；橫放時螢幕矮，最多只放大到 1.1 倍
+        let scale = isLandscape ? min(settings.heightScale, 1.1) : settings.heightScale
+        let h = Metrics.barHeight + (content * scale).rounded()
         if let c = heightConstraint {
             if c.constant != h { c.constant = h }
         } else {
