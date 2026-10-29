@@ -246,9 +246,10 @@ enum KeyLayouts {
 
     private static func chineseSymbols(_ c: Context) -> KeyboardLayout {
         var row3 = [KeySpec(face: .text("123"), action: .layer(.numbers), width: 1.4, kind: .special, fontSize: 16)]
-        row3 += keys("♡☆♪→※～", size: 20, width: 1.2)
+        row3 += keys("♡☆‧→※～", size: 20, width: 1.2)
         row3.append(backspace())
-        return KeyboardLayout(rows: [keys("【】《》〈〉＿＠＃％", size: 20), keys("＆＊＋＝／＼｜＄‧·", size: 20), row3,
+        // # * _ ~ ` | / \ > @ 用半形：Discord、LINE 等的標題、粗體、刪除線、劇透、@提及、/指令只認半形
+        return KeyboardLayout(rows: [keys("【】《》〈〉#@%&", size: 20), keys("*_~`|/\\>+=", size: 20), row3,
                                      bottomRow(c, columns: 10)],
                               columns: 10)
     }

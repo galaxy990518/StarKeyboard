@@ -157,7 +157,8 @@ object KeyLayouts {
     }
 
     private fun chineseSymbols(c: Context): KeyboardLayout {
-        val row3 = listOf(KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.4f, KeyKind.SPECIAL, 16f)) + keys("♡☆♪→※～", 20f, 1.2f) + backspace()
-        return KeyboardLayout(listOf(keys("【】《》〈〉＿＠＃％", 20f), keys("＆＊＋＝／＼｜＄‧·", 20f), row3, bottomRow(c, 10f)), 10f)
+        val row3 = listOf(KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.4f, KeyKind.SPECIAL, 16f)) + keys("♡☆‧→※～", 20f, 1.2f) + backspace()
+        // # * _ ~ ` | / \ > @ 用半形：Discord、LINE 等的標題、粗體、刪除線、劇透、@提及、/指令只認半形
+        return KeyboardLayout(listOf(keys("【】《》〈〉#@%&", 20f), keys("*_~`|/\\>+=", 20f), row3, bottomRow(c, 10f)), 10f)
     }
 }
