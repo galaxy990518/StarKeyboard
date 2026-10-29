@@ -1,7 +1,7 @@
 import UIKit
 
 enum InputMode: String, CaseIterable {
-    case zhuyin, english, handwriting, korean, japanese
+    case zhuyin, english, handwriting, korean, japanese, pinyin
 
     var title: String {
         switch self {
@@ -10,6 +10,7 @@ enum InputMode: String, CaseIterable {
         case .handwriting: return "手寫"
         case .korean: return "한국어"
         case .japanese: return "日本語"
+        case .pinyin: return "拼音"
         }
     }
 
@@ -20,6 +21,7 @@ enum InputMode: String, CaseIterable {
         case .handwriting: return "寫"
         case .korean: return "한"
         case .japanese: return "あ"
+        case .pinyin: return "拼"
         }
     }
 }
@@ -33,6 +35,7 @@ enum KeyAction: Equatable {
     case zhuyin(Character)
     case jamo(Character)     // 韓文字母
     case romaji(Character)   // 日文羅馬拼音
+    case pinyin(Character)   // 漢語拼音
     case backspace, space, returnKey, shift, globe, nextMode, clearCanvas
     case layer(KeyboardLayer)
     case panel(PanelKind)
@@ -40,7 +43,7 @@ enum KeyAction: Equatable {
     /// 一般打字的鍵：可以滑動修正、快速連打
     var isCharacter: Bool {
         switch self {
-        case .text, .zhuyin, .jamo, .romaji: return true
+        case .text, .zhuyin, .jamo, .romaji, .pinyin: return true
         default: return false
         }
     }
@@ -87,6 +90,7 @@ enum KeyLayouts {
             case .zhuyin: return zhuyin(c)
             case .korean: return korean(c)
             case .japanese: return japanese(c)
+            case .pinyin: return pinyin(c)
             default: return english(c)
             }
         case .numbers: return chinese ? chineseNumbers(c) : englishNumbers(c)
@@ -127,6 +131,7 @@ enum KeyLayouts {
             case .handwriting: title = "手寫"
             case .korean: title = "한글"
             case .japanese: title = "かな"
+            case .pinyin: title = "拼音"
             }
             layerKey = KeySpec(face: .text(title), action: .layer(.letters), width: 1.3 * k, kind: .special, fontSize: 14)
         }
@@ -197,6 +202,18 @@ enum KeyLayouts {
             s.map { KeySpec(face: .text(String($0)), action: .romaji($0), fontSize: 24) }
         }
         var row3 = [KeySpec(face: .text("ー"), action: .romaji("-"), width: 1.4, kind: .special, fontSize: 20)]
+        row3 += letters("zxcvbnm")
+        row3.append(backspace())
+        return KeyboardLayout(rows: [letters("qwertyuiop"), letters("asdfghjkl"), row3, bottomRow(c, columns: 10)],
+                              columns: 10)
+    }
+
+    /// 漢語拼音：左下角是分音節的「'」（例如 xi'an）
+    private static func pinyin(_ c: Context) -> KeyboardLayout {
+        func letters(_ s: String) -> [KeySpec] {
+            s.map { KeySpec(face: .text(String($0)), action: .pinyin($0), fontSize: 24) }
+        }
+        var row3 = [KeySpec(face: .text("'"), action: .pinyin("'"), width: 1.4, kind: .special, fontSize: 22)]
         row3 += letters("zxcvbnm")
         row3.append(backspace())
         return KeyboardLayout(rows: [letters("qwertyuiop"), letters("asdfghjkl"), row3, bottomRow(c, columns: 10)],

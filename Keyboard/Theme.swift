@@ -261,6 +261,11 @@ final class KeyboardSettings {
         get { d.integer(forKey: "notifiedBuild") }
         set { d.set(newValue, forKey: "notifiedBuild") }
     }
+    /// 拼音模式輸出簡體字（馬來西亞、中國用簡體）
+    var pinyinSimplified: Bool {
+        get { bool("pinyinSimplified", true) }
+        set { d.set(newValue, forKey: "pinyinSimplified") }
+    }
     var translateTarget: String {
         get { d.string(forKey: "translateTarget") ?? "en" }
         set { d.set(newValue, forKey: "translateTarget") }

@@ -20,6 +20,18 @@ final class KeyboardViewController: UIInputViewController {
         e.fuzzy = self.fuzzyOptions
         return e
     }()
+    /// 拼音：另外開一個連線，用沒聲調的 plain 欄查；繁轉簡也用同一個字典檔
+    private lazy var pinyinEngine: PinyinEngine? = {
+        guard let path = Bundle.main.path(forResource: "zhuyin", ofType: "sqlite"),
+              let db = SQLiteDB(path: path),
+              let e = ZhuyinEngine(path: path, userModel: UserPhraseModel(fileURL: Storage.url("learned-pinyin.json")), column: "plain")
+        else { return nil }
+        return PinyinEngine(engine: e, table: PinyinEngine.loadTable(from: db))
+    }()
+    private lazy var converter: ChineseConverter? = {
+        guard let path = Bundle.main.path(forResource: "zhuyin", ofType: "sqlite"), let db = SQLiteDB(path: path) else { return nil }
+        return ChineseConverter(db: db)
+    }()
     private lazy var textChecker = UITextChecker()
     /// 剛剛自動修正的字：馬上按刪除就改回原本打的
     private var lastAutocorrect: (original: String, corrected: String)?
@@ -36,6 +48,8 @@ final class KeyboardViewController: UIInputViewController {
     private var lastSpaceTime = Date.distantPast
     private var composer = ZhuyinComposer()
     private var kanaBuffer = ""              // 日文：還沒送出的羅馬拼音
+    private var pinyinBuffer = ""            // 拼音：還沒送出的字母
+    private var candidateOriginals: [String] = []   // 拼音候選轉簡體前的原文（學習、聯想詞用）
     private var hangul = HangulComposer()
     private var hangulShown = ""             // 韓文：已經放進輸入框、還在拼的那個字
     private var candidates: [Candidate] = []
@@ -72,7 +86,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     /// 注音或日文正在組字
-    private var isComposing: Bool { composer.isComposing || !kanaBuffer.isEmpty }
+    private var isComposing: Bool { composer.isComposing || !kanaBuffer.isEmpty || !pinyinBuffer.isEmpty }
 
     // MARK: - 生命週期
 
@@ -211,6 +225,7 @@ final class KeyboardViewController: UIInputViewController {
         case .zhuyin(let c): typeZhuyin(c)
         case .jamo(let c): typeJamo(c)
         case .romaji(let c): typeRomaji(c)
+        case .pinyin(let c): typePinyin(c)
         case .backspace: backspace()
         case .space: space()
         case .returnKey: returnKey()
@@ -326,6 +341,23 @@ final class KeyboardViewController: UIInputViewController {
         updateCandidates()
     }
 
+    private func typePinyin(_ c: Character) {
+        clearSuggestions(refresh: false)
+        if c == "'" && (pinyinBuffer.isEmpty || pinyinBuffer.hasSuffix("'")) { return }
+        pinyinBuffer.append(c)
+        if pinyinBuffer.count >= 60 {
+            commitAll()
+            return
+        }
+        updateCandidates()
+    }
+
+    /// 拼音模式要不要轉成簡體
+    private func simplify(_ s: String) -> String {
+        guard mode == .pinyin, settings.pinyinSimplified, let c = converter else { return s }
+        return c.convert(s)
+    }
+
     private func typeRomaji(_ c: Character) {
         clearSuggestions(refresh: false)
         kanaBuffer.append(c)
@@ -359,6 +391,11 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func backspace() {
+        if !pinyinBuffer.isEmpty {
+            pinyinBuffer.removeLast()
+            updateCandidates()
+            return
+        }
         if !kanaBuffer.isEmpty {
             kanaBuffer.removeLast()
             updateCandidates()
@@ -509,7 +546,20 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - 選字（注音、日文）
 
     private func updateCandidates() {
-        if !kanaBuffer.isEmpty {
+        candidateOriginals = []
+        if !pinyinBuffer.isEmpty {
+            // 拼音：查到的是繁體，要的話轉成簡體；轉完一樣的只留一個
+            let raw = pinyinEngine?.candidates(for: pinyinBuffer) ?? []
+            var seen = Set<String>()
+            var list: [Candidate] = []
+            for c in raw {
+                let shown = simplify(c.text)
+                guard seen.insert(shown).inserted else { continue }
+                list.append(Candidate(text: shown, span: c.span, kind: c.kind))
+                candidateOriginals.append(c.text)
+            }
+            candidates = list
+        } else if !kanaBuffer.isEmpty {
             let hiragana = Romaji.finalize(kanaBuffer)
             var texts = [hiragana, Romaji.katakana(hiragana), kanaBuffer]
             var seen = Set<String>()
@@ -529,6 +579,9 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private var compositionText: String {
+        if !pinyinBuffer.isEmpty {
+            return pinyinEngine?.display(pinyinBuffer) ?? pinyinBuffer
+        }
         if !kanaBuffer.isEmpty {
             let r = Romaji.convert(kanaBuffer)
             return r.kana + r.rest
@@ -548,6 +601,33 @@ final class KeyboardViewController: UIInputViewController {
             } else {
                 translation = nil
                 refreshTopBar()
+            }
+            return
+        }
+        if !pinyinBuffer.isEmpty {
+            guard i < candidates.count else { return }
+            let c = candidates[i]
+            let original = i < candidateOriginals.count ? candidateOriginals[i] : c.text
+            if let p = pinyinEngine {
+                if learn && c.kind != .literal {
+                    let readings = p.readings(for: p.segment(pinyinBuffer))
+                    p.engine.learn(readings: Array(readings.prefix(c.span)), text: original)
+                }
+                let used = p.consumedLength(pinyinBuffer, span: c.span)
+                pinyinBuffer = String(pinyinBuffer.dropFirst(used))
+                while pinyinBuffer.hasPrefix("'") { pinyinBuffer.removeFirst() }
+            } else {
+                pinyinBuffer = ""
+            }
+            output(c.text)
+            if !pinyinBuffer.isEmpty {
+                updateCandidates()
+            } else {
+                candidates = []
+                candidateOriginals = []
+                closeCandidatePanel()
+                showAssociations(after: original)
+                refreshReturnTitle()
             }
             return
         }
@@ -600,7 +680,12 @@ final class KeyboardViewController: UIInputViewController {
     private func commitAll() {
         guard isComposing else { return }
         var text = ""
-        if !kanaBuffer.isEmpty {
+        if !pinyinBuffer.isEmpty {
+            // 拼音：送出整句（第一個候選）；完全查不到就照打的字母送出
+            text = candidates.first?.text ?? pinyinBuffer.replacingOccurrences(of: "'", with: "")
+            pinyinBuffer = ""
+            candidateOriginals = []
+        } else if !kanaBuffer.isEmpty {
             text = Romaji.finalize(kanaBuffer)
             kanaBuffer = ""
         } else {
@@ -620,6 +705,10 @@ final class KeyboardViewController: UIInputViewController {
     private func showAssociations(after text: String) {
         if settings.associations, editorText == nil, mode == .zhuyin || mode == .handwriting, let engine = engine {
             suggestions = engine.associations(after: text)
+        } else if settings.associations, editorText == nil, mode == .pinyin, let p = pinyinEngine {
+            // 拼音：用繁體原文查，結果再轉簡體
+            var seen = Set<String>()
+            suggestions = p.engine.associations(after: text).map { simplify($0) }.filter { seen.insert($0).inserted }
         } else {
             suggestions = []
         }
@@ -885,6 +974,7 @@ final class KeyboardViewController: UIInputViewController {
     private func endEditor() {
         composer.clear()
         kanaBuffer = ""
+        pinyinBuffer = ""
         candidates = []
         editorText = nil
         editorReturnPanel = nil

@@ -26,6 +26,8 @@ final class ZhuyinEngine {
     static let userPhraseBase: Double = -6
 
     private let db: SQLiteDB
+    /// 用哪一欄查：注音用 reading（有聲調），拼音用 plain（沒聲調）
+    private let column: String
     private var cache: [String: [Scored]] = [:]
     private var fuzzyCache: [String: [Scored]] = [:]
     private var alternativeCache: [String: [(reading: String, penalty: Double)]] = [:]
@@ -51,27 +53,30 @@ final class ZhuyinEngine {
     static let neighborPenalty: Double = -2.5
     let userModel: UserPhraseModel
 
-    init(db: SQLiteDB, userModel: UserPhraseModel) {
+    init(db: SQLiteDB, userModel: UserPhraseModel, column: String = "reading") {
         self.db = db
         self.userModel = userModel
+        self.column = column
     }
 
-    convenience init?(path: String, userModel: UserPhraseModel) {
+    convenience init?(path: String, userModel: UserPhraseModel, column: String = "reading") {
         guard let db = SQLiteDB(path: path) else { return nil }
-        self.init(db: db, userModel: userModel)
+        self.init(db: db, userModel: userModel, column: column)
     }
 
     // MARK: 字典格式（tools/build_dict.py 也是用這個）
 
     static func createSchema(in db: SQLiteDB) {
-        db.execute("CREATE TABLE IF NOT EXISTS phrases(reading TEXT NOT NULL, phrase TEXT NOT NULL, score REAL NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS phrases(reading TEXT NOT NULL, plain TEXT NOT NULL, phrase TEXT NOT NULL, score REAL NOT NULL)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_reading ON phrases(reading)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_plain ON phrases(plain)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_phrase ON phrases(phrase)")
     }
 
     static func insert(into db: SQLiteDB, reading: String, phrase: String, score: Double) {
-        db.run("INSERT INTO phrases(reading, phrase, score) VALUES (?1, ?2, ?3)",
-               [.text(reading), .text(phrase), .double(score)])
+        let plain = String(reading.filter { !Bopomofo.tones.contains($0) })
+        db.run("INSERT INTO phrases(reading, plain, phrase, score) VALUES (?1, ?2, ?3, ?4)",
+               [.text(reading), .text(plain), .text(phrase), .double(score)])
     }
 
     // MARK: 查詢
@@ -83,7 +88,7 @@ final class ZhuyinEngine {
 
         var best: [String: Double] = [:]
         var order: [String] = []
-        db.run("SELECT phrase, score FROM phrases WHERE reading = ?1 ORDER BY score DESC LIMIT 80", [.text(key)]) { stmt in
+        db.run("SELECT phrase, score FROM phrases WHERE \(column) = ?1 ORDER BY score DESC LIMIT 80", [.text(key)]) { stmt in
             let phrase = SQLiteDB.text(stmt, 0)
             if best[phrase] == nil {
                 best[phrase] = SQLiteDB.double(stmt, 1)

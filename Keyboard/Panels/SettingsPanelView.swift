@@ -124,6 +124,9 @@ final class SettingsPanelView: UIView {
                 self.onChange?()
             })
         }
+        stack.addArrangedSubview(switchRow("拼音輸出簡體字", on: settings.pinyinSimplified) { [weak self] on in
+            self?.settings.pinyinSimplified = on
+        })
         stack.addArrangedSubview(switchRow("聯想詞（打完字後推薦下一個字）", on: settings.associations) { [weak self] on in
             self?.settings.associations = on
         })
@@ -184,6 +187,7 @@ final class SettingsPanelView: UIView {
         case .handwriting: return "手寫"
         case .korean: return "韓文（한국어）"
         case .japanese: return "日文（羅馬拼音→假名）"
+        case .pinyin: return "拼音（馬來西亞、中國用，可出簡體）"
         }
     }
 

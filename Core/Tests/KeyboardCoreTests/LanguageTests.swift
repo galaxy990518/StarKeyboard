@@ -89,3 +89,59 @@ final class ReleaseTests: XCTestCase {
         XCTAssertTrue(info?.notes.contains("修好按鍵") ?? false)
     }
 }
+
+final class PinyinTests: XCTestCase {
+    private func makePinyin() -> PinyinEngine {
+        let db = SQLiteDB.inMemory()!
+        ZhuyinEngine.createSchema(in: db)
+        let rows: [(String, String, Double)] = [
+            ("ㄋㄧˇ", "你", -3.0), ("ㄏㄠˇ", "好", -3.0), ("ㄋㄧˇ-ㄏㄠˇ", "你好", -4.0),
+            ("ㄏㄞˊ", "還", -3.2), ("ㄏㄜˊ", "和", -3.0), ("ㄒㄧ", "西", -3.5), ("ㄢ", "安", -3.6),
+            ("ㄒㄧ-ㄢ", "西安", -5.0), ("ㄒㄧㄢ", "先", -3.4), ("ㄓㄨㄥ-ㄍㄨㄛˊ", "中國", -3.5),
+            ("ㄌㄩˋ-ㄙㄜˋ", "綠色", -4.5), ("ㄊㄞˊ-ㄨㄢ", "臺灣", -4.0),
+        ]
+        for r in rows { ZhuyinEngine.insert(into: db, reading: r.0, phrase: r.1, score: r.2) }
+        let table = ["ni": "ㄋㄧ", "hao": "ㄏㄠ", "hai": "ㄏㄞ", "he": "ㄏㄜ", "xi": "ㄒㄧ", "an": "ㄢ",
+                     "xian": "ㄒㄧㄢ", "zhong": "ㄓㄨㄥ", "guo": "ㄍㄨㄛ", "lv": "ㄌㄩ", "se": "ㄙㄜ",
+                     "tai": "ㄊㄞ", "wan": "ㄨㄢ"]
+        let engine = ZhuyinEngine(db: db, userModel: UserPhraseModel(fileURL: nil), column: "plain")
+        return PinyinEngine(engine: engine, table: table)
+    }
+
+    private func pieces(_ p: PinyinEngine, _ s: String) -> [String] {
+        p.segment(s).pieces.map { $0.pinyin }
+    }
+
+    func testSegmentation() {
+        let p = makePinyin()
+        XCTAssertEqual(pieces(p, "nihao"), ["ni", "hao"])
+        XCTAssertEqual(pieces(p, "xian"), ["xian"])
+        XCTAssertEqual(pieces(p, "xi'an"), ["xi", "an"])
+        XCTAssertEqual(pieces(p, "zhongguo"), ["zhong", "guo"])
+        XCTAssertEqual(pieces(p, "lvse"), ["lv", "se"])
+        let half = p.segment("nih")
+        XCTAssertEqual(half.pieces.map { $0.pinyin }, ["ni"])
+        XCTAssertEqual(half.partial, "h")
+        XCTAssertEqual(p.display("nih"), "ni h")
+    }
+
+    func testCandidates() {
+        let p = makePinyin()
+        XCTAssertEqual(p.candidates(for: "nihao").first?.text, "你好")
+        XCTAssertEqual(p.candidates(for: "nih").first?.text, "你好")
+        XCTAssertEqual(p.candidates(for: "zhongguo").first?.text, "中國")
+        XCTAssertEqual(p.candidates(for: "taiwan").first?.text, "臺灣")
+        XCTAssertEqual(p.consumedLength("nihao", span: 1), 2)
+        XCTAssertEqual(p.consumedLength("xi'an", span: 1), 3)
+        XCTAssertEqual(p.consumedLength("nihao", span: 2), 5)
+    }
+
+    func testSimplified() {
+        let table = ["灣": "湾", "頭髮": "头发", "頭": "头", "髮": "发", "臺": "台", "國": "国"]
+        let c = ChineseConverter { table[$0] }
+        XCTAssertEqual(c.convert("臺灣"), "台湾")
+        XCTAssertEqual(c.convert("頭髮好"), "头发好")
+        XCTAssertEqual(c.convert("中國"), "中国")
+        XCTAssertEqual(c.convert("你好"), "你好")
+    }
+}
