@@ -1,0 +1,11 @@
+.DS_Store
+*.xcodeproj/
+build/
+Payload/
+*.ipa
+.build/
+Core/.build/
+Keyboard/Resources/zhuyin.sqlite
+Keyboard/Resources/McBopomofo-LICENSE.txt
+App/Info.plist
+Keyboard/Info.plist

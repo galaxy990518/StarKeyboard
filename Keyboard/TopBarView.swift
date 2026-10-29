@@ -1,0 +1,466 @@
+import UIKit
+
+enum ToolbarItem: CaseIterable {
+    case clipboard, emoji, kaomoji, symbols, handwriting, settings, dismiss
+}
+
+/// 鍵盤最上面那一條：沒在打字時是工具列，打注音時是候選字，新增表符時是編輯框
+final class TopBarView: UIView {
+    enum Trailing { case expand, close }
+
+    enum Content {
+        case toolbar
+        case candidates(composition: String, items: [String], trailing: Trailing)
+        case editor(text: String)
+    }
+
+    var onToolbar: ((ToolbarItem) -> Void)?
+    var onCandidate: ((Int) -> Void)?
+    var onTrailing: ((Trailing) -> Void)?
+    var onEditor: ((Bool) -> Void)?
+    var onEditorPanel: (() -> Void)?
+    var style: KeyboardStyle {
+        didSet { applyStyle() }
+    }
+
+    private var content: Content = .toolbar
+    private var trailing: Trailing = .expand
+    private let toolbar = UIStackView()
+    private var toolbarButtons: [UIButton] = []
+    private let compositionLabel = UILabel()
+    private let candidateScroll = UIScrollView()
+    private var candidateButtons: [UIButton] = []
+    private let trailingButton = UIButton(type: .system)
+    private let editorLabel = UILabel()
+    private let editorSave = UIButton(type: .system)
+    private let editorCancel = UIButton(type: .system)
+    private let editorPanel = UIButton(type: .system)
+    private let separator = UIView()
+
+    init(style: KeyboardStyle) {
+        self.style = style
+        super.init(frame: .zero)
+
+        toolbar.axis = .horizontal
+        toolbar.distribution = .fillEqually
+        for item in ToolbarItem.allCases {
+            let b = UIButton(type: .system)
+            switch item {
+            case .clipboard: b.setImage(Self.icon("doc.on.clipboard"), for: .normal)
+            case .emoji: b.setImage(Self.icon("face.smiling"), for: .normal)
+            case .kaomoji: b.setTitle("(•ᴗ•)", for: .normal)
+            case .symbols: b.setTitle("※", for: .normal)
+            case .handwriting: b.setImage(Self.icon("hand.draw"), for: .normal)
+            case .settings: b.setImage(Self.icon("gearshape"), for: .normal)
+            case .dismiss: b.setImage(Self.icon("keyboard.chevron.compact.down"), for: .normal)
+            }
+            b.titleLabel?.font = .rounded(15, .semibold)
+            b.addAction(UIAction { [weak self] _ in self?.onToolbar?(item) }, for: .touchUpInside)
+            toolbar.addArrangedSubview(b)
+            toolbarButtons.append(b)
+        }
+        addSubview(toolbar)
+
+        compositionLabel.font = .rounded(13, .medium)
+        addSubview(compositionLabel)
+        candidateScroll.showsHorizontalScrollIndicator = false
+        candidateScroll.alwaysBounceHorizontal = true
+        addSubview(candidateScroll)
+        trailingButton.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            self.onTrailing?(self.trailing)
+        }, for: .touchUpInside)
+        addSubview(trailingButton)
+
+        editorLabel.font = .rounded(17)
+        editorLabel.lineBreakMode = .byTruncatingHead
+        addSubview(editorLabel)
+        editorCancel.setTitle("取消", for: .normal)
+        editorSave.setTitle("儲存", for: .normal)
+        editorCancel.titleLabel?.font = .rounded(16)
+        editorSave.titleLabel?.font = .rounded(16, .bold)
+        editorCancel.addAction(UIAction { [weak self] _ in self?.onEditor?(false) }, for: .touchUpInside)
+        editorSave.addAction(UIAction { [weak self] _ in self?.onEditor?(true) }, for: .touchUpInside)
+        editorPanel.setTitle("(•ᴗ•)", for: .normal)
+        editorPanel.titleLabel?.font = .rounded(14, .semibold)
+        editorPanel.addAction(UIAction { [weak self] _ in self?.onEditorPanel?() }, for: .touchUpInside)
+        addSubview(editorPanel)
+        addSubview(editorCancel)
+        addSubview(editorSave)
+
+        addSubview(separator)
+        applyStyle()
+        show(.toolbar)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    private static func icon(_ name: String) -> UIImage? {
+        UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .medium))
+    }
+
+    func show(_ newContent: Content) {
+        content = newContent
+        var isToolbar = false, isCandidates = false, isEditor = false
+        switch newContent {
+        case .toolbar:
+            isToolbar = true
+        case let .candidates(composition, items, trailing):
+            isCandidates = true
+            compositionLabel.text = composition
+            self.trailing = trailing
+            trailingButton.setImage(Self.icon(trailing == .expand ? "chevron.down" : "xmark"), for: .normal)
+            trailingButton.isHidden = items.isEmpty && trailing == .expand
+            rebuildCandidates(Array(items.prefix(60)))
+        case .editor(let text):
+            isEditor = true
+            editorLabel.text = "新增表符：" + text + "▏"
+        }
+        toolbar.isHidden = !isToolbar
+        compositionLabel.isHidden = !isCandidates || (compositionLabel.text ?? "").isEmpty
+        candidateScroll.isHidden = !isCandidates
+        trailingButton.isHidden = trailingButton.isHidden || !isCandidates
+        editorLabel.isHidden = !isEditor
+        editorSave.isHidden = !isEditor
+        editorCancel.isHidden = !isEditor
+        editorPanel.isHidden = !isEditor
+        setNeedsLayout()
+    }
+
+    private func rebuildCandidates(_ items: [String]) {
+        candidateButtons.forEach { $0.removeFromSuperview() }
+        candidateButtons = items.enumerated().map { (i, text) in
+            let b = UIButton(type: .system)
+            b.setTitle(text, for: .normal)
+            b.titleLabel?.font = .rounded(20, i == 0 ? .bold : .regular)
+            b.setTitleColor(i == 0 ? style.theme.accent : style.theme.keyText, for: .normal)
+            if style.theme.accent == style.theme.key { b.setTitleColor(style.theme.keyText, for: .normal) }
+            b.tag = i
+            b.addAction(UIAction { [weak self] _ in self?.onCandidate?(i) }, for: .touchUpInside)
+            candidateScroll.addSubview(b)
+            return b
+        }
+        candidateScroll.contentOffset = .zero
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let w = bounds.width, h = bounds.height
+        toolbar.frame = CGRect(x: 4, y: 0, width: w - 8, height: h)
+        separator.frame = CGRect(x: 0, y: h - 0.5, width: w, height: 0.5)
+
+        let hasComposition = !compositionLabel.isHidden
+        let top: CGFloat = hasComposition ? 15 : 0
+        compositionLabel.frame = CGRect(x: 12, y: 1, width: w - 60, height: 14)
+        let trailingW: CGFloat = trailingButton.isHidden ? 0 : 44
+        trailingButton.frame = CGRect(x: w - 44, y: 0, width: 44, height: h)
+        candidateScroll.frame = CGRect(x: 0, y: top, width: w - trailingW, height: h - top)
+        var x: CGFloat = 6
+        for b in candidateButtons {
+            let textW = ((b.title(for: .normal) ?? "") as NSString)
+                .size(withAttributes: [.font: b.titleLabel?.font ?? UIFont.systemFont(ofSize: 20)]).width
+            let bw = max(40, ceil(textW) + 22)
+            b.frame = CGRect(x: x, y: 0, width: bw, height: candidateScroll.bounds.height)
+            x += bw
+        }
+        candidateScroll.contentSize = CGSize(width: x + 6, height: candidateScroll.bounds.height)
+
+        editorLabel.frame = CGRect(x: 12, y: 0, width: w - 206, height: h)
+        editorPanel.frame = CGRect(x: w - 194, y: 0, width: 58, height: h)
+        editorCancel.frame = CGRect(x: w - 136, y: 0, width: 64, height: h)
+        editorSave.frame = CGRect(x: w - 70, y: 0, width: 64, height: h)
+    }
+
+    private func applyStyle() {
+        let t = style.theme
+        let tint = t.isDark ? t.keyText : t.specialText
+        for b in toolbarButtons {
+            b.tintColor = tint
+            b.setTitleColor(tint, for: .normal)
+        }
+        compositionLabel.textColor = t.keyText.withAlphaComponent(0.75)
+        trailingButton.tintColor = tint
+        editorLabel.textColor = t.keyText
+        editorCancel.tintColor = tint
+        editorPanel.tintColor = tint
+        editorSave.tintColor = t.isDark ? t.accent : t.specialText
+        separator.backgroundColor = t.shadow.withAlphaComponent(0.4)
+        if case .candidates = content { show(content) }
+    }
+}
+
+/// 面板最下面那條：返回鍵盤、分頁、刪除
+final class PanelBottomBar: UIView {
+    var onBack: (() -> Void)?
+    var onBackspace: (() -> Void)?
+    var onTab: ((Int) -> Void)?
+    var style: KeyboardStyle {
+        didSet { applyStyle() }
+    }
+    var selectedTab = 0 {
+        didSet { applyStyle() }
+    }
+    var showsBackspace = true {
+        didSet { deleteButton.isHidden = !showsBackspace }
+    }
+
+    private let backButton = UIButton(type: .system)
+    private let deleteButton = UIButton(type: .system)
+    private let scroll = UIScrollView()
+    private var tabButtons: [UIButton] = []
+    private var repeatTimer: Timer?
+
+    init(style: KeyboardStyle, backTitle: String = "ABC") {
+        self.style = style
+        super.init(frame: .zero)
+        backButton.setTitle(backTitle, for: .normal)
+        backButton.titleLabel?.font = .rounded(15, .bold)
+        backButton.layer.cornerRadius = 8
+        backButton.addAction(UIAction { [weak self] _ in self?.onBack?() }, for: .touchUpInside)
+        addSubview(backButton)
+
+        deleteButton.setImage(UIImage(systemName: "delete.left"), for: .normal)
+        deleteButton.layer.cornerRadius = 8
+        deleteButton.addAction(UIAction { [weak self] _ in self?.startDeleting() }, for: .touchDown)
+        for event: UIControl.Event in [.touchUpInside, .touchUpOutside, .touchCancel] {
+            deleteButton.addAction(UIAction { [weak self] _ in self?.stopDeleting() }, for: event)
+        }
+        addSubview(deleteButton)
+
+        scroll.showsHorizontalScrollIndicator = false
+        addSubview(scroll)
+        applyStyle()
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func setTabs(_ titles: [String]) {
+        tabButtons.forEach { $0.removeFromSuperview() }
+        tabButtons = titles.enumerated().map { (i, title) in
+            let b = UIButton(type: .system)
+            b.setTitle(title, for: .normal)
+            b.titleLabel?.font = .rounded(title.count <= 2 ? 19 : 14, .semibold)
+            b.layer.cornerRadius = 8
+            b.addAction(UIAction { [weak self] _ in
+                self?.selectedTab = i
+                self?.onTab?(i)
+            }, for: .touchUpInside)
+            scroll.addSubview(b)
+            return b
+        }
+        applyStyle()
+        setNeedsLayout()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let h = bounds.height
+        backButton.frame = CGRect(x: 4, y: 3, width: 56, height: h - 6)
+        deleteButton.frame = CGRect(x: bounds.width - 56, y: 3, width: 52, height: h - 6)
+        let right = showsBackspace ? deleteButton.frame.minX - 4 : bounds.width - 4
+        scroll.frame = CGRect(x: 64, y: 0, width: right - 64, height: h)
+        var x: CGFloat = 0
+        for b in tabButtons {
+            let title = b.title(for: .normal) ?? ""
+            let w = max(40, (title as NSString).size(withAttributes: [.font: b.titleLabel?.font ?? UIFont.systemFont(ofSize: 15)]).width + 20)
+            b.frame = CGRect(x: x, y: 3, width: w, height: h - 6)
+            x += w + 2
+        }
+        scroll.contentSize = CGSize(width: x, height: h)
+    }
+
+    private func applyStyle() {
+        let t = style.theme
+        backButton.backgroundColor = t.specialKey.withAlphaComponent(style.keyAlpha)
+        backButton.setTitleColor(t.specialText, for: .normal)
+        deleteButton.backgroundColor = t.specialKey.withAlphaComponent(style.keyAlpha)
+        deleteButton.tintColor = t.specialText
+        for (i, b) in tabButtons.enumerated() {
+            let selected = i == selectedTab
+            b.backgroundColor = selected ? t.key.withAlphaComponent(style.keyAlpha) : .clear
+            b.setTitleColor(selected ? t.keyText : t.keyText.withAlphaComponent(0.6), for: .normal)
+        }
+    }
+
+    private func startDeleting() {
+        onBackspace?()
+        repeatTimer?.invalidate()
+        repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
+            self?.repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
+                self?.onBackspace?()
+            }
+        }
+    }
+
+    private func stopDeleting() {
+        repeatTimer?.invalidate()
+        repeatTimer = nil
+    }
+}
+
+/// 可以捲動的方塊格子（表情符號、顏文字、候選字都用這個）
+final class ChipGridView: UIView, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
+    enum Item {
+        case text(String)
+        case image(UIImage)
+        case add
+    }
+
+    enum CellStyle { case square, chip }
+
+    var items: [Item] = [] {
+        didSet { collectionView.reloadData() }
+    }
+    var cellStyle: CellStyle = .square {
+        didSet { collectionView.collectionViewLayout.invalidateLayout() }
+    }
+    var isEditingItems = false {
+        didSet { collectionView.reloadData() }
+    }
+    var canDelete: (Int) -> Bool = { _ in false }
+    var onSelect: ((Int) -> Void)?
+    var onDelete: ((Int) -> Void)?
+    var onLongPress: ((Int) -> Void)?
+    var style: KeyboardStyle {
+        didSet { collectionView.reloadData() }
+    }
+
+    private let collectionView: UICollectionView
+
+    init(style: KeyboardStyle) {
+        self.style = style
+        let layout = UICollectionViewFlowLayout()
+        layout.minimumInteritemSpacing = 6
+        layout.minimumLineSpacing = 6
+        layout.sectionInset = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        super.init(frame: .zero)
+        collectionView.backgroundColor = .clear
+        collectionView.dataSource = self
+        collectionView.delegate = self
+        collectionView.alwaysBounceVertical = true
+        collectionView.register(ChipCell.self, forCellWithReuseIdentifier: "chip")
+        let lp = UILongPressGestureRecognizer(target: self, action: #selector(longPressed(_:)))
+        collectionView.addGestureRecognizer(lp)
+        addSubview(collectionView)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if collectionView.frame != bounds {
+            collectionView.frame = bounds
+            collectionView.collectionViewLayout.invalidateLayout()
+        }
+    }
+
+    func scrollToTop() {
+        collectionView.setContentOffset(.zero, animated: false)
+    }
+
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        items.count
+    }
+
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "chip", for: indexPath) as! ChipCell
+        let i = indexPath.item
+        cell.configure(items[i], cellStyle: cellStyle, style: style, showDelete: isEditingItems && canDelete(i))
+        return cell
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        collectionView.deselectItem(at: indexPath, animated: false)
+        let i = indexPath.item
+        if isEditingItems && canDelete(i) {
+            onDelete?(i)
+        } else {
+            onSelect?(i)
+        }
+    }
+
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout,
+                        sizeForItemAt indexPath: IndexPath) -> CGSize {
+        switch items[indexPath.item] {
+        case .image:
+            return CGSize(width: 70, height: 70)
+        case .add:
+            return cellStyle == .square ? CGSize(width: 42, height: 42) : CGSize(width: 64, height: 40)
+        case .text(let s):
+            if cellStyle == .square { return CGSize(width: 42, height: 42) }
+            let w = (s as NSString).size(withAttributes: [.font: ChipCell.chipFont]).width
+            return CGSize(width: min(max(44, ceil(w) + 24), max(44, collectionView.bounds.width - 16)), height: 40)
+        }
+    }
+
+    @objc private func longPressed(_ g: UILongPressGestureRecognizer) {
+        guard g.state == .began, let ip = collectionView.indexPathForItem(at: g.location(in: collectionView)) else { return }
+        onLongPress?(ip.item)
+    }
+}
+
+final class ChipCell: UICollectionViewCell {
+    static let chipFont = UIFont.systemFont(ofSize: 17)
+
+    private let label = UILabel()
+    private let imageView = UIImageView()
+    private let badge = UILabel()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        contentView.layer.cornerRadius = 10
+        contentView.clipsToBounds = true
+        label.textAlignment = .center
+        label.adjustsFontSizeToFitWidth = true
+        label.minimumScaleFactor = 0.6
+        contentView.addSubview(label)
+        imageView.contentMode = .scaleAspectFit
+        contentView.addSubview(imageView)
+        badge.text = "✕"
+        badge.font = .systemFont(ofSize: 11, weight: .bold)
+        badge.textColor = .white
+        badge.textAlignment = .center
+        badge.backgroundColor = UIColor(hex: 0xFF5A6E)
+        badge.layer.cornerRadius = 9
+        badge.clipsToBounds = true
+        addSubview(badge)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func configure(_ item: ChipGridView.Item, cellStyle: ChipGridView.CellStyle, style: KeyboardStyle, showDelete: Bool) {
+        let t = style.theme
+        label.textColor = t.keyText
+        label.isHidden = false
+        imageView.isHidden = true
+        switch item {
+        case .text(let s):
+            label.text = s
+            label.font = cellStyle == .square ? .systemFont(ofSize: 28) : Self.chipFont
+            contentView.backgroundColor = cellStyle == .square ? .clear : t.key.withAlphaComponent(style.keyAlpha * 0.9)
+        case .image(let img):
+            label.isHidden = true
+            imageView.isHidden = false
+            imageView.image = img
+            contentView.backgroundColor = t.key.withAlphaComponent(style.keyAlpha * 0.6)
+        case .add:
+            label.text = "＋"
+            label.font = .rounded(22, .bold)
+            label.textColor = t.specialText
+            contentView.backgroundColor = t.specialKey.withAlphaComponent(style.keyAlpha)
+        }
+        badge.isHidden = !showDelete
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        label.frame = contentView.bounds.insetBy(dx: 4, dy: 0)
+        imageView.frame = contentView.bounds.insetBy(dx: 4, dy: 4)
+        badge.frame = CGRect(x: bounds.width - 16, y: -2, width: 18, height: 18)
+    }
+
+    override var isHighlighted: Bool {
+        didSet { contentView.alpha = isHighlighted ? 0.5 : 1 }
+    }
+}

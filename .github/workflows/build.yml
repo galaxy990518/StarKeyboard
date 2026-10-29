@@ -1,0 +1,67 @@
+name: 打包 iOS 鍵盤
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 下載並轉換注音字典（小麥注音，MIT 授權）
+        run: |
+          git clone --depth 1 https://github.com/openvanilla/McBopomofo.git "$RUNNER_TEMP/McBopomofo"
+          make -C "$RUNNER_TEMP/McBopomofo/Source/Data" data.txt
+          python3 tools/build_dict.py "$RUNNER_TEMP/McBopomofo/Source/Data/data.txt" Keyboard/Resources/zhuyin.sqlite
+          cp "$RUNNER_TEMP/McBopomofo/LICENSE.txt" Keyboard/Resources/McBopomofo-LICENSE.txt
+
+      - name: 核心邏輯測試（注音組字、選字、剪貼簿）
+        run: swift test --package-path Core
+
+      - name: 產生 Xcode 專案
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: 編譯
+        run: |
+          xcodebuild -project StarKeyboard.xcodeproj -scheme StarKeyboard -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build > build.log 2>&1 || { grep -E "error:" build.log | sort -u | head -60; tail -40 build.log; exit 1; }
+          grep -E "warning:" build.log | grep -v "/build/" | sort -u | head -40 || true
+
+      - name: 包成 IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/StarKeyboard.app Payload/
+          ls -la Payload/StarKeyboard.app/PlugIns
+          du -sh Payload/StarKeyboard.app
+          zip -qry StarKeyboard.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StarKeyboard-ipa
+          path: StarKeyboard.ipa
+
+      - name: 發佈到 Releases（方便下載）
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: 星星鍵盤 第 ${{ github.run_number }} 版
+          body: 下載 StarKeyboard.ipa，用 Sideloadly 裝到 iPhone。
+          files: StarKeyboard.ipa
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
