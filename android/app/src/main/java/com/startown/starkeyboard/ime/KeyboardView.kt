@@ -151,6 +151,11 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             // 線條造型（貓咪、熊熊…）有自己的形狀，空隙留小一點，圖案才夠大
             val art = style.shape.art != null
             val outer = RectF(k.frame).apply { inset((if (art) 1.2f else 3f) * dp * style.gapScale, (if (art) 1.8f else 4.5f) * dp * style.gapScale) }
+            // 「造型大小」：造型可以畫得比按鍵大一點（寬的空白鍵不放大，才不會蓋到上一排）
+            if (art && outer.width() < outer.height() * 1.65f) {
+                val grow = style.shapeScale - 1f
+                outer.inset(-outer.width() * grow / 2, -outer.height() * grow / 2)
+            }
             if (outer.width() < 4 || outer.height() < 4) continue
             k.path = style.shape.path(outer, dp)
             k.detail = style.shape.detailPath(outer, dp)
@@ -239,11 +244,13 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         textPaint.typeface = KeyFonts.get(context, style.fontId)
             ?: if (k.spec.kind == KeyKind.NORMAL) Typeface.DEFAULT else Typeface.DEFAULT_BOLD
         var size = k.spec.fontSize * dp * style.fontScale
+        val art = style.shape.art != null
         if (style.shape.isSoftShape) {
-            size = minOf(size, k.body.height() * 0.85f)
+            // 線條造型的字可以比身體框大一點，「字的大小」才調得動
+            size = minOf(size, k.body.height() * (if (art) 1.4f else 0.85f))
         }
         textPaint.textSize = size
-        val maxW = k.body.width() - 4 * dp
+        val maxW = if (art) k.body.width() * 1.3f else k.body.width() - 4 * dp
         val w = textPaint.measureText(k.spec.label)
         if (w > maxW && w > 0) {
             size *= maxW / w

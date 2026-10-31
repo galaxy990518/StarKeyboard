@@ -535,6 +535,8 @@ struct KeyboardStyle {
     var fontID = KeyFont.system.rawValue
     var keyEffect = KeyEffect.none.rawValue
     var finish = KeyFinish.flat
+    /// 線條造型（貓咪、熊熊…）放大幾倍；可以超出按鍵一點點，看起來比較大顆
+    var shapeScale: CGFloat = 1.15
 }
 
 /// 按鍵質感：平面、胖胖（圓滾滾有立體感、按下去會壓扁）、玻璃（半透明、亮亮的邊）
@@ -872,6 +874,11 @@ final class KeyboardSettings {
     var gapScale: CGFloat {
         get { CGFloat(double("gapScale", 1)) }
         set { d.set(Double(newValue), forKey: "gapScale") }
+    }
+    /// 貓咪、熊熊這類造型的大小（1 = 剛好放進按鍵，大於 1 會超出一點）
+    var shapeScale: CGFloat {
+        get { CGFloat(double("shapeScale", 1.15)) }
+        set { d.set(Double(newValue), forKey: "shapeScale") }
     }
     // 新版提醒
     var lastUpdateCheck: Double {

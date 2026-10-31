@@ -1102,6 +1102,7 @@
   if (darkBox) darkBox.addEventListener('change', function () { CUSTOM.dark = this.checked; setTheme('custom'); });
   $('sim-height').addEventListener('input', function () { phone.style.setProperty('--row-h', (46 * this.value) + 'px'); });
   $('sim-fontsize').addEventListener('input', function () { phone.style.setProperty('--fs', this.value); });
+  $('sim-shapesize').addEventListener('input', function () { phone.style.setProperty('--ss', this.value); });
   $('sim-gap').addEventListener('input', function () { phone.style.setProperty('--gap', this.value); });
   $('sim-sound').addEventListener('change', function () { S.sound = this.checked; if (S.sound) sound(); });
   var photoUrl = null;

@@ -61,16 +61,24 @@ final class KeyButton: UIView {
         content.center = CGPoint(x: bounds.midX, y: bounds.midY)
         // 線條造型（貓咪、熊熊…）有自己的形狀，空隙留小一點，圖案才夠大
         let art = style.shape.art != nil
-        let outer = bounds.insetBy(dx: (art ? 1.2 : 3) * style.gapScale, dy: (art ? 1.8 : 4.5) * style.gapScale)
+        var outer = bounds.insetBy(dx: (art ? 1.2 : 3) * style.gapScale, dy: (art ? 1.8 : 4.5) * style.gapScale)
         guard outer.width > 4, outer.height > 4 else { return }
+        // 「造型大小」：造型可以畫得比按鍵大一點（寬的空白鍵不放大，才不會蓋到上一排）
+        if art && outer.width < outer.height * 1.65 {
+            let grow = style.shapeScale - 1
+            outer = outer.insetBy(dx: -outer.width * grow / 2, dy: -outer.height * grow / 2)
+        }
         let path = style.shape.path(in: outer)
         let finish = style.finish
         var shift = CGAffineTransform(translationX: 0, y: finish == .puffy ? 3 : 1.5)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         bodyLayer.path = path
-        cushionLayer.frame = bounds
-        cushionMask.path = path
+        // 漸層的範圍比按鍵大，放大的造型才整個都有漸層
+        let big = bounds.insetBy(dx: -bounds.width / 2, dy: -bounds.height / 2)
+        cushionLayer.frame = big
+        var toBig = CGAffineTransform(translationX: -big.minX, y: -big.minY)
+        cushionMask.path = path.copy(using: &toBig)
         cushionLayer.isHidden = !style.shape.isSoftShape && finish == .flat
         detailLayer.path = style.shape.detailPath(in: outer)
         detailLayer.opacity = Float(style.shape.detailOpacity(in: outer))
@@ -97,14 +105,17 @@ final class KeyButton: UIView {
         let textRect = body
         if style.shape.isSoftShape {
             // Keep the glyph inside the smaller body when keyboard height is reduced.
-            label.font = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, textRect.height * 0.85),
+            // 線條造型的字可以比身體框大一點，「字的大小」才調得動
+            let cap = textRect.height * (art ? 1.4 : 0.85)
+            label.font = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, cap),
                                        weight: spec.kind == .normal ? .regular : .semibold)
             if case .symbol(let name) = spec.face {
                 icon.image = UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(
-                    pointSize: min(18 * style.fontScale, textRect.height * 0.85), weight: .medium))
+                    pointSize: min(18 * style.fontScale, cap), weight: .medium))
             }
         }
-        label.frame = textRect.insetBy(dx: 2, dy: 0)
+        // 字的框左右放寬一點，字放大時才不會被縮小
+        label.frame = art ? textRect.insetBy(dx: -textRect.width * 0.15, dy: -textRect.height * 0.2) : textRect.insetBy(dx: 2, dy: 0)
         icon.frame = textRect
     }
 

@@ -125,12 +125,18 @@ final class SettingsPanelView: UIView {
             self?.onChange?()
         })
         stack.addArrangedSubview(note("間距越小，按鍵越大、越好按。"))
+        stack.addArrangedSubview(sliderRow("造型大小", value: Float(settings.shapeScale), range: 0.9...1.6) { [weak self] v in
+            self?.settings.shapeScale = CGFloat(v)
+            self?.onChange?()
+        })
+        stack.addArrangedSubview(note("貓咪、熊熊、肉球這類造型的大小，往右拉會變大顆（可以超出按鍵一點點）。"))
         stack.addArrangedSubview(buttonRow([
             ("大小恢復預設", { [weak self] in
                 guard let self = self else { return }
                 self.settings.heightScale = 1
                 self.settings.fontScale = 1
                 self.settings.gapScale = 1
+                self.settings.shapeScale = 1.15
                 self.onChange?()
                 self.rebuild()
             }),

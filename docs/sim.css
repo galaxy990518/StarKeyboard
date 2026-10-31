@@ -201,3 +201,6 @@
 /* 線條造型：保持比例置中（docs/sim-shapes.js 的 aspect = 高÷寬） */
 .sim-key .face.artface { container-type: size; inset: calc(1.8px * var(--gap)) calc(1.2px * var(--gap)); }
 .sim-key .artbox { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(100cqw, calc(100cqh / var(--a, 1))); height: min(100cqh, calc(min(100cqw, 100cqh / var(--a, 1)) * var(--a, 1) * 1.3)); }
+/* 造型大小：貓咪、熊熊這類可以畫得比按鍵大一點 */
+.sim-key .artbox { transform: translate(-50%, -50%) scale(var(--ss, 1.15)); }
+.sim-key.down .artbox { transform: translate(-50%, -50%) scale(calc(var(--ss, 1.15) * 0.92)); }

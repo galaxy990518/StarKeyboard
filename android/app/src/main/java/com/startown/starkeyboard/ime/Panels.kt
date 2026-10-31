@@ -529,8 +529,10 @@ class SettingsPanel(
         slider("字的大小", settings.fontScale, 0.8f, 1.4f) { settings.fontScale = it }
         slider("按鍵間距", settings.gapScale, 0.3f, 1.6f) { settings.gapScale = it }
         note("間距越小，按鍵越大、越好按。")
+        slider("造型大小", settings.shapeScale, 0.9f, 1.6f) { settings.shapeScale = it }
+        note("貓咪、熊熊、肉球這類造型的大小，往右拉會變大顆（可以超出按鍵一點點）。")
         button("大小恢復預設") {
-            settings.heightScale = 1f; settings.fontScale = 1f; settings.gapScale = 1f; onChange()
+            settings.heightScale = 1f; settings.fontScale = 1f; settings.gapScale = 1f; settings.shapeScale = 1.15f; onChange()
         }
 
         header("背景照片")

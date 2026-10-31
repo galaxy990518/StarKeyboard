@@ -375,6 +375,8 @@ data class KeyboardStyle(
     val fontId: String = "system",
     val keyEffect: String = "none",
     val finish: KeyFinish = KeyFinish.FLAT,
+    /** 線條造型（貓咪、熊熊…）放大幾倍；可以超出按鍵一點點，看起來比較大顆 */
+    val shapeScale: Float = 1.15f,
 )
 
 /** 按鍵質感：平面、胖胖（圓滾滾有立體感、按下去會壓扁）、玻璃（半透明、亮亮的邊） */
@@ -573,6 +575,10 @@ class KeyboardSettings(context: Context) {
     var gapScale: Float
         get() = p.getFloat("gapScale", 1f)
         set(v) = p.edit().putFloat("gapScale", v).apply()
+    /** 貓咪、熊熊這類造型的大小（1 = 剛好放進按鍵，大於 1 會超出一點） */
+    var shapeScale: Float
+        get() = p.getFloat("shapeScale", 1.15f)
+        set(v) = p.edit().putFloat("shapeScale", v).apply()
     var keyEffect: String
         get() = p.getString("keyEffect", KeyEffect.NONE.id) ?: KeyEffect.NONE.id
         set(v) = p.edit().putString("keyEffect", v).apply()
@@ -670,5 +676,5 @@ class KeyboardSettings(context: Context) {
         get() = p.getString("fontId", KeyFont.SYSTEM.id) ?: KeyFont.SYSTEM.id
         set(v) = p.edit().putString("fontId", v).apply()
 
-    val style get() = KeyboardStyle(theme, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish)
+    val style get() = KeyboardStyle(theme, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish, shapeScale)
 }
