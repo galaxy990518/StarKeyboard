@@ -148,7 +148,9 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
 
     private fun rebuildPaths() {
         for (k in keys) {
-            val outer = RectF(k.frame).apply { inset(3 * dp * style.gapScale, 4.5f * dp * style.gapScale) }
+            // 線條造型（貓咪、熊熊…）有自己的形狀，空隙留小一點，圖案才夠大
+            val art = style.shape.art != null
+            val outer = RectF(k.frame).apply { inset((if (art) 1.2f else 3f) * dp * style.gapScale, (if (art) 1.8f else 4.5f) * dp * style.gapScale) }
             if (outer.width() < 4 || outer.height() < 4) continue
             k.path = style.shape.path(outer, dp)
             k.detail = style.shape.detailPath(outer, dp)

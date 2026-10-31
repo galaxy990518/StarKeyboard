@@ -59,7 +59,9 @@ final class KeyButton: UIView {
         super.layoutSubviews()
         content.bounds = bounds
         content.center = CGPoint(x: bounds.midX, y: bounds.midY)
-        let outer = bounds.insetBy(dx: 3 * style.gapScale, dy: 4.5 * style.gapScale)
+        // 線條造型（貓咪、熊熊…）有自己的形狀，空隙留小一點，圖案才夠大
+        let art = style.shape.art != nil
+        let outer = bounds.insetBy(dx: (art ? 1.2 : 3) * style.gapScale, dy: (art ? 1.8 : 4.5) * style.gapScale)
         guard outer.width > 4, outer.height > 4 else { return }
         let path = style.shape.path(in: outer)
         let finish = style.finish
