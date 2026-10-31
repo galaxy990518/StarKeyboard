@@ -46,13 +46,23 @@ function ellipse(cx, cy, rx, ry, deg) {
   return { start: P(cx + rx, cy), closed: true, segs: quarters.map(q => ({ t: 'C', c1: P(...q[0]), c2: P(...q[1]), p: P(...q[2]) })) };
 }
 
-function star(cx, cy, ro, ri, n, deg) {
+// round：每個角磨圓的程度（0 = 尖角，0.5 = 很圓）
+function star(cx, cy, ro, ri, n, deg, round) {
   const pts = [];
   for (let k = 0; k < n * 2; k++) {
     const a = (deg + k * 180 / n) * Math.PI / 180, r = k % 2 ? ri : ro;
     pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
   }
-  return { start: pts[0], closed: true, segs: pts.slice(1).map(p => ({ t: 'L', p })) };
+  if (!round) return { start: pts[0], closed: true, segs: pts.slice(1).map(p => ({ t: 'L', p })) };
+  const m = pts.length, mix = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+  const enter = pts.map((v, k) => mix(v, pts[(k - 1 + m) % m], round));
+  const leave = pts.map((v, k) => mix(v, pts[(k + 1) % m], round));
+  const segs = [];
+  for (let k = 1; k <= m; k++) {
+    const v = k % m;
+    segs.push({ t: 'L', p: enter[v] }, { t: 'Q', c1: pts[v], p: leave[v] });
+  }
+  return { start: leave[0], closed: true, segs };
 }
 
 function parse(d) {
@@ -69,7 +79,7 @@ function parse(d) {
     else if (c === 'Q') sub.segs.push({ t: 'Q', c1: [num(), num()], p: [num(), num()] });
     else if (c === 'Z') sub.closed = true;
     else if (c === 'E') { const a = [num(), num(), num(), num()]; subs.push(ellipse(...a, hasNum() ? num() : 0)); }
-    else if (c === 'S') { const a = [num(), num(), num(), num(), num()]; subs.push(star(...a, hasNum() ? num() : 0)); }
+    else if (c === 'S') { const a = [num(), num(), num(), num(), num()]; const deg = hasNum() ? num() : 0; subs.push(star(...a, deg, hasNum() ? num() : 0)); }
     else throw new Error('不支援的指令 ' + c + '：' + d);
   }
   for (const s of subs) if (area(s) < 0) reverse(s);
@@ -167,8 +177,9 @@ const swift = [
   '',
   '    /// 按鍵裡實際畫圖案的方框：保持比例、置中',
   '    func fit(_ r: CGRect) -> CGRect {',
-  '        var w = r.width, h = r.width * aspect',
-  '        if h > r.height { h = r.height; w = h / aspect }',
+  '        // 最多比設計的再高 18%（按鍵很瘦時圖案才不會太小），還是圓圓的',
+  '        var w = r.width, h = min(r.height, r.width * aspect * 1.18)',
+  '        if r.width * aspect > r.height { h = r.height; w = h / aspect }',
   '        return CGRect(x: r.midX - w / 2, y: r.midY - h / 2, width: w, height: h)',
   '    }',
   '    func path(in r: CGRect) -> CGPath { Self.build(path, in: fit(r)) }',
@@ -239,8 +250,9 @@ const kt = [
   ') {',
   '    /** 按鍵裡實際畫圖案的方框：保持比例、置中 */',
   '    fun fit(r: RectF): RectF {',
-  '        var w = r.width(); var h = w * aspect',
-  '        if (h > r.height()) { h = r.height(); w = h / aspect }',
+  '        // 最多比設計的再高 18%（按鍵很瘦時圖案才不會太小），還是圓圓的',
+  '        var w = r.width(); var h = minOf(r.height(), w * aspect * 1.18f)',
+  '        if (r.width() * aspect > r.height()) { h = r.height(); w = h / aspect }',
   '        return RectF(r.centerX() - w / 2, r.centerY() - h / 2, r.centerX() + w / 2, r.centerY() + h / 2)',
   '    }',
   '    fun path(r: RectF): Path = build(path, fit(r))',

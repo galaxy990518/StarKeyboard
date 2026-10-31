@@ -200,4 +200,4 @@
 .sim-hue::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0005; }
 /* 線條造型：保持比例置中（docs/sim-shapes.js 的 aspect = 高÷寬） */
 .sim-key .face.artface { container-type: size; }
-.sim-key .artbox { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(100cqw, calc(100cqh / var(--a, 1))); aspect-ratio: 1 / var(--a, 1); }
+.sim-key .artbox { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(100cqw, calc(100cqh / var(--a, 1))); height: min(100cqh, calc(min(100cqw, 100cqh / var(--a, 1)) * var(--a, 1) * 1.18)); }
