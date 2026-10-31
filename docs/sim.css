@@ -196,3 +196,5 @@
 .sim-phone[data-finish="puffy"] .sim-key svg.shape use.shade { --key: url(#sim-shade-puffy); display: inline; }
 .sim-phone[data-finish="glass"] .sim-key svg.shape use.shade { --key: url(#sim-shade-glass); display: inline; }
 @media (max-width: 480px) { .sim-chat { height: 112px; } }
+.sim-hue { background: linear-gradient(90deg,#f66,#fc6,#6d8,#6cf,#a8f,#f6a); border-radius: 999px; height: 8px; -webkit-appearance: none; appearance: none; }
+.sim-hue::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0005; }

@@ -71,6 +71,7 @@ final class KeyButton: UIView {
         cushionMask.path = path
         cushionLayer.isHidden = !style.shape.isSoftShape && finish == .flat
         detailLayer.path = style.shape.detailPath(in: outer)
+        detailLayer.opacity = Float(style.shape.detailOpacity(in: outer))
         shadowLayer.path = path.copy(using: &shift)
         let body = style.shape.bodyRect(in: outer)
         if finish == .puffy {
@@ -162,7 +163,7 @@ final class KeyButton: UIView {
             cushionLayer.colors = [UIColor.white.withAlphaComponent(t.isDark ? 0.22 : 0.45).cgColor,
                                    UIColor.white.withAlphaComponent(0.04).cgColor, UIColor.white.withAlphaComponent(t.isDark ? 0.08 : 0.2).cgColor]
         }
-        detailLayer.fillColor = style.shape.detailColor(theme: t).withAlphaComponent(style.keyAlpha * (style.shape == .pudding || style.shape == .duck ? 0.85 : 0.4)).cgColor
+        detailLayer.fillColor = style.shape.detailColor(theme: t).withAlphaComponent(style.keyAlpha).cgColor
         glossLayer.fillColor = UIColor.white.withAlphaComponent(style.finish == .puffy ? (t.isDark ? 0.3 : 0.75) : (t.isDark ? 0.18 : 0.55)).cgColor
         CATransaction.commit()
         label.textColor = text

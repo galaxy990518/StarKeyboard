@@ -44,6 +44,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         var detail: Path = Path()
         var shading: LinearGradient? = null
         var body: RectF = RectF()
+        var detailAlpha = 0.4f
         var scale = 1f
         var pressed = false
         var animator: ValueAnimator? = null
@@ -162,6 +163,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 shadeColors, floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP) else null
             k.shadow = Path(k.path).apply { offset(0f, (if (style.finish == KeyFinish.PUFFY) 3f else 1.5f) * dp) }
             k.body = style.shape.bodyRect(outer, dp)
+            k.detailAlpha = style.shape.detailOpacity(outer)
         }
     }
 
@@ -216,7 +218,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 canvas.drawPath(k.path, fillPaint)
                 fillPaint.shader = null
             }
-            fillPaint.color = style.shape.detailColor(t).withAlpha(style.keyAlpha * (if (style.shape == KeyShape.PUDDING || style.shape == KeyShape.DUCK) 0.85f else 0.4f))
+            fillPaint.color = style.shape.detailColor(t).withAlpha(style.keyAlpha * k.detailAlpha)
             canvas.drawPath(k.detail, fillPaint)
             if (finish == KeyFinish.GLASS) {
                 rimPaint.strokeWidth = dp

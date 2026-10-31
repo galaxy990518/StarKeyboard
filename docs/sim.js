@@ -16,6 +16,16 @@
     lavender: { name: '薰衣草', top: '#ece4ff', bottom: '#dcd0ff', key: '#ffffff', text: '#5b4b8a', special: '#c7b8f5', specialText: '#4a3b78', accent: '#8d74e8', accentText: '#ffffff', shadow: '#b9a9ec' },
     lemon: { name: '檸檬小雞', top: '#fff6cc', bottom: '#ffec9e', key: '#ffffff', text: '#7a5b12', special: '#ffdd6b', specialText: '#6b4e0a', accent: '#ffa928', accentText: '#ffffff', shadow: '#e9cb6a' },
     night: { name: '星空夜', top: '#1e2245', bottom: '#2b2f63', key: '#3a3f7a', text: '#f3f0ff', special: '#2a2e5e', specialText: '#cfcbff', accent: '#ffd65c', accentText: '#2b2f63', shadow: '#14173a', dark: true },
+    sakura: { name: '櫻花', top: '#fde8ef', bottom: '#f9d5e2', key: '#ffffff', text: '#9b4d6b', special: '#f6c1d4', specialText: '#8a3a5a', accent: '#f08bb0', accentText: '#ffffff', shadow: '#e8b0c4' },
+    peach: { name: '蜜桃', top: '#ffe9dc', bottom: '#ffd8c4', key: '#ffffff', text: '#8a5040', special: '#ffc8ad', specialText: '#7a4030', accent: '#ff9a76', accentText: '#ffffff', shadow: '#ecb59c' },
+    cream: { name: '奶油', top: '#fffaf0', bottom: '#fff1d9', key: '#ffffff', text: '#7a6340', special: '#f7e2b8', specialText: '#6b5430', accent: '#f2b94b', accentText: '#ffffff', shadow: '#e6d2a6' },
+    matcha: { name: '抹茶', top: '#e9f3dc', bottom: '#d8eac4', key: '#fffef8', text: '#4a6332', special: '#c6dfa9', specialText: '#3e5629', accent: '#8cbf5a', accentText: '#ffffff', shadow: '#b4cf98' },
+    sky: { name: '天空', top: '#e2f1ff', bottom: '#cfe6ff', key: '#ffffff', text: '#3d5f8a', special: '#b9d8fb', specialText: '#2f4f78', accent: '#5aa9f0', accentText: '#ffffff', shadow: '#a9c8ea' },
+    ocean: { name: '海洋', top: '#d8f0fb', bottom: '#bfe4f6', key: '#f7fdff', text: '#2d5f7a', special: '#a6d8ef', specialText: '#245570', accent: '#3fb2d8', accentText: '#ffffff', shadow: '#96c8de' },
+    grape: { name: '葡萄', top: '#efe2f7', bottom: '#e2cdf2', key: '#ffffff', text: '#6a3f86', special: '#d6b8ec', specialText: '#5a2f78', accent: '#a86ad6', accentText: '#ffffff', shadow: '#c8a8e0' },
+    aurora: { name: '夢幻極光', top: '#ffe7ef', bottom: '#e5e0ff', key: '#ffffff', text: '#5d4f8a', special: '#e3d6ff', specialText: '#4a3b78', accent: '#ff9ec4', accentText: '#ffffff', shadow: '#cbbfeb' },
+    cocoa: { name: '可可', top: '#3a2a26', bottom: '#2e211e', key: '#5a443d', text: '#f8ebe2', special: '#46342f', specialText: '#e8d5c8', accent: '#f0a77a', accentText: '#3a2a26', shadow: '#1f1513', dark: true },
+    neon: { name: '電玩霓虹', top: '#1c1640', bottom: '#251c52', key: '#362a73', text: '#f0eaff', special: '#2a2160', specialText: '#cfc4ff', accent: '#ff7ad9', accentText: '#1c1640', shadow: '#120d2e', dark: true },
     light: { name: '經典淺色', top: '#d3d6dc', bottom: '#cdd0d6', key: '#ffffff', text: '#000000', special: '#abb0ba', specialText: '#000000', accent: '#2f7bf6', accentText: '#ffffff', shadow: '#8e9196' },
     dark: { name: '經典深色', top: '#2b2b2d', bottom: '#232325', key: '#6b6b6e', text: '#ffffff', special: '#474749', specialText: '#ffffff', accent: '#2f7bf6', accentText: '#ffffff', shadow: '#111111', dark: true }
   };
@@ -26,6 +36,39 @@
     ['mochi', '麻糬', 51, 0, '新'], ['bubble', '泡泡', 50, 0, '新']
   ];
   var DETAIL = { pudding: ['#a86635', '#d7a15f'], flame: ['#ed914a', '#ffd46b'], droplet: ['#4aadd5', '#b8efff'], duck: ['#d78a32', '#ffd276'], bubble: ['#ffffff', '#ffffff'] };
+  // 線條造型（docs/sim-shapes.js，和 App 同一份資料）加進清單，圖形放進頁面的 svg
+  var ART = window.SIM_ART_SHAPES || [];
+  ART.forEach(function (a) {
+    SHAPES.push([a.id, a.title, a.center, 1, '新']);
+    if (a.color) DETAIL[a.id] = a.color;
+  });
+  (function addArtSymbols() {
+    var first = document.querySelector('symbol[id^="preview-shape-"]');
+    if (!first) return;
+    var parent = first.parentNode, ns = 'http://www.w3.org/2000/svg';
+    ART.forEach(function (a) {
+      var sym = document.createElementNS(ns, 'symbol');
+      sym.setAttribute('id', 'preview-shape-' + a.id); sym.setAttribute('viewBox', '0 0 100 100');
+      var p = document.createElementNS(ns, 'path'); p.setAttribute('d', a.d); p.setAttribute('fill', 'var(--key)'); sym.appendChild(p);
+      if (a.detail && a.alpha > 0) {
+        var q = document.createElementNS(ns, 'path'); q.setAttribute('d', a.detail); q.setAttribute('fill', 'var(--detail)'); q.setAttribute('opacity', a.alpha); sym.appendChild(q);
+      }
+      parent.appendChild(sym);
+    });
+  }());
+  // 自訂配色：色相 0～1、濃淡、深色（和 App 的 KeyboardTheme.custom 一樣的算法）
+  var CUSTOM = { hue: 0.92, sat: 0.55, dark: false };
+  function hsb(h, s, v) {
+    s = Math.min(1, Math.max(0, s)); v = Math.min(1, Math.max(0, v));
+    var f = function (n) { var k = (n + h * 6) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+    return '#' + [f(5), f(3), f(1)].map(function (x) { return Math.round(x * 255).toString(16).padStart(2, '0'); }).join('');
+  }
+  function customTheme() {
+    var h = CUSTOM.hue, s = Math.max(0.05, CUSTOM.sat);
+    if (CUSTOM.dark) return { name: '自訂', top: hsb(h, s * .5, .22), bottom: hsb(h, s * .5, .28), key: hsb(h, s * .45, .40), text: hsb(h, .06, .98), special: hsb(h, s * .5, .30), specialText: hsb(h, .2, .88), accent: hsb(h, s * .55, .95), accentText: hsb(h, s * .5, .22), shadow: hsb(h, s * .5, .12), dark: true };
+    return { name: '自訂', top: hsb(h, s * .15, 1), bottom: hsb(h, s * .25, .97), key: '#ffffff', text: hsb(h, s * .6 + .2, .45), special: hsb(h, s * .35, .95), specialText: hsb(h, s * .7, .38), accent: hsb(h, s * .6, .9), accentText: '#ffffff', shadow: hsb(h, s * .4, .82) };
+  }
+  THEMES.custom = customTheme();
   var FINISHES = [['flat', '平面'], ['puffy', '胖胖'], ['glass', '玻璃']];
   var EFFECTS = [['none', '無', []], ['stars', '星星', ['★', '☆', '✦']], ['hearts', '愛心', ['♥︎', '♡', '❤︎']], ['sparkles', '閃亮', ['✧', '✦', '⋆']], ['flowers', '花花', ['✿', '❀', '❁']], ['bubbles', '泡泡', ['○', '◦', '°']]];
   var JSD = 'https://cdn.jsdelivr.net/gh/';
@@ -987,6 +1030,8 @@
 
   // ===== 外觀設定 =====
   function setTheme(id) {
+    if (id === 'custom') THEMES.custom = customTheme();
+    var box = document.getElementById('sim-custom'); if (box) box.hidden = id !== 'custom';
     S.theme = id; var t = THEMES[id];
     var map = { top: 'top', bottom: 'bottom', key: 'key', text: 'key-text', special: 'special', specialText: 'special-text', accent: 'key-accent', accentText: 'accent-text', shadow: 'key-shadow' };
     Object.keys(map).forEach(function (k) { phone.style.setProperty('--' + map[k], t[k]); });
@@ -1039,8 +1084,14 @@
   chipGroup($('sim-fonts'), FONTS, setFont, function (b, it) { if (it[4]) b.textContent = it[1] + ' ✦'; });
   chipGroup($('sim-colors'), Object.keys(THEMES).map(function (k) { return [k, THEMES[k].name]; }), setTheme, function (b, it) {
     var t = THEMES[it[0]]; b.textContent = ''; b.title = t.name; b.setAttribute('aria-label', t.name);
-    var sw = el('span'); sw.style.setProperty('--swatch', 'linear-gradient(135deg,' + t.top + ' 50%,' + t.accent + ' 50%)'); b.appendChild(sw);
+    var sw = el('span'); sw.style.setProperty('--swatch', it[0] === 'custom' ? 'conic-gradient(#ff8fb1,#ffd36e,#8fe3a8,#7cc7ff,#b79cf0,#ff8fb1)' : 'linear-gradient(135deg,' + t.top + ' 50%,' + t.accent + ' 50%)'); b.appendChild(sw);
   });
+  ['hue', 'sat'].forEach(function (k) {
+    var input = document.getElementById('sim-custom-' + k);
+    if (input) input.addEventListener('input', function () { CUSTOM[k] = Number(this.value); setTheme('custom'); });
+  });
+  var darkBox = document.getElementById('sim-custom-dark');
+  if (darkBox) darkBox.addEventListener('change', function () { CUSTOM.dark = this.checked; setTheme('custom'); });
   $('sim-height').addEventListener('input', function () { phone.style.setProperty('--row-h', (46 * this.value) + 'px'); });
   $('sim-fontsize').addEventListener('input', function () { phone.style.setProperty('--fs', this.value); });
   $('sim-gap').addEventListener('input', function () { phone.style.setProperty('--gap', this.value); });

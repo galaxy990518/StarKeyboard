@@ -73,6 +73,21 @@ final class SettingsPanelView: UIView {
 
         stack.addArrangedSubview(header("主題"))
         stack.addArrangedSubview(themeRow())
+        if settings.themeID == "custom" {
+            // 自訂配色：拖拉選顏色和濃淡，深淺色可以切換
+            stack.addArrangedSubview(sliderRow("顏色", value: Float(settings.customHue), range: 0...1) { [weak self] v in
+                self?.settings.customHue = Double(v)
+                self?.onChange?()
+            })
+            stack.addArrangedSubview(sliderRow("濃淡", value: Float(settings.customSaturation), range: 0.1...1) { [weak self] v in
+                self?.settings.customSaturation = Double(v)
+                self?.onChange?()
+            })
+            stack.addArrangedSubview(choiceRow(["淺色", "深色"], selected: settings.customDark ? 1 : 0) { [weak self] i in
+                self?.settings.customDark = i == 1
+                self?.onChange?()
+            })
+        }
 
         stack.addArrangedSubview(header("按鍵造型"))
         stack.addArrangedSubview(shapeRow())
@@ -297,7 +312,7 @@ final class SettingsPanelView: UIView {
         scrollRow.showsHorizontalScrollIndicator = false
         scrollRow.heightAnchor.constraint(equalToConstant: 78).isActive = true
         var x: CGFloat = 0
-        for theme in KeyboardTheme.all {
+        for theme in KeyboardTheme.all + [KeyboardTheme.named("custom")] {
             let selected = theme.id == settings.themeID
             let b = UIButton(type: .custom)
             b.frame = CGRect(x: x, y: 0, width: 64, height: 76)
@@ -317,7 +332,7 @@ final class SettingsPanelView: UIView {
             swatch.addSubview(accent)
             b.addSubview(swatch)
             let name = UILabel(frame: CGRect(x: 0, y: 54, width: 64, height: 18))
-            name.text = theme.name
+            name.text = theme.id == "custom" ? "🎨 自訂" : theme.name
             name.font = .rounded(11, selected ? .bold : .regular)
             name.textAlignment = .center
             name.textColor = textColor
@@ -535,7 +550,7 @@ final class SettingsPanelView: UIView {
             holder.layer.addSublayer(preview)
             let detail = CAShapeLayer()
             detail.path = shape.detailPath(in: CGRect(x: 0, y: 0, width: 40, height: 34))
-            detail.fillColor = shape.detailColor(theme: style.theme).withAlphaComponent(shape == .pudding || shape == .duck ? 0.85 : 0.4).cgColor
+            detail.fillColor = shape.detailColor(theme: style.theme).withAlphaComponent(shape.detailOpacity()).cgColor
             holder.layer.addSublayer(detail)
             holder.translatesAutoresizingMaskIntoConstraints = false
             b.addSubview(holder)

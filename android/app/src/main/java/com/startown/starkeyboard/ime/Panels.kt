@@ -460,7 +460,7 @@ class SettingsPanel(
     private fun build() {
         header("主題")
         val themes = LinearLayout(context).apply { orientation = HORIZONTAL }
-        for (theme in KeyboardTheme.all) {
+        for (theme in KeyboardTheme.all + KeyboardTheme.custom(settings.customHue, settings.customSaturation, settings.customDark)) {
             val selected = theme.id == settings.themeId
             val cell = LinearLayout(context).apply { orientation = VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dpi(4f), 0, dpi(4f), 0) }
             cell.addView(View(context).apply {
@@ -470,11 +470,17 @@ class SettingsPanel(
                     setStroke(if (selected) dpi(3f) else dpi(1f), if (selected) theme.accent else theme.shadow)
                 }
             }, LayoutParams(dpi(46f), dpi(46f)))
-            cell.addView(TextView(context).apply { text = theme.name; textSize = 11f; setTextColor(t.keyText); gravity = Gravity.CENTER })
+            cell.addView(TextView(context).apply { text = if (theme.id == "custom") "🎨 自訂" else theme.name; textSize = 11f; setTextColor(t.keyText); gravity = Gravity.CENTER })
             cell.setOnClickListener { settings.themeId = theme.id; onChange() }
             themes.addView(cell)
         }
         col.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(themes) })
+        if (settings.themeId == "custom") {
+            // 自訂配色：拖拉選顏色和濃淡，深淺色可以切換
+            slider("顏色", settings.customHue, 0f, 1f) { settings.customHue = it }
+            slider("濃淡", settings.customSaturation, 0.1f, 1f) { settings.customSaturation = it }
+            choices(listOf("淺色", "深色"), if (settings.customDark) 1 else 0) { settings.customDark = it == 1; onChange() }
+        }
 
         header("按鍵造型")
         for (group in KeyShape.values().toList().chunked(4)) {

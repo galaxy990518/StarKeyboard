@@ -33,23 +33,56 @@ data class KeyboardTheme(
             KeyboardTheme("lavender", "薰衣草", c("#ECE4FF"), c("#DCD0FF"), c("#FFFFFF"), c("#5B4B8A"), c("#C7B8F5"), c("#4A3B78"), c("#8D74E8"), c("#FFFFFF"), c("#B9A9EC"), "💜", false),
             KeyboardTheme("lemon", "檸檬小雞", c("#FFF6CC"), c("#FFEC9E"), c("#FFFFFF"), c("#7A5B12"), c("#FFDD6B"), c("#6B4E0A"), c("#FFA928"), c("#FFFFFF"), c("#E9CB6A"), "🐥", false),
             KeyboardTheme("night", "星空夜", c("#1E2245"), c("#2B2F63"), c("#3A3F7A"), c("#F3F0FF"), c("#2A2E5E"), c("#CFCBFF"), c("#FFD65C"), c("#2B2F63"), c("#14173A"), "⭐", true),
+            KeyboardTheme("sakura", "櫻花", c("#FDE8EF"), c("#F9D5E2"), c("#FFFFFF"), c("#9B4D6B"), c("#F6C1D4"), c("#8A3A5A"), c("#F08BB0"), c("#FFFFFF"), c("#E8B0C4"), "🌸", false),
+            KeyboardTheme("peach", "蜜桃", c("#FFE9DC"), c("#FFD8C4"), c("#FFFFFF"), c("#8A5040"), c("#FFC8AD"), c("#7A4030"), c("#FF9A76"), c("#FFFFFF"), c("#ECB59C"), "🍑", false),
+            KeyboardTheme("cream", "奶油", c("#FFFAF0"), c("#FFF1D9"), c("#FFFFFF"), c("#7A6340"), c("#F7E2B8"), c("#6B5430"), c("#F2B94B"), c("#FFFFFF"), c("#E6D2A6"), "🧈", false),
+            KeyboardTheme("matcha", "抹茶", c("#E9F3DC"), c("#D8EAC4"), c("#FFFEF8"), c("#4A6332"), c("#C6DFA9"), c("#3E5629"), c("#8CBF5A"), c("#FFFFFF"), c("#B4CF98"), "🍵", false),
+            KeyboardTheme("sky", "天空", c("#E2F1FF"), c("#CFE6FF"), c("#FFFFFF"), c("#3D5F8A"), c("#B9D8FB"), c("#2F4F78"), c("#5AA9F0"), c("#FFFFFF"), c("#A9C8EA"), "☁️", false),
+            KeyboardTheme("ocean", "海洋", c("#D8F0FB"), c("#BFE4F6"), c("#F7FDFF"), c("#2D5F7A"), c("#A6D8EF"), c("#245570"), c("#3FB2D8"), c("#FFFFFF"), c("#96C8DE"), "🐟", false),
+            KeyboardTheme("grape", "葡萄", c("#EFE2F7"), c("#E2CDF2"), c("#FFFFFF"), c("#6A3F86"), c("#D6B8EC"), c("#5A2F78"), c("#A86AD6"), c("#FFFFFF"), c("#C8A8E0"), "🍇", false),
+            KeyboardTheme("aurora", "夢幻極光", c("#FFE7EF"), c("#E5E0FF"), c("#FFFFFF"), c("#5D4F8A"), c("#E3D6FF"), c("#4A3B78"), c("#FF9EC4"), c("#FFFFFF"), c("#CBBFEB"), "🌈", false),
+            KeyboardTheme("cocoa", "可可", c("#3A2A26"), c("#2E211E"), c("#5A443D"), c("#F8EBE2"), c("#46342F"), c("#E8D5C8"), c("#F0A77A"), c("#3A2A26"), c("#1F1513"), "🍫", true),
+            KeyboardTheme("neon", "電玩霓虹", c("#1C1640"), c("#251C52"), c("#362A73"), c("#F0EAFF"), c("#2A2160"), c("#CFC4FF"), c("#FF7AD9"), c("#1C1640"), c("#120D2E"), "🎮", true),
             KeyboardTheme("light", "經典淺色", c("#D3D6DC"), c("#CDD0D6"), c("#FFFFFF"), c("#000000"), c("#ABB0BA"), c("#000000"), c("#2F7BF6"), c("#FFFFFF"), c("#8E9196"), "", false),
             KeyboardTheme("dark", "經典深色", c("#2B2B2D"), c("#232325"), c("#6B6B6E"), c("#FFFFFF"), c("#474749"), c("#FFFFFF"), c("#2F7BF6"), c("#FFFFFF"), c("#111111"), "", true),
         )
 
         fun named(id: String) = all.firstOrNull { it.id == id } ?: all[0]
+
+        /** 自訂配色：選一個顏色（色相 0～1）和濃淡，其他顏色自動配 */
+        fun custom(hue: Float, saturation: Float, dark: Boolean): KeyboardTheme {
+            val h = hue.coerceIn(0f, 1f) * 360f
+            val s = saturation.coerceIn(0.05f, 1f)
+            fun hsb(sat: Float, bri: Float) = Color.HSVToColor(floatArrayOf(h, sat.coerceIn(0f, 1f), bri.coerceIn(0f, 1f)))
+            return if (dark) KeyboardTheme("custom", "自訂", hsb(s * 0.5f, 0.22f), hsb(s * 0.5f, 0.28f), hsb(s * 0.45f, 0.40f), hsb(0.06f, 0.98f),
+                hsb(s * 0.5f, 0.30f), hsb(0.2f, 0.88f), hsb(s * 0.55f, 0.95f), hsb(s * 0.5f, 0.22f), hsb(s * 0.5f, 0.12f), "🎨", true)
+            else KeyboardTheme("custom", "自訂", hsb(s * 0.15f, 1f), hsb(s * 0.25f, 0.97f), Color.WHITE, hsb(s * 0.6f + 0.2f, 0.45f),
+                hsb(s * 0.35f, 0.95f), hsb(s * 0.7f, 0.38f), hsb(s * 0.6f, 0.9f), Color.WHITE, hsb(s * 0.4f, 0.82f), "🎨", false)
+        }
     }
 }
 
 fun Int.withAlpha(a: Float): Int = Color.argb((Color.alpha(this) * a.coerceIn(0f, 1f)).toInt(), Color.red(this), Color.green(this), Color.blue(this))
 
 /** 按鍵造型（和 iPhone 版 KeyShape 一樣的算法，單位是 dp 換成的像素） */
-enum class KeyShape(val title: String) {
-    ROUNDED("圓角"), JELLY("果凍"), CAT_EAR("貓耳"), CLOUD("雲朵"), BUNNY("兔兔"), PUPPY("狗狗"), PUDDING("布丁"), JELLYFISH("水母"), FLAME("火焰"), DROPLET("水滴"), DUCK("鴨鴨"), MOCHI("麻糬"), BUBBLE("泡泡");
+enum class KeyShape(val title: String, private val artId: String? = null) {
+    ROUNDED("圓角"), JELLY("果凍"), CAT_EAR("貓耳"), CLOUD("雲朵"), BUNNY("兔兔"), PUPPY("狗狗"), PUDDING("布丁"), JELLYFISH("水母"), FLAME("火焰"), DROPLET("水滴"), DUCK("鴨鴨"), MOCHI("麻糬"), BUBBLE("泡泡"),
+    // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.kt）
+    CAT_FACE("貓咪", "catFace"), BEAR("熊熊", "bear"), PAW("肉球", "paw"), PIXEL("像素", "pixel"), PIXEL_HEART("像素心", "pixelHeart"),
+    PUZZLE("拼圖", "puzzle"), BOOK("書本", "book"), BOW("蝴蝶結", "bow"), BUTTERFLY("蝴蝶", "butterfly"), FISH("小魚", "fish"),
+    STRAWBERRY("草莓", "strawberry"), FLOWER("花花", "flower"), MOON("月亮", "moon"), SUN("太陽", "sun"), STAR("星星", "star"), HEART("愛心", "heart");
+
+    val art: KeyShapeArt? get() = artId?.let { KeyShapeArt.shapes[it] }
+
+    /** 小裝飾的不透明度（寬鍵左邊的小圖示一定看得到） */
+    fun detailOpacity(r: RectF? = null): Float {
+        val a = art ?: return if (this == PUDDING || this == DUCK) 0.85f else 0.4f
+        return if (r != null && isWide(r)) maxOf(a.detailAlpha, 0.6f) else a.detailAlpha
+    }
 
     val isSoftShape: Boolean get() = when (this) {
         BUNNY, PUPPY, PUDDING, JELLYFISH, FLAME, DROPLET, DUCK -> true
-        else -> false
+        else -> art != null
     }
 
     private fun isWide(r: RectF) = isSoftShape && r.width() > r.height() * 1.65f
@@ -67,6 +100,7 @@ enum class KeyShape(val title: String) {
     fun bodyRect(r: RectF, dp: Float): RectF {
         if (isWide(r)) return RectF(r.left + r.height() * 0.82f, r.top + r.height() * 0.15f,
             r.right - r.height() * 0.14f, r.top + r.height() * 0.85f)
+        art?.let { return it.bodyRect(r) }
         return when (this) {
         CAT_EAR -> RectF(r.left, r.top + earSize(r, dp) * 0.6f, r.right, r.bottom)
         CLOUD -> RectF(r.left, r.top + bumpSize(r, dp), r.right, r.bottom)
@@ -83,6 +117,7 @@ enum class KeyShape(val title: String) {
 
     fun detailPath(r: RectF, dp: Float): Path {
         if (isWide(r)) return path(badgeRect(r), dp)
+        art?.let { return it.detailPath(r) }
         if (this == BUBBLE) {
             val b = bodyRect(r, dp)
             val s = minOf(b.width(), b.height()) * 0.16f
@@ -179,7 +214,7 @@ enum class KeyShape(val title: String) {
         }
     }
 
-    fun detailColor(theme: KeyboardTheme): Int = when (this) {
+    fun detailColor(theme: KeyboardTheme): Int = art?.detailColor(theme) ?: when (this) {
         PUDDING -> Color.rgb(if (theme.dark) 215 else 168, if (theme.dark) 161 else 102, if (theme.dark) 95 else 53)
         FLAME -> if (theme.dark) Color.rgb(255, 212, 107) else Color.rgb(237, 145, 74)
         DROPLET -> if (theme.dark) Color.rgb(184, 239, 255) else Color.rgb(74, 173, 213)
@@ -194,6 +229,7 @@ enum class KeyShape(val title: String) {
             return Path().apply { addRoundRect(body, body.height() * 0.36f, body.height() * 0.36f, Path.Direction.CW) }
         }
         val body = bodyRect(r, dp)
+        art?.let { return it.path(r) }
         val path = Path()
         val minSide = minOf(body.width(), body.height())
         when (this) {
@@ -344,6 +380,7 @@ enum class KeyShape(val title: String) {
                 path.close()
             }
             BUBBLE -> path.addRoundRect(body, minSide / 2, minSide / 2, Path.Direction.CW)
+            else -> path.addRoundRect(body, minSide * 0.3f, minSide * 0.3f, Path.Direction.CW)
         }
         return path
     }
@@ -559,6 +596,18 @@ class KeyboardSettings(context: Context) {
     var keyEffect: String
         get() = p.getString("keyEffect", KeyEffect.NONE.id) ?: KeyEffect.NONE.id
         set(v) = p.edit().putString("keyEffect", v).apply()
+    // 自訂配色：色相 0～1、濃淡 0～1、深色
+    var customHue: Float
+        get() = p.getFloat("customHue", 0.92f)
+        set(v) = p.edit().putFloat("customHue", v).apply()
+    var customSaturation: Float
+        get() = p.getFloat("customSaturation", 0.55f)
+        set(v) = p.edit().putFloat("customSaturation", v).apply()
+    var customDark: Boolean
+        get() = p.getBoolean("customDark", false)
+        set(v) = p.edit().putBoolean("customDark", v).apply()
+    val theme: KeyboardTheme
+        get() = if (themeId == "custom") KeyboardTheme.custom(customHue, customSaturation, customDark) else KeyboardTheme.named(themeId)
     var keyFinish: KeyFinish
         get() = runCatching { KeyFinish.valueOf(p.getString("keyFinish", "FLAT")!!) }.getOrDefault(KeyFinish.FLAT)
         set(v) = p.edit().putString("keyFinish", v.name).apply()
@@ -641,5 +690,5 @@ class KeyboardSettings(context: Context) {
         get() = p.getString("fontId", KeyFont.SYSTEM.id) ?: KeyFont.SYSTEM.id
         set(v) = p.edit().putString("fontId", v).apply()
 
-    val style get() = KeyboardStyle(KeyboardTheme.named(themeId), shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish)
+    val style get() = KeyboardStyle(theme, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish)
 }

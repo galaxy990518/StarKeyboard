@@ -72,6 +72,66 @@ struct KeyboardTheme {
                       specialKey: UIColor(hex: 0x2A2E5E), specialText: UIColor(hex: 0xCFCBFF),
                       accent: UIColor(hex: 0xFFD65C), accentText: UIColor(hex: 0x2B2F63),
                       shadow: UIColor(hex: 0x14173A), decoration: "⭐", isDark: true),
+        KeyboardTheme(id: "sakura", name: "櫻花",
+                      backgroundTop: UIColor(hex: 0xFDE8EF), backgroundBottom: UIColor(hex: 0xF9D5E2),
+                      key: .white, keyText: UIColor(hex: 0x9B4D6B),
+                      specialKey: UIColor(hex: 0xF6C1D4), specialText: UIColor(hex: 0x8A3A5A),
+                      accent: UIColor(hex: 0xF08BB0), accentText: .white,
+                      shadow: UIColor(hex: 0xE8B0C4), decoration: "🌸", isDark: false),
+        KeyboardTheme(id: "peach", name: "蜜桃",
+                      backgroundTop: UIColor(hex: 0xFFE9DC), backgroundBottom: UIColor(hex: 0xFFD8C4),
+                      key: .white, keyText: UIColor(hex: 0x8A5040),
+                      specialKey: UIColor(hex: 0xFFC8AD), specialText: UIColor(hex: 0x7A4030),
+                      accent: UIColor(hex: 0xFF9A76), accentText: .white,
+                      shadow: UIColor(hex: 0xECB59C), decoration: "🍑", isDark: false),
+        KeyboardTheme(id: "cream", name: "奶油",
+                      backgroundTop: UIColor(hex: 0xFFFAF0), backgroundBottom: UIColor(hex: 0xFFF1D9),
+                      key: .white, keyText: UIColor(hex: 0x7A6340),
+                      specialKey: UIColor(hex: 0xF7E2B8), specialText: UIColor(hex: 0x6B5430),
+                      accent: UIColor(hex: 0xF2B94B), accentText: .white,
+                      shadow: UIColor(hex: 0xE6D2A6), decoration: "🧈", isDark: false),
+        KeyboardTheme(id: "matcha", name: "抹茶",
+                      backgroundTop: UIColor(hex: 0xE9F3DC), backgroundBottom: UIColor(hex: 0xD8EAC4),
+                      key: UIColor(hex: 0xFFFEF8), keyText: UIColor(hex: 0x4A6332),
+                      specialKey: UIColor(hex: 0xC6DFA9), specialText: UIColor(hex: 0x3E5629),
+                      accent: UIColor(hex: 0x8CBF5A), accentText: .white,
+                      shadow: UIColor(hex: 0xB4CF98), decoration: "🍵", isDark: false),
+        KeyboardTheme(id: "sky", name: "天空",
+                      backgroundTop: UIColor(hex: 0xE2F1FF), backgroundBottom: UIColor(hex: 0xCFE6FF),
+                      key: .white, keyText: UIColor(hex: 0x3D5F8A),
+                      specialKey: UIColor(hex: 0xB9D8FB), specialText: UIColor(hex: 0x2F4F78),
+                      accent: UIColor(hex: 0x5AA9F0), accentText: .white,
+                      shadow: UIColor(hex: 0xA9C8EA), decoration: "☁️", isDark: false),
+        KeyboardTheme(id: "ocean", name: "海洋",
+                      backgroundTop: UIColor(hex: 0xD8F0FB), backgroundBottom: UIColor(hex: 0xBFE4F6),
+                      key: UIColor(hex: 0xF7FDFF), keyText: UIColor(hex: 0x2D5F7A),
+                      specialKey: UIColor(hex: 0xA6D8EF), specialText: UIColor(hex: 0x245570),
+                      accent: UIColor(hex: 0x3FB2D8), accentText: .white,
+                      shadow: UIColor(hex: 0x96C8DE), decoration: "🐟", isDark: false),
+        KeyboardTheme(id: "grape", name: "葡萄",
+                      backgroundTop: UIColor(hex: 0xEFE2F7), backgroundBottom: UIColor(hex: 0xE2CDF2),
+                      key: .white, keyText: UIColor(hex: 0x6A3F86),
+                      specialKey: UIColor(hex: 0xD6B8EC), specialText: UIColor(hex: 0x5A2F78),
+                      accent: UIColor(hex: 0xA86AD6), accentText: .white,
+                      shadow: UIColor(hex: 0xC8A8E0), decoration: "🍇", isDark: false),
+        KeyboardTheme(id: "aurora", name: "夢幻極光",
+                      backgroundTop: UIColor(hex: 0xFFE7EF), backgroundBottom: UIColor(hex: 0xE5E0FF),
+                      key: .white, keyText: UIColor(hex: 0x5D4F8A),
+                      specialKey: UIColor(hex: 0xE3D6FF), specialText: UIColor(hex: 0x4A3B78),
+                      accent: UIColor(hex: 0xFF9EC4), accentText: .white,
+                      shadow: UIColor(hex: 0xCBBFEB), decoration: "🌈", isDark: false),
+        KeyboardTheme(id: "cocoa", name: "可可",
+                      backgroundTop: UIColor(hex: 0x3A2A26), backgroundBottom: UIColor(hex: 0x2E211E),
+                      key: UIColor(hex: 0x5A443D), keyText: UIColor(hex: 0xF8EBE2),
+                      specialKey: UIColor(hex: 0x46342F), specialText: UIColor(hex: 0xE8D5C8),
+                      accent: UIColor(hex: 0xF0A77A), accentText: UIColor(hex: 0x3A2A26),
+                      shadow: UIColor(hex: 0x1F1513), decoration: "🍫", isDark: true),
+        KeyboardTheme(id: "neon", name: "電玩霓虹",
+                      backgroundTop: UIColor(hex: 0x1C1640), backgroundBottom: UIColor(hex: 0x251C52),
+                      key: UIColor(hex: 0x362A73), keyText: UIColor(hex: 0xF0EAFF),
+                      specialKey: UIColor(hex: 0x2A2160), specialText: UIColor(hex: 0xCFC4FF),
+                      accent: UIColor(hex: 0xFF7AD9), accentText: UIColor(hex: 0x1C1640),
+                      shadow: UIColor(hex: 0x120D2E), decoration: "🎮", isDark: true),
         KeyboardTheme(id: "light", name: "經典淺色",
                       backgroundTop: UIColor(hex: 0xD3D6DC), backgroundBottom: UIColor(hex: 0xCDD0D6),
                       key: .white, keyText: .black,
@@ -87,15 +147,50 @@ struct KeyboardTheme {
     ]
 
     static func named(_ id: String) -> KeyboardTheme {
+        if id == "custom" {
+            let s = KeyboardSettings.shared
+            return custom(hue: s.customHue, saturation: s.customSaturation, dark: s.customDark)
+        }
         all.first { $0.id == id } ?? all[0]
+    }
+
+    /// 自訂配色：選一個顏色（色相）和濃淡，其他顏色自動配
+    static func custom(hue: Double, saturation: Double, dark: Bool) -> KeyboardTheme {
+        let h = CGFloat(hue), s = CGFloat(min(max(saturation, 0.05), 1))
+        func c(_ sat: CGFloat, _ bri: CGFloat) -> UIColor { UIColor(hue: h, saturation: min(1, sat), brightness: min(1, bri), alpha: 1) }
+        if dark {
+            return KeyboardTheme(id: "custom", name: "自訂",
+                                 backgroundTop: c(s * 0.5, 0.22), backgroundBottom: c(s * 0.5, 0.28),
+                                 key: c(s * 0.45, 0.40), keyText: c(0.06, 0.98),
+                                 specialKey: c(s * 0.5, 0.30), specialText: c(0.2, 0.88),
+                                 accent: c(s * 0.55, 0.95), accentText: c(s * 0.5, 0.22),
+                                 shadow: c(s * 0.5, 0.12), decoration: "🎨", isDark: true)
+        }
+        return KeyboardTheme(id: "custom", name: "自訂",
+                             backgroundTop: c(s * 0.15, 1), backgroundBottom: c(s * 0.25, 0.97),
+                             key: .white, keyText: c(s * 0.6 + 0.2, 0.45),
+                             specialKey: c(s * 0.35, 0.95), specialText: c(s * 0.7, 0.38),
+                             accent: c(s * 0.6, 0.9), accentText: .white,
+                             shadow: c(s * 0.4, 0.82), decoration: "🎨", isDark: false)
     }
 }
 
 /// 按鍵造型
 enum KeyShape: String, CaseIterable {
     case rounded, jelly, catEar, cloud, bunny, puppy, pudding, jellyfish, flame, droplet, duck, mochi, bubble
+    // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.swift）
+    case catFace, bear, paw, pixel, pixelHeart, puzzle, book, bow, butterfly, fish, strawberry, flower, moon, sun, star, heart
+
+    var art: KeyShapeArt? { KeyShapeArt.shapes[rawValue] }
+
+    /// 小裝飾的不透明度（寬鍵左邊的小圖示一定看得到）
+    func detailOpacity(in r: CGRect? = nil) -> CGFloat {
+        if let a = art { return r.map { isWide($0) } == true ? max(a.detailAlpha, 0.6) : a.detailAlpha }
+        return self == .pudding || self == .duck ? 0.85 : 0.4
+    }
 
     var title: String {
+        if let a = art { return a.title }
         switch self {
         case .rounded: return "圓角"
         case .jelly: return "果凍"
@@ -110,13 +205,14 @@ enum KeyShape: String, CaseIterable {
         case .duck: return "鴨鴨"
         case .mochi: return "麻糬"
         case .bubble: return "泡泡"
+        default: return ""
         }
     }
 
     var isSoftShape: Bool {
         switch self {
         case .bunny, .puppy, .pudding, .jellyfish, .flame, .droplet, .duck: return true
-        default: return false
+        default: return art != nil
         }
     }
 
@@ -138,6 +234,7 @@ enum KeyShape: String, CaseIterable {
             return CGRect(x: r.minX + r.height * 0.82, y: r.minY + r.height * 0.15,
                           width: r.width - r.height * 0.96, height: r.height * 0.70)
         }
+        if let a = art { return a.bodyRect(in: r) }
         switch self {
         case .catEar:
             let ear = earSize(r) * 0.6
@@ -166,6 +263,7 @@ enum KeyShape: String, CaseIterable {
 
     func detailPath(in r: CGRect) -> CGPath? {
         if isWide(r) { return path(in: badgeRect(in: r)) }
+        if let a = art { return a.detailPath(in: r) }
         if self == .bubble {
             let body = bodyRect(in: r)
             let s = min(body.width, body.height) * 0.16
@@ -261,6 +359,7 @@ enum KeyShape: String, CaseIterable {
     }
 
     func detailColor(theme: KeyboardTheme) -> UIColor {
+        if let a = art { return a.detailColor(theme: theme) }
         switch self {
         case .pudding: return UIColor(hex: theme.isDark ? 0xD7A15F : 0xA86635)
         case .flame: return UIColor(hex: theme.isDark ? 0xFFD46B : 0xED914A)
@@ -276,6 +375,7 @@ enum KeyShape: String, CaseIterable {
             let body = wideBody(in: r)
             return UIBezierPath(roundedRect: body, cornerRadius: body.height * 0.36).cgPath
         }
+        if let a = art { return a.path(in: r) }
         let body = bodyRect(in: r)
         switch self {
         case .rounded:
@@ -441,6 +541,8 @@ enum KeyShape: String, CaseIterable {
             p.addQuadCurve(to: point(0.32, 0.43), controlPoint: point(0.23, 0.64))
             p.close()
             return p.cgPath
+        default:
+            return UIBezierPath(roundedRect: body, cornerRadius: min(body.width, body.height) * 0.3).cgPath
         }
     }
 }
@@ -711,6 +813,19 @@ final class KeyboardSettings {
     var keyEffect: String {
         get { d.string(forKey: "keyEffect") ?? KeyEffect.none.rawValue }
         set { d.set(newValue, forKey: "keyEffect") }
+    }
+    // 自訂配色：色相 0～1、濃淡 0～1、深色
+    var customHue: Double {
+        get { double("customHue", 0.92) }
+        set { d.set(newValue, forKey: "customHue") }
+    }
+    var customSaturation: Double {
+        get { double("customSaturation", 0.55) }
+        set { d.set(newValue, forKey: "customSaturation") }
+    }
+    var customDark: Bool {
+        get { bool("customDark", false) }
+        set { d.set(newValue, forKey: "customDark") }
     }
     var keyFinish: KeyFinish {
         get { KeyFinish(rawValue: d.string(forKey: "keyFinish") ?? "") ?? .flat }
