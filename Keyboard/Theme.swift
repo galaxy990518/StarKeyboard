@@ -151,7 +151,7 @@ struct KeyboardTheme {
             let s = KeyboardSettings.shared
             return custom(hue: s.customHue, saturation: s.customSaturation, dark: s.customDark)
         }
-        all.first { $0.id == id } ?? all[0]
+        return all.first { $0.id == id } ?? all[0]
     }
 
     /// 自訂配色：選一個顏色（色相）和濃淡，其他顏色自動配
