@@ -41,7 +41,7 @@ class KeyShapeArt(
     }
 
     companion object {
-        val order = listOf("catFace", "bear", "paw", "cloudPuff", "pixel", "pixelHeart", "puzzle", "book", "bow", "butterfly", "strawberry", "flower", "moon", "star", "heart")
+        val order = listOf("catFace", "bear", "paw", "cloudPuff", "pixel", "pixelHeart", "puzzle", "book", "butterfly", "strawberry", "flower", "moon", "star", "heart")
 
         val shapes: Map<String, KeyShapeArt> = mapOf(
             "catFace" to KeyShapeArt(
@@ -84,11 +84,6 @@ class KeyShapeArt(
                 floatArrayOf(0f, 6f, 14f, 3f, 27f, 4f, 50f, 14f, 3f, 73f, 4f, 94f, 14f, 3f, 100f, 16f, 100f, 22f, 1f, 100f, 86f, 3f, 100f, 92f, 94f, 91f, 3f, 73f, 82f, 50f, 92f, 3f, 27f, 82f, 6f, 91f, 3f, 0f, 92f, 0f, 86f, 1f, 0f, 22f, 3f, 0f, 16f, 6f, 14f, 4f),
                 floatArrayOf(0f, 49f, 16f, 3f, 50f, 15f, 51f, 16f, 1f, 51f, 89f, 3f, 50f, 90f, 49f, 89f, 4f, 0f, 2f, 92f, 3f, 26f, 83f, 50f, 93f, 3f, 74f, 83f, 98f, 92f, 3f, 100f, 93f, 99f, 95f, 3f, 74f, 88f, 50f, 98f, 3f, 26f, 88f, 1f, 95f, 3f, 0f, 93f, 2f, 92f, 4f),
                 0xB98A6A, 0xD7A983, 0.85f, 0.8f),
-            "bow" to KeyShapeArt(
-                "蝴蝶結", floatArrayOf(14f, 30f, 72f, 32f),
-                floatArrayOf(0f, 52.11f, 37.27f, 2f, 55.26f, 49.01f, 46.56f, 61.53f, 32.69f, 65.25f, 2f, 18.82f, 68.97f, 5.03f, 62.47f, 1.89f, 50.73f, 2f, -1.26f, 38.99f, 7.44f, 26.47f, 21.31f, 22.75f, 2f, 35.18f, 19.03f, 48.97f, 25.53f, 52.11f, 37.27f, 4f, 0f, 98.11f, 50.73f, 2f, 94.97f, 62.47f, 81.18f, 68.97f, 67.31f, 65.25f, 2f, 53.44f, 61.53f, 44.74f, 49.01f, 47.89f, 37.27f, 2f, 51.03f, 25.53f, 64.82f, 19.03f, 78.69f, 22.75f, 2f, 92.56f, 26.47f, 101.26f, 38.99f, 98.11f, 50.73f, 4f, 0f, 62f, 46f, 2f, 62f, 53.73f, 56.63f, 60f, 50f, 60f, 2f, 43.37f, 60f, 38f, 53.73f, 38f, 46f, 2f, 38f, 38.27f, 43.37f, 32f, 50f, 32f, 2f, 56.63f, 32f, 62f, 38.27f, 62f, 46f, 4f, 0f, 57f, 54f, 2f, 60f, 68f, 64f, 80f, 69f, 91f, 2f, 71f, 96f, 66f, 98f, 63f, 95f, 1f, 54f, 86f, 1f, 50f, 92f, 1f, 46f, 86f, 1f, 37f, 95f, 2f, 34f, 98f, 29f, 96f, 31f, 91f, 2f, 36f, 80f, 40f, 68f, 43f, 54f, 4f),
-                floatArrayOf(0f, 58f, 46f, 2f, 58f, 51.52f, 54.42f, 56f, 50f, 56f, 2f, 45.58f, 56f, 42f, 51.52f, 42f, 46f, 2f, 42f, 40.48f, 45.58f, 36f, 50f, 36f, 2f, 54.42f, 36f, 58f, 40.48f, 58f, 46f, 4f),
-                0xF29AB8, 0xF7B5CC, 0.9f, 0.8f),
             "butterfly" to KeyShapeArt(
                 "蝴蝶", floatArrayOf(14f, 26f, 72f, 46f),
                 floatArrayOf(0f, 50f, 40f, 2f, 54f, 28f, 60f, 18f, 70f, 12f, 2f, 78f, 6f, 90f, 3f, 95f, 6f, 2f, 99f, 9f, 99f, 20f, 97f, 32f, 2f, 95f, 44f, 90f, 54f, 82f, 60f, 2f, 90f, 68f, 92f, 82f, 88f, 92f, 2f, 85f, 98f, 74f, 99f, 64f, 96f, 2f, 56f, 93f, 52f, 86f, 50f, 78f, 2f, 48f, 86f, 44f, 93f, 36f, 96f, 2f, 26f, 99f, 15f, 98f, 12f, 92f, 2f, 8f, 82f, 10f, 68f, 18f, 60f, 2f, 10f, 54f, 5f, 44f, 3f, 32f, 2f, 1f, 20f, 1f, 9f, 5f, 6f, 2f, 10f, 3f, 22f, 6f, 30f, 12f, 2f, 40f, 18f, 46f, 28f, 50f, 40f, 4f),
