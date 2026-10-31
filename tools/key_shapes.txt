@@ -5,10 +5,12 @@
 //   path …                按鍵本體（用按鍵的顏色）
 //   detail …              小裝飾（用 color 的顏色；淺色主題 深色主題，或 accent = 主題的強調色）
 //   alpha 0.9             小裝飾的不透明度
+//   aspect 0.95           高÷寬：畫的時候保持這個比例（按鍵太瘦時上下留白，不會被拉長）
 // 指令：M x y、L x y、C x1 y1 x2 y2 x y、Q x1 y1 x y、Z，
 //       E 中心x 中心y 橫半徑 直半徑 [旋轉角度]（橢圓）、S 中心x 中心y 外半徑 內半徑 尖角數 [旋轉角度]（星形）
 
 == catFace 貓咪
+aspect 0.95
 body 12 34 76 56
 path M14 34 L10 6 Q10 2 14 4 L36 20 Q50 16 64 20 L86 4 Q90 2 90 6 L86 34 Q98 48 96 66 C94 90 76 98 50 98 C24 98 6 90 4 66 Q2 48 14 34 Z
 detail M17 28 L15 12 L30 22 Z M83 28 L85 12 L70 22 Z M3 62 L17 64 L17 66 L3 65 Z M3 73 L17 70 L17 72 L3 76 Z M97 62 L83 64 L83 66 L97 65 Z M97 73 L83 70 L83 72 L97 76 Z
@@ -16,6 +18,7 @@ color F2A0BC F2A0BC
 alpha 0.85
 
 == bear 熊熊
+aspect 0.95
 body 14 30 72 52
 path M22 30 C10 30 4 22 6 14 C8 4 20 2 28 10 Q50 0 72 10 C80 2 92 4 94 14 C96 22 90 30 78 30 Q98 44 96 64 C94 90 76 98 50 98 C24 98 6 90 4 64 Q2 44 22 30 Z
 detail M39 84 L48 87 L39 91 Z M61 84 L52 87 L61 91 Z E 50 87 3.5 3.5
@@ -23,13 +26,15 @@ color 8A5A44 D9A07A
 alpha 0.9
 
 == paw 肉球
-body 26 46 48 40
-path M18 64 C18 46 34 38 50 38 C66 38 82 46 82 64 C82 86 68 98 50 98 C32 98 18 86 18 64 Z E 14 36 11 14 -15 E 37 18 11 14 -5 E 63 18 11 14 5 E 86 36 11 14 15
-detail E 14 37 6 8 -15 E 37 19 6 8 -5 E 63 19 6 8 5 E 86 37 6 8 15
+aspect 0.95
+body 24 50 52 38
+path E 50 66 36 32 E 50 44 30 16 E 22 44 13 15 -20 E 40 28 13 15 -6 E 60 28 13 15 6 E 78 44 13 15 20
+detail E 22 44 6.5 8 -20 E 40 28 6.5 8 -6 E 60 28 6.5 8 6 E 78 44 6.5 8 20
 color F4A3BC F4A3BC
 alpha 0.95
 
 == pixel 像素
+aspect 1
 body 6 6 88 88
 path M12 0 L88 0 L88 6 L94 6 L94 12 L100 12 L100 88 L94 88 L94 94 L88 94 L88 100 L12 100 L12 94 L6 94 L6 88 L0 88 L0 12 L6 12 L6 6 L12 6 Z
 detail M12 10 L28 10 L28 16 L18 16 L18 28 L12 28 Z
@@ -37,6 +42,7 @@ color FFFFFF FFFFFF
 alpha 0.75
 
 == pixelHeart 像素心
+aspect 0.95
 body 14 12 72 52
 path M10 0 L40 0 L40 10 L60 10 L60 0 L90 0 L90 10 L100 10 L100 50 L90 50 L90 60 L80 60 L80 70 L70 70 L70 80 L60 80 L60 100 L40 100 L40 80 L30 80 L30 70 L20 70 L20 60 L10 60 L10 50 L0 50 L0 10 L10 10 Z
 detail M10 10 L22 10 L22 18 L16 18 L16 26 L10 26 Z
@@ -44,12 +50,14 @@ color FFFFFF FFFFFF
 alpha 0.75
 
 == puzzle 拼圖
+aspect 1
 body 6 26 72 68
 path M0 20 L38 20 C34 12 38 2 50 2 C62 2 66 12 62 20 L100 20 L100 44 C92 40 84 44 84 56 C84 68 92 72 100 68 L100 100 L0 100 Z
 color accent accent
 alpha 0
 
 == book 書本
+aspect 0.8
 body 8 20 84 62
 path M0 14 Q24 4 50 14 Q76 4 100 14 L100 92 Q76 82 50 92 Q24 82 0 92 Z
 detail M49 16 L51 16 L51 90 L49 90 Z M0 92 Q24 82 50 92 Q76 82 100 92 L100 98 Q76 88 50 98 Q24 88 0 98 Z
@@ -57,6 +65,7 @@ color B98A6A D7A983
 alpha 0.85
 
 == bow 蝴蝶結
+aspect 0.8
 body 18 28 64 36
 path M50 40 C40 20 24 6 10 12 C0 18 0 40 6 60 C10 76 30 76 44 62 L38 94 L48 88 L50 98 L52 88 L62 94 L56 62 C70 76 90 76 94 60 C100 40 100 18 90 12 C76 6 60 20 50 40 Z
 detail E 50 48 8 10
@@ -64,6 +73,7 @@ color F29AB8 F7B5CC
 alpha 0.9
 
 == butterfly 蝴蝶
+aspect 0.85
 body 14 22 72 52
 path M50 30 C44 10 24 0 10 6 C0 12 2 34 14 46 C4 54 4 74 16 84 C28 94 42 84 48 70 L50 66 L52 70 C58 84 72 94 84 84 C96 74 96 54 86 46 C98 34 100 12 90 6 C76 0 56 10 50 30 Z
 detail E 50 50 3.5 22
@@ -71,6 +81,7 @@ color B79CF0 CDB8FF
 alpha 0.9
 
 == fish 小魚
+aspect 0.7
 body 12 32 60 36
 path M4 50 C16 22 50 14 72 32 L92 16 Q98 14 96 22 L88 50 L96 78 Q98 86 92 84 L72 68 C50 86 16 78 4 50 Z
 detail E 20 44 3.5 3.5
@@ -78,6 +89,7 @@ color 4A5A8A DDE6FF
 alpha 0.9
 
 == strawberry 草莓
+aspect 1.05
 body 16 34 68 48
 path M50 22 C70 18 92 22 94 40 C96 64 72 92 50 98 C28 92 4 64 6 40 C8 22 30 18 50 22 Z
 detail M50 26 L38 8 L47 15 L50 2 L53 15 L62 8 Z M28 22 Q40 12 50 24 Q60 12 72 22 Q60 32 50 27 Q40 32 28 22 Z
@@ -85,6 +97,7 @@ color 74B86E 8FD08A
 alpha 0.95
 
 == flower 花花
+aspect 1
 body 26 32 48 44
 path E 50 22 18 22 0 E 81 44 18 22 72 E 69 80 18 22 144 E 31 80 18 22 216 E 19 44 18 22 288 E 50 54 30 30
 detail E 50 54 7 7
@@ -92,24 +105,28 @@ color F6CD5B F6D877
 alpha 0.95
 
 == moon 月亮
+aspect 1
 body 10 32 44 40
 path M62 4 C30 6 6 28 6 54 C6 80 28 98 56 98 C76 98 92 88 98 72 C88 78 78 80 68 78 C44 74 30 56 34 34 C36 20 46 10 62 4 Z
 color accent accent
 alpha 0
 
 == sun 太陽
+aspect 1
 body 22 22 56 56
 path S 50 50 50 36 12 0 E 50 50 36 36
 color accent accent
 alpha 0
 
 == star 星星
+aspect 1
 body 28 40 44 34
 path S 50 54 52 26 5 -90
 color accent accent
 alpha 0
 
 == heart 愛心
+aspect 0.92
 body 16 20 68 46
 path M50 96 C30 80 2 62 2 34 C2 14 18 4 32 4 C42 4 48 10 50 18 C52 10 58 4 68 4 C82 4 98 14 98 34 C98 62 70 80 50 96 Z
 color accent accent

@@ -522,19 +522,28 @@
     b.setAttribute('aria-label', k.label === '⌫' ? '刪除' : k.label);
     var face = el('span', 'face'), info = shapeInfo();
     var soft = info[3];
+    // 線條造型保持自己的比例（按鍵太瘦就上下留白），不會被拉長
+    var art = !k.wide && ART.filter(function (a) { return a.id === S.shape; })[0];
+    var host = face;
+    if (art) {
+      face.classList.add('artface');
+      host = el('span', 'artbox');
+      host.style.setProperty('--a', art.aspect || 1);
+      face.appendChild(host);
+    }
     if (k.wide) {
       face.appendChild(shapeSvg(S.shape === 'bubble' || S.shape === 'mochi' ? 'bubble' : 'wide', 'shape'));
       if (soft) { var badge = shapeSvg(S.shape, 'badge'); face.appendChild(badge); }
       face.style.setProperty('--label-y', '50%');
     } else {
-      face.appendChild(shapeSvg(S.shape, 'shape'));
-      face.style.setProperty('--label-y', info[2] + '%');
+      host.appendChild(shapeSvg(S.shape, 'shape'));
+      host.style.setProperty('--label-y', info[2] + '%');
     }
-    face.appendChild(el('i', 'gloss'));
+    host.appendChild(el('i', 'gloss'));
     var lbl = el('span', 'lbl', k.label);
     if (k.fs) lbl.style.setProperty('--kfs', k.fs + 'px');
     if (k.wide && soft) lbl.style.paddingLeft = '18%';
-    face.appendChild(lbl);
+    host.appendChild(lbl);
     b.appendChild(face);
     b.style.flex = k.w === 0 ? '1 1 0' : (k.w || 1) + ' 0 0';
     return b;

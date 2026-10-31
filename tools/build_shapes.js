@@ -15,7 +15,7 @@ for (const raw of fs.readFileSync(path.join(__dirname, 'key_shapes.txt'), 'utf8'
   const line = raw.trim();
   if (!line || line.startsWith('//')) continue;
   const head = line.match(/^== (\w+) (.+)$/);
-  if (head) { cur = { id: head[1], title: head[2], body: [0, 0, 100, 100], path: '', detail: '', color: null, alpha: 0.4 }; shapes.push(cur); continue; }
+  if (head) { cur = { id: head[1], title: head[2], body: [0, 0, 100, 100], path: '', detail: '', color: null, alpha: 0.4, aspect: 1 }; shapes.push(cur); continue; }
   const [key, ...rest] = line.split(/\s+/);
   const value = rest.join(' ');
   if (key === 'body') cur.body = rest.map(Number);
@@ -23,6 +23,7 @@ for (const raw of fs.readFileSync(path.join(__dirname, 'key_shapes.txt'), 'utf8'
   else if (key === 'detail') cur.detail = value;
   else if (key === 'color') cur.color = rest[0] === 'accent' ? null : rest.map(h => parseInt(h, 16));
   else if (key === 'alpha') cur.alpha = Number(value);
+  else if (key === 'aspect') cur.aspect = Number(value);
   else throw new Error('看不懂：' + line);
 }
 
@@ -136,7 +137,7 @@ const swiftEntries = shapes.map(s => [
   `            title: ${JSON.stringify(s.title)}, body: CGRect(x: ${s.body[0]}, y: ${s.body[1]}, width: ${s.body[2]}, height: ${s.body[3]}),`,
   `            path: [${s.ops.join(', ')}],`,
   `            detail: [${s.dops.join(', ')}],`,
-  `            detailLight: ${s.color ? hex(s.color[0]) : 'nil'}, detailDark: ${s.color ? hex(s.color[1]) : 'nil'}, detailAlpha: ${s.alpha}),`,
+  `            detailLight: ${s.color ? hex(s.color[0]) : 'nil'}, detailDark: ${s.color ? hex(s.color[1]) : 'nil'}, detailAlpha: ${s.alpha}, aspect: ${s.aspect}),`,
 ].join('\n')).join('\n');
 
 const swift = [
@@ -155,6 +156,8 @@ const swift = [
   '    let detailLight: UInt32?',
   '    let detailDark: UInt32?',
   '    let detailAlpha: CGFloat',
+  '    /// 高÷寬：畫的時候保持這個比例（按鍵太瘦時上下留白，太矮時左右留白），才不會被拉長',
+  '    let aspect: CGFloat',
   '',
   `    static let order: [String] = [${ids}]`,
   '',
@@ -162,11 +165,18 @@ const swift = [
   swiftEntries,
   '    ]',
   '',
-  '    func path(in r: CGRect) -> CGPath { Self.build(path, in: r) }',
-  '    func detailPath(in r: CGRect) -> CGPath? { detail.isEmpty ? nil : Self.build(detail, in: r) }',
-  '    func bodyRect(in r: CGRect) -> CGRect {',
-  '        CGRect(x: r.minX + r.width * body.minX / 100, y: r.minY + r.height * body.minY / 100,',
-  '               width: r.width * body.width / 100, height: r.height * body.height / 100)',
+  '    /// 按鍵裡實際畫圖案的方框：保持比例、置中',
+  '    func fit(_ r: CGRect) -> CGRect {',
+  '        var w = r.width, h = r.width * aspect',
+  '        if h > r.height { h = r.height; w = h / aspect }',
+  '        return CGRect(x: r.midX - w / 2, y: r.midY - h / 2, width: w, height: h)',
+  '    }',
+  '    func path(in r: CGRect) -> CGPath { Self.build(path, in: fit(r)) }',
+  '    func detailPath(in r: CGRect) -> CGPath? { detail.isEmpty ? nil : Self.build(detail, in: fit(r)) }',
+  '    func bodyRect(in rect: CGRect) -> CGRect {',
+  '        let r = fit(rect)',
+  '        return CGRect(x: r.minX + r.width * body.minX / 100, y: r.minY + r.height * body.minY / 100,',
+  '                      width: r.width * body.width / 100, height: r.height * body.height / 100)',
   '    }',
   '    func detailColor(theme: KeyboardTheme) -> UIColor {',
   '        guard let light = detailLight, let dark = detailDark else { return theme.accent }',
@@ -201,7 +211,7 @@ const ktEntries = shapes.map(s => [
   `                ${JSON.stringify(s.title)}, floatArrayOf(${s.body.map(f).join(', ')}),`,
   `                floatArrayOf(${s.ops.map(f).join(', ')}),`,
   `                floatArrayOf(${s.dops.map(f).join(', ')}),`,
-  `                ${s.color ? hex(s.color[0]) : 'null'}, ${s.color ? hex(s.color[1]) : 'null'}, ${s.alpha}f),`,
+  `                ${s.color ? hex(s.color[0]) : 'null'}, ${s.color ? hex(s.color[1]) : 'null'}, ${s.alpha}f, ${s.aspect}f),`,
 ].join('\n')).join('\n');
 
 const kt = [
@@ -224,11 +234,22 @@ const kt = [
   '    private val detailLight: Int?,',
   '    private val detailDark: Int?,',
   '    val detailAlpha: Float,',
+  '    /** 高÷寬：畫的時候保持這個比例（按鍵太瘦時上下留白，太矮時左右留白），才不會被拉長 */',
+  '    private val aspect: Float,',
   ') {',
-  '    fun path(r: RectF): Path = build(path, r)',
-  '    fun detailPath(r: RectF): Path = build(detail, r)',
-  '    fun bodyRect(r: RectF) = RectF(r.left + r.width() * body[0] / 100, r.top + r.height() * body[1] / 100,',
-  '        r.left + r.width() * (body[0] + body[2]) / 100, r.top + r.height() * (body[1] + body[3]) / 100)',
+  '    /** 按鍵裡實際畫圖案的方框：保持比例、置中 */',
+  '    fun fit(r: RectF): RectF {',
+  '        var w = r.width(); var h = w * aspect',
+  '        if (h > r.height()) { h = r.height(); w = h / aspect }',
+  '        return RectF(r.centerX() - w / 2, r.centerY() - h / 2, r.centerX() + w / 2, r.centerY() + h / 2)',
+  '    }',
+  '    fun path(r: RectF): Path = build(path, fit(r))',
+  '    fun detailPath(r: RectF): Path = build(detail, fit(r))',
+  '    fun bodyRect(rect: RectF): RectF {',
+  '        val r = fit(rect)',
+  '        return RectF(r.left + r.width() * body[0] / 100, r.top + r.height() * body[1] / 100,',
+  '            r.left + r.width() * (body[0] + body[2]) / 100, r.top + r.height() * (body[1] + body[3]) / 100)',
+  '    }',
   '    fun detailColor(theme: KeyboardTheme): Int {',
   '        val light = detailLight ?: return theme.accent',
   '        val c = if (theme.dark) detailDark ?: light else light',
@@ -269,7 +290,7 @@ fs.writeFileSync(path.join(root, 'android/app/src/main/java/com/startown/starkey
 const css = n => '#' + n.toString(16).padStart(6, '0');
 const web = shapes.map(s => ({
   id: s.id, title: s.title, center: r2(s.body[1] + s.body[3] / 2), d: s.svg, detail: s.dsvg,
-  color: s.color ? s.color.map(css) : null, alpha: s.alpha,
+  color: s.color ? s.color.map(css) : null, alpha: s.alpha, aspect: s.aspect,
 }));
 fs.writeFileSync(path.join(root, 'docs/sim-shapes.js'), `/* ${note} */\nwindow.SIM_ART_SHAPES = ${JSON.stringify(web)};\n`);
 console.log('造型 ' + shapes.length + ' 個：' + shapes.map(s => s.title).join('、'));
