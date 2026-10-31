@@ -177,7 +177,7 @@ struct KeyboardTheme {
 
 /// 按鍵造型
 enum KeyShape: String, CaseIterable {
-    case rounded, jelly, catEar, cloud, bunny, puppy, pudding, jellyfish, flame, droplet, duck, mochi
+    case rounded, jelly, catEar, cloud, bunny, puppy, pudding, jellyfish, flame, droplet, duck
     // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.swift）
     case catFace, bear, paw, cloudPuff, pixel, pixelHeart, puzzle, book, butterfly, strawberry, flower, moon, star, heart
 
@@ -203,7 +203,6 @@ enum KeyShape: String, CaseIterable {
         case .flame: return "火焰"
         case .droplet: return "水滴"
         case .duck: return "鴨鴨"
-        case .mochi: return "麻糬"
         default: return ""
         }
     }
@@ -402,17 +401,6 @@ enum KeyShape: String, CaseIterable {
                 path.append(circle)
             }
             return path.cgPath
-        case .mochi:
-            // 圓滾滾、下面比較胖的麻糬
-            func m(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: body.minX + body.width * x, y: body.minY + body.height * y) }
-            let p = UIBezierPath()
-            p.move(to: m(0.5, 0.03))
-            p.addCurve(to: m(0.985, 0.52), controlPoint1: m(0.86, 0.02), controlPoint2: m(0.985, 0.2))
-            p.addCurve(to: m(0.5, 0.99), controlPoint1: m(0.99, 0.88), controlPoint2: m(0.84, 0.99))
-            p.addCurve(to: m(0.015, 0.52), controlPoint1: m(0.16, 0.99), controlPoint2: m(0.01, 0.88))
-            p.addCurve(to: m(0.5, 0.03), controlPoint1: m(0.015, 0.2), controlPoint2: m(0.14, 0.02))
-            p.close()
-            return p.cgPath
         case .bunny:
             func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
                 CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)

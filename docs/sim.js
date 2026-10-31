@@ -32,8 +32,7 @@
   // center：字放在造型裡的高度（%），和 App 的 bodyRect 中心一樣；soft：有耳朵、尾巴的造型，寬鍵改成膠囊＋小圖
   var SHAPES = [
     ['rounded', '圓角', 50], ['jelly', '果凍', 50], ['catEar', '貓耳', 57], ['cloud', '雲朵', 58], ['bunny', '兔兔', 61, 1], ['puppy', '狗狗', 56, 1],
-    ['pudding', '布丁', 59.5, 1], ['jellyfish', '水母', 46, 1], ['flame', '火焰', 62.5, 1], ['droplet', '水滴', 60.5, 1], ['duck', '鴨鴨', 65, 1],
-    ['mochi', '麻糬', 51, 0, '新']
+    ['pudding', '布丁', 59.5, 1], ['jellyfish', '水母', 46, 1], ['flame', '火焰', 62.5, 1], ['droplet', '水滴', 60.5, 1], ['duck', '鴨鴨', 65, 1]
   ];
   var DETAIL = { pudding: ['#a86635', '#d7a15f'], flame: ['#ed914a', '#ffd46b'], droplet: ['#4aadd5', '#b8efff'], duck: ['#d78a32', '#ffd276'], bubble: ['#ffffff', '#ffffff'] };
   // 線條造型（docs/sim-shapes.js，和 App 同一份資料）加進清單，圖形放進頁面的 svg

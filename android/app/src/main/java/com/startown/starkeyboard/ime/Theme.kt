@@ -66,7 +66,7 @@ fun Int.withAlpha(a: Float): Int = Color.argb((Color.alpha(this) * a.coerceIn(0f
 
 /** 按鍵造型（和 iPhone 版 KeyShape 一樣的算法，單位是 dp 換成的像素） */
 enum class KeyShape(val title: String, private val artId: String? = null) {
-    ROUNDED("圓角"), JELLY("果凍"), CAT_EAR("貓耳"), CLOUD("雲朵"), BUNNY("兔兔"), PUPPY("狗狗"), PUDDING("布丁"), JELLYFISH("水母"), FLAME("火焰"), DROPLET("水滴"), DUCK("鴨鴨"), MOCHI("麻糬"),
+    ROUNDED("圓角"), JELLY("果凍"), CAT_EAR("貓耳"), CLOUD("雲朵"), BUNNY("兔兔"), PUPPY("狗狗"), PUDDING("布丁"), JELLYFISH("水母"), FLAME("火焰"), DROPLET("水滴"), DUCK("鴨鴨"),
     // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.kt）
     CAT_FACE("貓咪", "catFace"), BEAR("熊熊", "bear"), PAW("肉球", "paw"), CLOUD_PUFF("棉花雲", "cloudPuff"), PIXEL("像素", "pixel"), PIXEL_HEART("像素心", "pixelHeart"),
     PUZZLE("拼圖", "puzzle"), BOOK("書本", "book"), BUTTERFLY("蝴蝶", "butterfly"),
@@ -358,17 +358,6 @@ enum class KeyShape(val title: String, private val artId: String? = null) {
                 path.cubicTo(x(0.19f), y(0.97f), x(0.05f), y(0.84f), x(0.04f), y(0.66f))
                 path.quadTo(x(0.02f), y(0.54f), x(0.1f), y(0.57f))
                 path.quadTo(x(0.23f), y(0.64f), x(0.32f), y(0.43f))
-                path.close()
-            }
-            MOCHI -> {
-                // 圓滾滾、下面比較胖的麻糬
-                fun x(v: Float) = body.left + body.width() * v
-                fun y(v: Float) = body.top + body.height() * v
-                path.moveTo(x(0.5f), y(0.03f))
-                path.cubicTo(x(0.86f), y(0.02f), x(0.985f), y(0.2f), x(0.985f), y(0.52f))
-                path.cubicTo(x(0.99f), y(0.88f), x(0.84f), y(0.99f), x(0.5f), y(0.99f))
-                path.cubicTo(x(0.16f), y(0.99f), x(0.01f), y(0.88f), x(0.015f), y(0.52f))
-                path.cubicTo(x(0.015f), y(0.2f), x(0.14f), y(0.02f), x(0.5f), y(0.03f))
                 path.close()
             }
             else -> path.addRoundRect(body, minSide * 0.3f, minSide * 0.3f, Path.Direction.CW)
