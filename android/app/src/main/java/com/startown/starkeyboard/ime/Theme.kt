@@ -66,7 +66,7 @@ fun Int.withAlpha(a: Float): Int = Color.argb((Color.alpha(this) * a.coerceIn(0f
 
 /** 按鍵造型（和 iPhone 版 KeyShape 一樣的算法，單位是 dp 換成的像素） */
 enum class KeyShape(val title: String, private val artId: String? = null) {
-    ROUNDED("圓角"), JELLY("果凍"), CAT_EAR("貓耳"), CLOUD("雲朵"), BUNNY("兔兔"), PUPPY("狗狗"), PUDDING("布丁"), JELLYFISH("水母"), FLAME("火焰"), DROPLET("水滴"), DUCK("鴨鴨"), MOCHI("麻糬"), BUBBLE("泡泡"),
+    ROUNDED("圓角"), JELLY("果凍"), CAT_EAR("貓耳"), CLOUD("雲朵"), BUNNY("兔兔"), PUPPY("狗狗"), PUDDING("布丁"), JELLYFISH("水母"), FLAME("火焰"), DROPLET("水滴"), DUCK("鴨鴨"), MOCHI("麻糬"),
     // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.kt）
     CAT_FACE("貓咪", "catFace"), BEAR("熊熊", "bear"), PAW("肉球", "paw"), CLOUD_PUFF("棉花雲", "cloudPuff"), PIXEL("像素", "pixel"), PIXEL_HEART("像素心", "pixelHeart"),
     PUZZLE("拼圖", "puzzle"), BOOK("書本", "book"), BUTTERFLY("蝴蝶", "butterfly"),
@@ -118,13 +118,6 @@ enum class KeyShape(val title: String, private val artId: String? = null) {
     fun detailPath(r: RectF, dp: Float): Path {
         if (isWide(r)) return path(badgeRect(r), dp)
         art?.let { return it.detailPath(r) }
-        if (this == BUBBLE) {
-            val b = bodyRect(r, dp)
-            val s = minOf(b.width(), b.height()) * 0.16f
-            val l = b.left + b.width() * 0.2f
-            val tp = b.top + b.height() * 0.16f
-            return Path().apply { addOval(RectF(l, tp, l + s, tp + s), Path.Direction.CW) }
-        }
         return Path().apply {
             when (this@KeyShape) {
             BUNNY -> {
@@ -219,7 +212,6 @@ enum class KeyShape(val title: String, private val artId: String? = null) {
         FLAME -> if (theme.dark) Color.rgb(255, 212, 107) else Color.rgb(237, 145, 74)
         DROPLET -> if (theme.dark) Color.rgb(184, 239, 255) else Color.rgb(74, 173, 213)
         DUCK -> if (theme.dark) Color.rgb(255, 210, 118) else Color.rgb(215, 138, 50)
-        BUBBLE -> Color.WHITE
         else -> theme.accent
     }
 
@@ -379,7 +371,6 @@ enum class KeyShape(val title: String, private val artId: String? = null) {
                 path.cubicTo(x(0.015f), y(0.2f), x(0.14f), y(0.02f), x(0.5f), y(0.03f))
                 path.close()
             }
-            BUBBLE -> path.addRoundRect(body, minSide / 2, minSide / 2, Path.Direction.CW)
             else -> path.addRoundRect(body, minSide * 0.3f, minSide * 0.3f, Path.Direction.CW)
         }
         return path

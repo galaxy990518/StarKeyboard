@@ -177,7 +177,7 @@ struct KeyboardTheme {
 
 /// 按鍵造型
 enum KeyShape: String, CaseIterable {
-    case rounded, jelly, catEar, cloud, bunny, puppy, pudding, jellyfish, flame, droplet, duck, mochi, bubble
+    case rounded, jelly, catEar, cloud, bunny, puppy, pudding, jellyfish, flame, droplet, duck, mochi
     // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.swift）
     case catFace, bear, paw, cloudPuff, pixel, pixelHeart, puzzle, book, butterfly, strawberry, flower, moon, star, heart
 
@@ -204,7 +204,6 @@ enum KeyShape: String, CaseIterable {
         case .droplet: return "水滴"
         case .duck: return "鴨鴨"
         case .mochi: return "麻糬"
-        case .bubble: return "泡泡"
         default: return ""
         }
     }
@@ -264,11 +263,6 @@ enum KeyShape: String, CaseIterable {
     func detailPath(in r: CGRect) -> CGPath? {
         if isWide(r) { return path(in: badgeRect(in: r)) }
         if let a = art { return a.detailPath(in: r) }
-        if self == .bubble {
-            let body = bodyRect(in: r)
-            let s = min(body.width, body.height) * 0.16
-            return UIBezierPath(ovalIn: CGRect(x: body.minX + body.width * 0.2, y: body.minY + body.height * 0.16, width: s, height: s)).cgPath
-        }
         let p = UIBezierPath()
         switch self {
         case .bunny:
@@ -365,7 +359,6 @@ enum KeyShape: String, CaseIterable {
         case .flame: return UIColor(hex: theme.isDark ? 0xFFD46B : 0xED914A)
         case .droplet: return UIColor(hex: theme.isDark ? 0xB8EFFF : 0x4AADD5)
         case .duck: return UIColor(hex: theme.isDark ? 0xFFD276 : 0xD78A32)
-        case .bubble: return .white
         default: return theme.accent
         }
     }
@@ -420,8 +413,6 @@ enum KeyShape: String, CaseIterable {
             p.addCurve(to: m(0.5, 0.03), controlPoint1: m(0.015, 0.2), controlPoint2: m(0.14, 0.02))
             p.close()
             return p.cgPath
-        case .bubble:
-            return UIBezierPath(roundedRect: body, cornerRadius: min(body.width, body.height) / 2).cgPath
         case .bunny:
             func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
                 CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
