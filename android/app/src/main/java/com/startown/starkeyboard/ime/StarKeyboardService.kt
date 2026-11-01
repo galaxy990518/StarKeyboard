@@ -311,6 +311,17 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         keyboard.onKey = { handle(it) }
         keyboard.onLongPress = { showImePicker() }
         keyboard.onCursorMove = { steps -> moveCursor(steps) }   // 注音中間、編輯框的游標都在 moveCursor 裡處理
+        keyboard.onCursorLine = { dir ->
+            // 文字框自己會照畫面上的行換到上一行／下一行
+            if (!isComposing && editorText == null) {
+                currentInputConnection?.let { ic ->
+                    finishHangul()
+                    val code = if (dir > 0) KeyEvent.KEYCODE_DPAD_DOWN else KeyEvent.KEYCODE_DPAD_UP
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+                }
+            }
+        }
         keyboard.onGlide = { path, centers, kw -> glideTyped(path, centers, kw) }
         topBar.onScriptToggle = {
             if (mode == InputMode.PINYIN) {
@@ -417,7 +428,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             KeyAction.ClearCanvas -> { handwriting?.clear(); clearSuggestions() }
             KeyAction.ToggleWidth -> {
                 settings.fullWidthSymbols = !settings.fullWidthSymbols
-                toast("程式符號維持半形，中文標點維持全形")
+                toast(if (settings.fullWidthSymbols) "全形：（）：；？！" else "半形：():;?!")
                 rebuildKeys()
             }
         }

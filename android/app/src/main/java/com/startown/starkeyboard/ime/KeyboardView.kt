@@ -24,6 +24,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     var onKey: ((KeySpec) -> Unit)? = null
     var onLongPress: ((KeySpec) -> Unit)? = null
     var onCursorMove: ((Int) -> Unit)? = null
+    /** 按住空白鍵上下滑：游標換到上一行（-1）或下一行（1） */
+    var onCursorLine: ((Int) -> Unit)? = null
     /** 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去 */
     var glideEnabled = false
     var onGlide: ((List<Pt>, Map<Char, Pt>, Float) -> Unit)? = null
@@ -53,7 +55,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
 
     private var keys: List<Key> = emptyList()
 
-    private class Track(var key: Key, val action: KeyAction, val startX: Float) {
+    private class Track(var key: Key, val action: KeyAction, val startX: Float, val startY: Float = 0f) {
+        var cursorY = 0f
         var fired = false
         val points = ArrayList<Pt>()   // 滑行輸入：手指經過的點
         var visited = 1                // 經過幾個不同的鍵
@@ -373,7 +376,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 val key = keyAt(e.getX(i), e.getY(i)) ?: return true
                 // 先亮起這顆鍵，再送出上一拍還沒放開的字。選字不能擋住按鍵變色。
                 setPressed(key, true)
-                val track = Track(key, key.spec.action, e.getX(i))
+                val track = Track(key, key.spec.action, e.getX(i), e.getY(i))
                 if (glideEnabled && key.isLetter) track.points.add(Pt(e.getX(i), e.getY(i)))
                 tracks[e.getPointerId(i)] = track
                 for (t in tracks.values) {
@@ -413,15 +416,24 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                     if (t.fired) continue
                     val x = e.getX(i)
                     if (t.action == KeyAction.Space) {
-                        if (!t.cursorMode && abs(x - t.startX) > 16 * dp) {
+                        val y = e.getY(i)
+                        if (!t.cursorMode && (abs(x - t.startX) > 16 * dp || abs(y - t.startY) > 18 * dp)) {
                             t.cursorMode = true
                             t.cursorX = x
+                            t.cursorY = y
                         }
                         if (t.cursorMode) {
                             val steps = ((x - t.cursorX) / (9 * dp)).toInt()
                             if (steps != 0) {
                                 onCursorMove?.invoke(steps)
                                 t.cursorX += steps * 9 * dp
+                            }
+                            // 上下滑一段（約 22dp）換一行
+                            val lines = ((y - t.cursorY) / (22 * dp)).toInt()
+                            if (lines != 0) {
+                                val d = if (lines > 0) 1 else -1
+                                onCursorLine?.invoke(d)
+                                t.cursorY += d * 22 * dp
                             }
                         }
                     } else if (t.action.isCharacter) {

@@ -9,6 +9,9 @@ enum SymbolPages {
     static let zhuyinSymbolRow2 = "{[]<>%}～—…"
     static let zhuyinNumberRow2 = "-/：；（）$@「」"
     static let zhuyinNumberRow3 = "。，、？！."
+    /// 切成「半形」時：括號、冒號、分號、問號、驚嘆號改用半形（寫程式、英文混打用）
+    static let zhuyinNumberRow2Half = "-/:;()$@「」"
+    static let zhuyinNumberRow3Half = "。，、?!."
     static let englishSymbolRow1 = "[]{}#%^*+="
     static let englishSymbolRow2 = "_\\|~<>€£¥`"
 

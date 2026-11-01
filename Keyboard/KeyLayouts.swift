@@ -240,12 +240,13 @@ enum KeyLayouts {
                               columns: 10)
     }
 
-    /// 注音的 123 頁，和 iPhone 注音鍵盤同一排列。標點用全形，減號、斜線、錢號、小老鼠和句點用半形。
+    /// 注音的 123 頁，和 iPhone 注音鍵盤同一排列。全形時標點用全形；切成半形時括號、冒號、問號這些改半形。
     private static func chineseNumbers(_ c: Context) -> KeyboardLayout {
-        var row3 = [KeySpec(face: .text("#+="), action: .layer(.symbols), width: 1.4, kind: .special, fontSize: 16)]
-        row3 += keys(SymbolPages.zhuyinNumberRow3, size: 20, width: 1.2)
-        row3.append(backspace())
-        return KeyboardLayout(rows: [keys("1234567890"), keys(SymbolPages.zhuyinNumberRow2, size: 20), row3, bottomRow(c, columns: 10)],
+        var row3 = [KeySpec(face: .text("#+="), action: .layer(.symbols), width: 1.25, kind: .special, fontSize: 16)]
+        row3 += keys(c.fullWidthSymbols ? SymbolPages.zhuyinNumberRow3 : SymbolPages.zhuyinNumberRow3Half, size: 20, width: 1.05)
+        row3.append(KeySpec(face: .text(c.fullWidthSymbols ? "全形" : "半形"), action: .toggleWidth, width: 1.1, kind: .special, fontSize: 14))
+        row3.append(backspace(1.35))
+        return KeyboardLayout(rows: [keys("1234567890"), keys(c.fullWidthSymbols ? SymbolPages.zhuyinNumberRow2 : SymbolPages.zhuyinNumberRow2Half, size: 20), row3, bottomRow(c, columns: 10)],
                               columns: 10)
     }
 

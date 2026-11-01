@@ -236,6 +236,8 @@ final class KeyboardGridView: UIView {
     var onKey: ((KeySpec) -> Void)?
     var onGlobe: ((UIView, UIEvent?) -> Void)?
     var onCursorMove: ((Int) -> Void)?
+    /// 按住空白鍵上下滑：游標換到上一行（-1）或下一行（1）
+    var onCursorLine: ((Int) -> Void)?
     /// 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去
     var glideEnabled = false
     var onGlide: (([CGPoint], [Character: CGPoint], CGFloat) -> Void)?
@@ -255,6 +257,7 @@ final class KeyboardGridView: UIView {
         var fired = false
         var origin: CGPoint
         var cursorX: CGFloat = 0
+        var cursorY: CGFloat = 0
         var cursorMode = false
         var points: [CGPoint] = []   // 滑行輸入：手指經過的點
         var visited = 1              // 經過幾個不同的鍵
@@ -455,15 +458,22 @@ final class KeyboardGridView: UIView {
             guard var track = tracks[touch], !track.fired else { continue }
             let p = touch.location(in: self)
             if track.key.spec.action == .space {
-                if !track.cursorMode && abs(p.x - track.origin.x) > 16 {
+                if !track.cursorMode && (abs(p.x - track.origin.x) > 16 || abs(p.y - track.origin.y) > 18) {
                     track.cursorMode = true
                     track.cursorX = p.x
+                    track.cursorY = p.y
                 }
                 if track.cursorMode {
                     let steps = Int((p.x - track.cursorX) / 9)
                     if steps != 0 {
                         onCursorMove?(steps)
                         track.cursorX += CGFloat(steps) * 9
+                    }
+                    // 上下滑一段（約 22 點）換一行
+                    let lines = Int((p.y - track.cursorY) / 22)
+                    if lines != 0 {
+                        onCursorLine?(lines > 0 ? 1 : -1)
+                        track.cursorY += CGFloat(lines > 0 ? 1 : -1) * 22
                     }
                 }
             } else if track.key.spec.action.isCharacter {

@@ -362,6 +362,11 @@ final class KeyboardViewController: UIInputViewController {
             self.finishHangul()
             self.textDocumentProxy.adjustTextPosition(byCharacterOffset: steps)
         }
+        grid.onCursorLine = { [weak self] dir in
+            guard let self = self, !self.isComposing, self.editorText == nil else { return }
+            self.finishHangul()
+            self.moveCursorLine(dir)
+        }
         topBar.onScriptToggle = { [weak self] in
             guard let self = self, self.mode == .pinyin else { return }
             self.settings.pinyinSimplified.toggle()
@@ -448,7 +453,7 @@ final class KeyboardViewController: UIInputViewController {
             clearSuggestions()
         case .toggleWidth:
             settings.fullWidthSymbols.toggle()
-            toast("程式符號維持半形，中文標點維持全形")
+            toast(settings.fullWidthSymbols ? "全形：（）：；？！" : "半形：():;?!")
             rebuildKeys()
         }
     }
@@ -1766,6 +1771,36 @@ final class KeyboardViewController: UIInputViewController {
             startPhotoAdjust()
         } catch {
             toast("存檔失敗")
+        }
+    }
+
+    /// 游標換行：有換行字元就跳到上／下一行的同一欄；同一段太長（畫面上自動折行）就照一行大約幾個字跳
+    private func moveCursorLine(_ dir: Int) {
+        let perLine = max(8, Int(view.bounds.width / 19))
+        if dir < 0 {
+            let before = Array(textDocumentProxy.documentContextBeforeInput ?? "")
+            guard !before.isEmpty else { return }
+            var offset = -min(perLine, before.count)
+            if let nl = before.lastIndex(of: "\n") {
+                let col = before.count - nl - 1
+                if col <= perLine {
+                    let start = before[..<nl].lastIndex(of: "\n").map { $0 + 1 } ?? 0
+                    let target = start + min(col, nl - start)
+                    offset = target - before.count
+                }
+            }
+            textDocumentProxy.adjustTextPosition(byCharacterOffset: offset)
+        } else {
+            let before = Array(textDocumentProxy.documentContextBeforeInput ?? "")
+            let after = Array(textDocumentProxy.documentContextAfterInput ?? "")
+            guard !after.isEmpty else { return }
+            var offset = min(perLine, after.count)
+            if let nl = after.firstIndex(of: "\n"), nl <= perLine {
+                let col = before.count - ((before.lastIndex(of: "\n") ?? -1) + 1)
+                let nextEnd = after[(nl + 1)...].firstIndex(of: "\n") ?? after.count
+                offset = min(nl + 1 + col, nextEnd)
+            }
+            textDocumentProxy.adjustTextPosition(byCharacterOffset: offset)
         }
     }
 

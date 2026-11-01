@@ -156,8 +156,11 @@ object KeyLayouts {
 
     /** 注音的 123 頁，和 iPhone 注音鍵盤同一排列。標點用全形，減號、斜線、錢號、小老鼠和句點用半形。 */
     private fun chineseNumbers(c: Context): KeyboardLayout {
-        val row3 = listOf(KeySpec("#+=", KeyAction.Layer(KeyboardLayer.SYMBOLS), 1.4f, KeyKind.SPECIAL, 16f)) + keys(SymbolPages.ZHUYIN_NUMBER_ROW3, 20f, 1.2f) + backspace()
-        return KeyboardLayout(listOf(keys("1234567890"), keys(SymbolPages.ZHUYIN_NUMBER_ROW2, 20f), row3, bottomRow(c, 10f)), 10f)
+        val full = c.fullWidthSymbols
+        val toggle = KeySpec(if (full) "全形" else "半形", KeyAction.ToggleWidth, 1.1f, KeyKind.SPECIAL, 14f)
+        val row3 = listOf(KeySpec("#+=", KeyAction.Layer(KeyboardLayer.SYMBOLS), 1.25f, KeyKind.SPECIAL, 16f)) +
+            keys(if (full) SymbolPages.ZHUYIN_NUMBER_ROW3 else SymbolPages.ZHUYIN_NUMBER_ROW3_HALF, 20f, 1.05f) + toggle + backspace(1.35f)
+        return KeyboardLayout(listOf(keys("1234567890"), keys(if (full) SymbolPages.ZHUYIN_NUMBER_ROW2 else SymbolPages.ZHUYIN_NUMBER_ROW2_HALF, 20f), row3, bottomRow(c, 10f)), 10f)
     }
 
     /** 注音的 #+= 頁。Markdown 用的符號永遠半形；中文標點維持全形。 */
