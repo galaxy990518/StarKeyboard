@@ -154,6 +154,17 @@ class ZhuyinComposer {
                 current = syllables.removeAt(syllables.size - 1).also { it.open = false }
             }
         }
+        // 不能單獨念的音（ㄒ、ㄐ）後面跟著聲調：那個聲調是按錯的，接下來的 ㄩㄝ 還是同一個字
+        val full = validSyllables
+        val toned = syllables.lastOrNull()
+        if (current.isEmpty && kind != BopomofoKind.INITIAL && pendingTone == null && full != null && toned != null && toned.tone != null) {
+            val bare = toned.copy(tone = null)
+            val merged = bare.copy().also { it.put(c) }
+            if (bare.reading !in full && !bare.startsNewWith(kind) && validPrefixes?.contains(merged.reading) != false) {
+                syllables.removeAt(syllables.size - 1)
+                current = bare
+            }
+        }
         // 快速打字時拇指順便碰到空白鍵（ㄩ 就在空白鍵正上方）：ㄐ＋空白＋ㄩㄝ 還是「覺」，不是「居約」
         if (current.isEmpty && kind != BopomofoKind.INITIAL && pendingTone == null && closedIndex >= 0 && closedIndex == syllables.size - 1) {
             val last = syllables[closedIndex]

@@ -99,4 +99,13 @@ final class TypingRegressionTests: XCTestCase {
         for k in "ㄩㄝ" { c.input(k) }
         XCTAssertEqual(c.readings.map { $0.replacingOccurrences(of: "~", with: "") }, ["ㄍㄞ*", "ㄒㄩㄝ*"])
     }
+
+    /// ㄒ 後面不小心按到聲調，接著打的 ㄩㄝ 還是同一個字
+    func testStrayToneOnImpossibleSyllableIsDropped() {
+        var c = ZhuyinComposer()
+        c.validPrefixes = ["ㄒ", "ㄒㄩ", "ㄒㄩㄝ"]
+        c.validSyllables = ["ㄒㄩㄝ"]
+        for k in "ㄒ˙ㄩㄝ" { c.input(k) }
+        XCTAssertEqual(c.readings.map { $0.replacingOccurrences(of: "~", with: "") }, ["ㄒㄩㄝ*"])
+    }
 }

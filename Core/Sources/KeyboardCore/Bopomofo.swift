@@ -181,6 +181,19 @@ struct ZhuyinComposer {
                 current.open = false
             }
         }
+        // 不能單獨念的音（ㄒ、ㄐ）後面跟著聲調：那個聲調是按錯的，接下來的 ㄩㄝ 還是同一個字
+        if current.isEmpty, kind != .initial, pendingTone == nil, let full = validSyllables, let last = syllables.last,
+           last.tone != nil {
+            var bare = last
+            bare.tone = nil
+            var merged = bare
+            merged.put(c)
+            if !full.contains(bare.reading), !bare.startsNew(with: kind), validPrefixes?.contains(merged.reading) ?? true {
+                syllables.removeLast()
+                current = bare
+                current.open = false
+            }
+        }
         // 快速打字時拇指順便碰到空白鍵（ㄩ 就在空白鍵正上方）：ㄐ＋空白＋ㄩㄝ 還是「覺」，不是「居約」
         if current.isEmpty, kind != .initial, pendingTone == nil, let sc = closedBySpace, sc.index == syllables.count - 1 {
             let last = syllables[sc.index]
