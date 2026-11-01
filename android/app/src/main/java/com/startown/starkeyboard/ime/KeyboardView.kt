@@ -353,14 +353,14 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
 
     private fun spawnEffect(k: Key) {
         val glyphs = KeyEffect.from(style.keyEffect).glyphs
-        if (glyphs.isEmpty() || particles.size > 60) return
+        if (glyphs.isEmpty() || particles.size > 90) return
         val now = android.os.SystemClock.uptimeMillis()
         val t = style.theme
         repeat(3) { i ->
             particles.add(Particle(
                 glyphs.random(), k.frame.centerX(), k.frame.centerY(),
-                (Math.random().toFloat() - 0.5f) * 44 * dp, -(26 + Math.random().toFloat() * 22) * dp,
-                (Math.random().toFloat() - 0.5f) * 70f, (11 + Math.random().toFloat() * 7) * dp,
+                (Math.random().toFloat() - 0.5f) * 60 * dp, -(45 + Math.random().toFloat() * 30) * dp,
+                (Math.random().toFloat() - 0.5f) * 70f, (15 + Math.random().toFloat() * 9) * dp,
                 if (i == 0) t.accent else t.keyText, now,
             ))
         }
@@ -373,12 +373,13 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         val it = particles.iterator()
         while (it.hasNext()) {
             val p = it.next()
-            val t = (now - p.start) / 240f
+            // 飄久一點（0.8 秒），前半段清楚看得到，後半段才慢慢變透明
+            val t = (now - p.start) / 800f
             if (t >= 1f) { it.remove(); continue }
             val ease = 1 - (1 - t) * (1 - t)
             val x = p.x + p.dx * ease
             val y = p.y + p.dy * ease
-            particlePaint.color = p.color.withAlpha(1 - t)
+            particlePaint.color = p.color.withAlpha(if (t < 0.5f) 1f else 1f - (t - 0.5f) / 0.5f)
             particlePaint.textSize = p.size * (1 + 0.3f * ease)
             canvas.save()
             canvas.rotate(p.rotation * ease, x, y)

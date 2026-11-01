@@ -382,20 +382,23 @@ final class KeyboardGridView: UIView {
         for i in 0..<3 {
             let l = UILabel()
             l.text = glyphs.randomElement()
-            l.font = .systemFont(ofSize: CGFloat.random(in: 11...18))
+            l.font = .systemFont(ofSize: CGFloat.random(in: 15...24))
             l.textColor = i == 0 ? style.theme.accent : style.theme.keyText
             l.isUserInteractionEnabled = false
             l.sizeToFit()
             l.center = key.center
             addSubview(l)
-            let dx = CGFloat.random(in: -22...22)
-            let dy = CGFloat.random(in: -48 ... -26)
+            let dx = CGFloat.random(in: -30...30)
+            let dy = CGFloat.random(in: -75 ... -45)
             let turn = CGFloat.random(in: -0.6...0.6)
-            UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseOut, .allowUserInteraction], animations: {
+            // 飄久一點（0.8 秒），前半段清楚看得到，後半段才慢慢變透明
+            UIView.animate(withDuration: 0.8, delay: 0, options: [.curveEaseOut, .allowUserInteraction], animations: {
                 l.center = CGPoint(x: l.center.x + dx, y: l.center.y + dy)
-                l.alpha = 0
-                l.transform = CGAffineTransform(scaleX: 1.3, y: 1.3).rotated(by: turn)
+                l.transform = CGAffineTransform(scaleX: 1.35, y: 1.35).rotated(by: turn)
             }, completion: { _ in l.removeFromSuperview() })
+            UIView.animate(withDuration: 0.4, delay: 0.4, options: [.curveEaseIn, .allowUserInteraction], animations: {
+                l.alpha = 0
+            })
         }
     }
 
