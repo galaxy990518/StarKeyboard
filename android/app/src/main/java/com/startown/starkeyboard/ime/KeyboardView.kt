@@ -56,6 +56,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         var body: RectF = RectF()
         var detailAlpha = 0.4f
         var depth = 0f   // 立體：按鍵側面的厚度
+        var releaseAt = 0L   // 放開的時間（果凍、跳跳、搖搖放開後還會動一下）
         var scale = 1f
         var pressed = false
         var animator: ValueAnimator? = null
@@ -192,8 +193,11 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         val t = style.theme
-        // 按下去變大的鍵最後畫，才不會被旁邊的鍵蓋住
-        for (k in if (style.popKeys) keys.sortedBy { if (it.scale != 1f) 1 else 0 } else keys) {
+        val now = android.os.SystemClock.uptimeMillis()
+        val motion = KeyMotion.from(style.motion)
+        var moving = false
+        // 正在動的鍵最後畫，才不會被旁邊的鍵蓋住
+        for (k in if (motion != KeyMotion.NONE) keys.sortedBy { if (it.scale != 1f || now - it.releaseAt < 600) 1 else 0 } else keys) {
             val fill: Int
             val text: Int
             when (k.spec.kind) {
@@ -205,11 +209,9 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             val finish = style.finish
             // 按下去的程度 0～1
             val press = ((1f - k.scale) * 10f).coerceIn(0f, 1f)
-            if (k.scale != 1f && style.popKeys && k.spec.action.isCharacter) {
-                // 按下去那顆變大、往上跳一下：看得到按到哪顆；按鍵特效在後面才畫，會在它上面
-                canvas.translate(0f, -k.frame.height() * 0.22f * press)
-                val s = 1f + 0.25f * press
-                canvas.scale(s, s, k.frame.centerX(), k.frame.centerY())
+            val m = if (k.spec.action.isCharacter) motion else KeyMotion.NONE
+            if (m != KeyMotion.NONE && (k.pressed || now - k.releaseAt < 600)) {
+                if (applyMotion(canvas, k, m, press, now)) moving = true
             } else if (k.scale != 1f) {
                 val d = 1f - k.scale
                 // 胖胖的鍵按下去會被壓扁；立體的鍵往下沉
@@ -254,6 +256,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             drawLabel(canvas, k, text)
             canvas.restore()
         }
+        if (moving) postInvalidateOnAnimation()
         drawTrail(canvas)
         drawParticles(canvas)
     }
@@ -282,6 +285,63 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         previewText.typeface = KeyFonts.get(context, style.fontId) ?: Typeface.DEFAULT_BOLD
         val fm = previewText.fontMetrics
         canvas.drawText(k.spec.label, r.centerX(), r.centerY() - (fm.ascent + fm.descent) / 2, previewText)
+    }
+
+    /** 可愛的按鍵動作；回傳 true 表示還在動（要繼續重畫） */
+    private fun applyMotion(canvas: Canvas, k: Key, m: KeyMotion, press: Float, now: Long): Boolean {
+        val f = k.frame
+        val h = f.height()
+        val cx = f.centerX()
+        if (k.pressed) {
+            when (m) {
+                KeyMotion.POP -> { canvas.translate(0f, -h * 0.22f * press); canvas.scale(1f + 0.25f * press, 1f + 0.25f * press, cx, f.centerY()) }
+                KeyMotion.JELLY -> canvas.scale(1f + 0.18f * press, 1f - 0.2f * press, cx, f.bottom)   // 貼著地板壓扁
+                KeyMotion.HOP -> canvas.scale(1f + 0.06f * press, 1f - 0.1f * press, cx, f.bottom)
+                KeyMotion.WIGGLE -> { canvas.rotate(9f * press, cx, f.centerY()); canvas.scale(1f + 0.08f * press, 1f + 0.08f * press, cx, f.centerY()) }
+                KeyMotion.NONE -> {}
+            }
+            return false
+        }
+        val ms = (now - k.releaseAt).toFloat()
+        when (m) {
+            KeyMotion.JELLY -> {
+                // 像果凍一樣 duang duang 抖回來：越抖越小
+                val t = ms / 550f
+                if (t >= 1f) return false
+                val a = Math.exp(-4.5 * t).toFloat() * Math.cos(4.5 * Math.PI * t).toFloat()
+                canvas.scale(1f + 0.18f * a, 1f - 0.2f * a, cx, f.bottom)
+            }
+            KeyMotion.HOP -> {
+                // 蹦一下：往上跳（拉長）→ 落地壓扁 → 回來
+                val t = ms / 420f
+                if (t >= 1f) return false
+                if (t < 0.65f) {
+                    val u = t / 0.65f
+                    canvas.translate(0f, -h * 0.45f * Math.sin(Math.PI * u).toFloat())
+                    canvas.scale(0.92f, 1.12f, cx, f.centerY())
+                } else {
+                    val s = Math.sin(Math.PI * (t - 0.65f) / 0.35f).toFloat()
+                    canvas.scale(1f + 0.15f * s, 1f - 0.15f * s, cx, f.bottom)
+                }
+            }
+            KeyMotion.WIGGLE -> {
+                // 左右扭一扭
+                val t = ms / 400f
+                if (t >= 1f) return false
+                val angle = 12f * Math.exp(-3.5 * t).toFloat() * Math.sin(5 * Math.PI * t).toFloat()
+                canvas.rotate(-angle, cx, f.centerY())
+            }
+            KeyMotion.POP -> {
+                // 放大的那種很快縮回去
+                val t = ms / 90f
+                if (t >= 1f) return false
+                val s = 1f + 0.25f * (1f - t)
+                canvas.translate(0f, -h * 0.22f * (1f - t))
+                canvas.scale(s, s, cx, f.centerY())
+            }
+            KeyMotion.NONE -> return false
+        }
+        return true
     }
 
     private fun darker(c: Int, f: Float) = Color.rgb((Color.red(c) * f).toInt(), (Color.green(c) * f).toInt(), (Color.blue(c) * f).toInt())
@@ -392,7 +452,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     private fun setPressed(k: Key, pressed: Boolean) {
         if (k.pressed == pressed) return
         k.pressed = pressed
-        if (pressed) spawnEffect(k)
+        if (pressed) spawnEffect(k) else k.releaseAt = android.os.SystemClock.uptimeMillis()
         k.animator?.cancel()
         val anim = if (pressed) {
             ValueAnimator.ofFloat(k.scale, 0.9f).setDuration(50)

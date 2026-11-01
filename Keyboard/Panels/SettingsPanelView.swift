@@ -139,10 +139,13 @@ final class SettingsPanelView: UIView {
         ]))
         stack.addArrangedSubview(note("先「拷貝」一張圖片、GIF、表情符號或顏文字，再按上面的按鈕，空白鍵就只放那個小圖。想幫照片去背：打開「糯糯鍵盤」App →「空白鍵圖案」挑照片，會自動去背並複製好。"))
 
-        stack.addArrangedSubview(switchRow("按鍵放大（按下去那顆會變大跳起來，看得到按到哪顆）", on: settings.keyPreview) { [weak self] on in
-            self?.settings.keyPreview = on
+        stack.addArrangedSubview(header("按下去的動作"))
+        stack.addArrangedSubview(choiceRow(KeyMotion.allCases.map { $0.title },
+                                           selected: KeyMotion.allCases.firstIndex { $0.rawValue == settings.keyMotion } ?? 0) { [weak self] i in
+            self?.settings.keyMotion = KeyMotion.allCases[i].rawValue
             self?.onChange?()
         })
+        stack.addArrangedSubview(note("果凍彈彈：壓扁再 duang duang 抖回來。跳跳：放開時蹦一下。搖搖：左右扭一扭。"))
 
         stack.addArrangedSubview(header("注音被拆開了？"))
         stack.addArrangedSubview(buttonRow([("📋 複製剛剛的打字紀錄", { [weak self] in self?.onCopyTypingLog?() })]))

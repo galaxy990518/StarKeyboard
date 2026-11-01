@@ -390,9 +390,18 @@ data class KeyboardStyle(
     val finish: KeyFinish = KeyFinish.FLAT,
     /** 線條造型（貓咪、熊熊…）放大幾倍；可以超出按鍵一點點，看起來比較大顆 */
     val shapeScale: Float = 1.15f,
-    /** 按下去那顆鍵變大、往上跳一下（看得到按到哪顆，也不會擋住按鍵特效） */
-    val popKeys: Boolean = true,
+    /** 按下去的動作：jelly 果凍彈彈、hop 跳跳、wiggle 搖搖、pop 放大、none 無（只有字的按鍵會動） */
+    val motion: String = "jelly",
 )
+
+/** 按下去的動作 */
+enum class KeyMotion(val id: String, val title: String) {
+    JELLY("jelly", "🍮 果凍彈彈"), HOP("hop", "🐰 跳跳"), WIGGLE("wiggle", "🎵 搖搖"), POP("pop", "⭐ 放大"), NONE("none", "無");
+
+    companion object {
+        fun from(id: String) = values().firstOrNull { it.id == id } ?: NONE
+    }
+}
 
 /** 按鍵質感：平面、胖胖（圓滾滾、按下去會壓扁）、立體（有厚度、按下去往下沉） */
 enum class KeyFinish(val title: String) {
@@ -741,10 +750,10 @@ class KeyboardSettings(context: Context) {
         get() = p.getFloat("customSaturation2", 0.55f)
         set(v) = p.edit().putFloat("customSaturation2", v).apply()
     /** 空白鍵：theme 主題符號＋輸入法名字、image 自己的圖片／GIF、emoji 表符、text 只有字 */
-    /** 按下去那顆鍵變大跳起來 */
-    var keyPreview: Boolean
-        get() = p.getBoolean("keyPreview", true)
-        set(v) = p.edit().putBoolean("keyPreview", v).apply()
+    /** 按下去的動作（KeyMotion） */
+    var keyMotion: String
+        get() = p.getString("keyMotion", "jelly") ?: "jelly"
+        set(v) = p.edit().putString("keyMotion", v).apply()
     var spaceStyle: String
         get() = p.getString("spaceStyle", "theme") ?: "theme"
         set(v) = p.edit().putString("spaceStyle", v).apply()
@@ -838,5 +847,5 @@ class KeyboardSettings(context: Context) {
         get() = p.getString("fontId", KeyFont.SYSTEM.id) ?: KeyFont.SYSTEM.id
         set(v) = p.edit().putString("fontId", v).apply()
 
-    val style get() = KeyboardStyle(theme, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish, shapeScale, keyPreview)
+    val style get() = KeyboardStyle(theme, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish, shapeScale, keyMotion)
 }

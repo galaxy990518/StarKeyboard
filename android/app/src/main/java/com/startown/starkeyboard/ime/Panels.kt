@@ -624,7 +624,11 @@ class SettingsPanel(
         }
         note("胖胖：圓滾滾，按下去會壓扁。立體：按鍵有厚度，按下去會往下沉；按鍵調透明也看得出來。")
 
-        toggle("按鍵放大（按下去那顆會變大跳起來，看得到按到哪顆）", settings.keyPreview) { settings.keyPreview = it; onChange() }
+        header("按下去的動作")
+        choices(KeyMotion.values().map { it.title }, KeyMotion.values().indexOfFirst { it.id == settings.keyMotion }.coerceAtLeast(0)) {
+            settings.keyMotion = KeyMotion.values()[it].id; onChange()
+        }
+        note("果凍彈彈：壓扁再 duang duang 抖回來。跳跳：放開時蹦一下。搖搖：左右扭一扭。")
 
         header("空白鍵")
         val spaceModes = listOf("theme" to "主題符號", "image" to "我的圖片", "emoji" to "表符", "text" to "只有字")

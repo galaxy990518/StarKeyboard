@@ -552,8 +552,8 @@ struct KeyboardStyle {
     var finish = KeyFinish.flat
     /// 線條造型（貓咪、熊熊…）放大幾倍；可以超出按鍵一點點，看起來比較大顆
     var shapeScale: CGFloat = 1.15
-    /// 按下去那顆鍵變大、往上跳一下（看得到按到哪顆，也不會擋住按鍵特效）
-    var popKeys = true
+    /// 按下去的動作：jelly 果凍彈彈、hop 跳跳、wiggle 搖搖、pop 放大、none 無（只有字的按鍵會動）
+    var motion = KeyMotion.jelly.rawValue
 }
 
 /// 按鍵質感：平面、胖胖（圓滾滾、按下去會壓扁）、立體（有厚度、按下去往下沉）
@@ -566,6 +566,21 @@ enum KeyFinish: String, CaseIterable {
         case .flat: return "平面"
         case .puffy: return "胖胖"
         case .raised: return "立體"
+        }
+    }
+}
+
+/// 按下去的動作
+enum KeyMotion: String, CaseIterable {
+    case jelly, hop, wiggle, pop, none
+
+    var title: String {
+        switch self {
+        case .jelly: return "🍮 果凍彈彈"
+        case .hop: return "🐰 跳跳"
+        case .wiggle: return "🎵 搖搖"
+        case .pop: return "⭐ 放大"
+        case .none: return "無"
         }
     }
 }
@@ -1020,10 +1035,10 @@ final class KeyboardSettings {
         get { d.string(forKey: "keySoundStyle") ?? KeySound.system.rawValue }
         set { d.set(newValue, forKey: "keySoundStyle") }
     }
-    /// 按下去那顆鍵變大跳起來
-    var keyPreview: Bool {
-        get { bool("keyPreview", true) }
-        set { d.set(newValue, forKey: "keyPreview") }
+    /// 按下去的動作（KeyMotion）
+    var keyMotion: String {
+        get { d.string(forKey: "keyMotion") ?? KeyMotion.jelly.rawValue }
+        set { d.set(newValue, forKey: "keyMotion") }
     }
     var keySound: Bool {
         get { bool("keySound", true) }

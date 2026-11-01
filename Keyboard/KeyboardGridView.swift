@@ -213,15 +213,39 @@ final class KeyButton: UIView {
 
     private func pressChanged() {
         applyColors()
+        // 可愛的動作只給字的按鍵；空白、刪除這些照質感本來的樣子
+        let motion = spec.action.isCharacter ? (KeyMotion(rawValue: style.motion) ?? .none) : .none
+        let h = bounds.height
+        let opts: UIView.AnimationOptions = [.allowUserInteraction, .beginFromCurrentState]
+        if motion != .none {
+            // 動起來的鍵放到最上面；按鍵特效是之後才加的，還是在它上面
+            superview?.bringSubviewToFront(self)
+        }
         if isPressed {
-            if style.popKeys && spec.action.isCharacter {
-                // 按下去那顆變大、往上跳一下：看得到按到哪顆。按鍵特效是之後才加的，會在它上面
-                superview?.bringSubviewToFront(self)
-                UIView.animate(withDuration: 0.08, delay: 0, usingSpringWithDamping: 0.55, initialSpringVelocity: 0.8,
-                               options: [.allowUserInteraction, .beginFromCurrentState]) {
-                    self.content.transform = CGAffineTransform(translationX: 0, y: -self.bounds.height * 0.22).scaledBy(x: 1.25, y: 1.25)
+            switch motion {
+            case .pop:
+                UIView.animate(withDuration: 0.08, delay: 0, usingSpringWithDamping: 0.55, initialSpringVelocity: 0.8, options: opts) {
+                    self.content.transform = CGAffineTransform(translationX: 0, y: -h * 0.22).scaledBy(x: 1.25, y: 1.25)
                 }
                 return
+            case .jelly:
+                // 壓扁（貼著地板）
+                UIView.animate(withDuration: 0.06, delay: 0, options: opts) {
+                    self.content.transform = CGAffineTransform(translationX: 0, y: h * 0.1).scaledBy(x: 1.18, y: 0.8)
+                }
+                return
+            case .hop:
+                UIView.animate(withDuration: 0.05, delay: 0, options: opts) {
+                    self.content.transform = CGAffineTransform(translationX: 0, y: h * 0.04).scaledBy(x: 1.06, y: 0.9)
+                }
+                return
+            case .wiggle:
+                UIView.animate(withDuration: 0.06, delay: 0, options: opts) {
+                    self.content.transform = CGAffineTransform(rotationAngle: 0.16).scaledBy(x: 1.08, y: 1.08)
+                }
+                return
+            case .none:
+                break
             }
             UIView.animate(withDuration: 0.05, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
                 // 胖胖的鍵按下去會被壓扁
@@ -232,9 +256,39 @@ final class KeyButton: UIView {
                 }
             }
         } else {
-            // 放開後很快回到原狀。0.3 秒的彈簧會讓按鍵浮起的樣子留在畫面上。
-            UIView.animate(withDuration: 0.08, delay: 0, options: [.curveEaseOut, .allowUserInteraction, .beginFromCurrentState]) {
-                self.content.transform = .identity
+            switch motion {
+            case .jelly:
+                // 像果凍一樣 duang duang 抖回來
+                UIView.animate(withDuration: 0.55, delay: 0, usingSpringWithDamping: 0.22, initialSpringVelocity: 4, options: opts) {
+                    self.content.transform = .identity
+                }
+            case .hop:
+                // 蹦一下：往上跳（拉長）→ 落地壓扁 → 回來
+                UIView.animateKeyframes(withDuration: 0.42, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
+                    UIView.addKeyframe(withRelativeStartTime: 0, relativeDuration: 0.35) {
+                        self.content.transform = CGAffineTransform(translationX: 0, y: -h * 0.45).scaledBy(x: 0.92, y: 1.12)
+                    }
+                    UIView.addKeyframe(withRelativeStartTime: 0.35, relativeDuration: 0.3) {
+                        self.content.transform = CGAffineTransform(translationX: 0, y: h * 0.08).scaledBy(x: 1.15, y: 0.85)
+                    }
+                    UIView.addKeyframe(withRelativeStartTime: 0.65, relativeDuration: 0.35) {
+                        self.content.transform = .identity
+                    }
+                }
+            case .wiggle:
+                // 左右扭一扭
+                UIView.animateKeyframes(withDuration: 0.4, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
+                    for (i, angle) in [-0.2, 0.13, -0.07, 0.03, 0].enumerated() {
+                        UIView.addKeyframe(withRelativeStartTime: Double(i) * 0.2, relativeDuration: 0.2) {
+                            self.content.transform = CGAffineTransform(rotationAngle: CGFloat(angle))
+                        }
+                    }
+                }
+            default:
+                // 放開後很快回到原狀。0.3 秒的彈簧會讓按鍵浮起的樣子留在畫面上。
+                UIView.animate(withDuration: 0.08, delay: 0, options: [.curveEaseOut, .allowUserInteraction, .beginFromCurrentState]) {
+                    self.content.transform = .identity
+                }
             }
         }
     }
