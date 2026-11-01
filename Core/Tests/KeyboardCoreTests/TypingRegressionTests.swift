@@ -88,4 +88,15 @@ final class TypingRegressionTests: XCTestCase {
         c.input("ㄩ", at: 0); c.confirmSyllable(at: 0.1); c.input("ㄢ", at: 1.5)
         XCTAssertEqual(c.readings, ["ㄩ", "ㄢ*"])
     }
+
+    /// 朋友的打字紀錄：ㄍㄞ ㄒ 按成 ㄝ，刪掉再打 ㄩㄝ，「學」被拆成「小月」
+    func testRetypingAfterBackspaceJoinsPreviousSyllable() {
+        var c = ZhuyinComposer()
+        c.validPrefixes = ["ㄍ", "ㄍㄞ", "ㄒ", "ㄒㄩ", "ㄒㄩㄝ", "ㄝ", "ㄩ", "ㄩㄝ"]
+        for k in "ㄍㄞㄒㄝ" { c.input(k) }
+        XCTAssertEqual(c.readings.count, 3)   // ㄒ 和 ㄝ 拼不起來
+        c.backspace()
+        for k in "ㄩㄝ" { c.input(k) }
+        XCTAssertEqual(c.readings.map { $0.replacingOccurrences(of: "~", with: "") }, ["ㄍㄞ*", "ㄒㄩㄝ*"])
+    }
 }

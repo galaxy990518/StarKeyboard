@@ -170,6 +170,17 @@ struct ZhuyinComposer {
         if kind == .tone {
             return putTone(c)
         }
+        // 刪掉剛打錯的那個注音之後（ㄒ＋ㄝ 拼不起來，ㄝ 被當成下一個字；刪掉 ㄝ 再打 ㄩ）：
+        // 前一個字是被自動收起來的（沒聲調），接得上就接回去，ㄒㄩㄝ 才是「學」，不是「小月」
+        if current.isEmpty, kind != .initial, pendingTone == nil, let last = syllables.last,
+           last.open, last.tone == nil, !last.startsNew(with: kind) {
+            var merged = last
+            merged.put(c)
+            if validPrefixes?.contains(merged.reading) ?? true {
+                current = syllables.removeLast()
+                current.open = false
+            }
+        }
         // 快速打字時拇指順便碰到空白鍵（ㄩ 就在空白鍵正上方）：ㄐ＋空白＋ㄩㄝ 還是「覺」，不是「居約」
         if current.isEmpty, kind != .initial, pendingTone == nil, let sc = closedBySpace, sc.index == syllables.count - 1 {
             let last = syllables[sc.index]
