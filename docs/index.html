@@ -2,6 +2,7 @@
 <title>糯糯鍵盤｜完整功能、外觀預覽與下載</title>
 <link rel="stylesheet" href="sim.css?v=9">
 <link rel="stylesheet" href="features.css?v=1">
+<link rel="stylesheet" href="guide.css?v=1">
 <link rel="icon" type="image/png" href="assets/app-icon.png?v=4">
 <link rel="apple-touch-icon" href="assets/app-icon.png?v=4">
 <meta name="description" content="糯糯鍵盤完整功能介紹：注音、拼音繁簡、英文滑行、韓文、日文、手寫、選字記憶、表符貼圖、翻譯、主題、剪貼簿搬家，以及 iPhone／Android 的功能差異與安裝教學。">
@@ -264,6 +265,10 @@
 
   <!-- ===================== iPhone ===================== -->
   <div class="panel" id="panel-iphone" role="tabpanel" aria-labelledby="tab-iphone">
+    <section class="guide" data-guide="iphone" aria-label="iPhone 安裝圖解">
+      <h2 class="guide-title">看圖安裝（iPhone）</h2>
+      <p class="guide-hint">手機畫面是示意圖，實際按鈕位置依手機和系統版本可能有一點不同。每一步下面有更詳細的文字說明。</p>
+    </section>
     <p class="tip">電腦只需要用一次。裝好之後，更新都在 iPhone 上做：下載新的 <span class="path">.ipa</span> → 打開 LocalDevVPN → SideStore 左上角 <b>＋</b> → 選檔案 → 蓋過舊版。不用每 7 天再插線。SideStore 會自己幫免費 Apple ID 的 7 天開發者簽章續期，也可以在背景續期。</p>
     <p class="note">免費帳號最多同時 3 個側載 App（SideStore 自己算 1 個），每 7 天最多 10 個 App ID。SideStore 加上糯糯鍵盤用掉 2 個名額。只裝這個鍵盤<b>不需要</b> Sideloadly、LiveContainer、iCloud，也不用另外的 USB 無線網卡。如果已經裝了 LiveContainer，建議移除，免得佔掉第三個名額。</p>
 
@@ -364,6 +369,7 @@
 
     <section id="wifi-refresh">
       <h2>之後更新（都在手機上）</h2>
+      <div class="guide" data-guide="iphone-update" aria-label="iPhone 更新圖解"></div>
       <ol class="steps">
         <li><div>用 iPhone 打開這一頁，下載新的 <span class="path">.ipa</span>。</div></li>
         <li><div>打開 <b>LocalDevVPN</b>，確認已連上。</div></li>
@@ -386,6 +392,10 @@
 
   <!-- ===================== Android ===================== -->
   <div class="panel" id="panel-android" role="tabpanel" aria-labelledby="tab-android" hidden>
+    <section class="guide" data-guide="android" aria-label="Android 安裝圖解">
+      <h2 class="guide-title">看圖安裝（Android）</h2>
+      <p class="guide-hint">手機畫面是示意圖，實際按鈕位置依手機和系統版本可能有一點不同。每一步下面有更詳細的文字說明。</p>
+    </section>
     <p class="tip">Android 不用電腦，用手機直接下載安裝，大約 5 分鐘，也不用每 7 天重裝。</p>
 
     <section>
@@ -462,6 +472,7 @@
 
     <section>
       <h2>裝新版</h2>
+      <div class="guide" data-guide="android-update" aria-label="Android 更新圖解"></div>
       <p>有新版時，打開「糯糯鍵盤」App 最上面會出現「有新版」和下載按鈕；或直接按這一頁的「下載 Android 安裝檔」。</p>
       <p><b>已經是 v0.7.7 以後：</b>下載新的安裝檔，到「檔案」App 的下載資料夾點它，按「更新」就好，什麼都會留著，不用刪舊版。</p>
       <p><b>從 v0.7.6 或更早更新（只有這一次）：</b></p>
@@ -543,6 +554,7 @@
 
 <script src="sim-shapes.js?v=9" defer></script>
 <script src="sim.js?v=9" defer></script>
+<script src="guide.js?v=1" defer></script>
 <script src="downloads.js" defer></script>
 <script src="features.js?v=1" defer></script>
 </body></html>
