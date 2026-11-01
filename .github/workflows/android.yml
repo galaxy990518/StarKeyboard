@@ -47,6 +47,9 @@ jobs:
           git clone --depth 1 https://github.com/openvanilla/McBopomofo.git "$RUNNER_TEMP/McBopomofo"
           make -C "$RUNNER_TEMP/McBopomofo/Source/Data" data.txt
           for f in TSCharacters TSPhrases; do curl -sSfL -o "$RUNNER_TEMP/$f.txt" "https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/$f.txt"; done
+          curl -sSfL -o "$RUNNER_TEMP/Unihan.zip" https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip
+          unzip -q -o "$RUNNER_TEMP/Unihan.zip" Unihan_IRGSources.txt -d "$RUNNER_TEMP"
+          export UNIHAN="$RUNNER_TEMP/Unihan_IRGSources.txt"
           python3 tools/build_dict.py "$RUNNER_TEMP/McBopomofo/Source/Data/data.txt" android/app/src/main/assets/zhuyin.sqlite "$RUNNER_TEMP/TSCharacters.txt" "$RUNNER_TEMP/TSPhrases.txt"
 
       - name: 下載可愛字體並縮小（粉圓、芫荽、霞鶩文楷、源泉圓體、內海、俐方體11號，都是 SIL OFL 1.1）
@@ -66,6 +69,8 @@ jobs:
           curl -sSfL -o "$RUNNER_TEMP/naikai.ttf" https://raw.githubusercontent.com/max32002/naikaifont/master/tw/NaikaiFont-Regular-Lite.ttf
           curl -sSfL -o "$RUNNER_TEMP/cubic.ttf" https://raw.githubusercontent.com/ACh-K/Cubic-11/main/fonts/ttf/Cubic_11.ttf
           "$RUNNER_TEMP/venv/bin/python" tools/build_fonts.py android/app/src/main/assets/zhuyin.sqlite android/app/src/main/assets/fonts huninn="$RUNNER_TEMP/huninn.ttf" iansui="$IANSUI" wenkai="$RUNNER_TEMP/wenkai.ttf" gensen="$GENSEN" naikai="$RUNNER_TEMP/naikai.ttf" cubic="$RUNNER_TEMP/cubic.ttf"
+          # 只有粉圓放進 App，其他字體鍵盤要用時才從 font-pack 下載（iOS 那邊的打包會上傳）
+          for f in iansui wenkai gensen naikai cubic; do rm -f "android/app/src/main/assets/fonts/$f.ttf"; done
 
       - name: 下載英文常用字表（滑行輸入用；FrequencyWords，CC BY-SA 4.0）
         run: |

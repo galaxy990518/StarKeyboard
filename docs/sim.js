@@ -73,7 +73,7 @@
     return { name: '自訂', top: hsb(h, s * .15, 1), bottom: hsb(h2, s2 * .25, .97), key: '#ffffff', text: hsb(h, s * .6 + .2, .45), special: hsb(h2, s2 * .35, .95), specialText: hsb(h2, s2 * .7, .38), accent: hsb(h2, s2 * .6, .9), accentText: '#ffffff', shadow: hsb(h, s * .4, .82) };
   }
   THEMES.custom = customTheme();
-  var FINISHES = [['flat', '平面'], ['puffy', '胖胖'], ['glass', '玻璃']];
+  var FINISHES = [['flat', '平面'], ['puffy', '胖胖'], ['raised', '立體']];
   var EFFECTS = [['none', '無', []], ['stars', '星星', ['★', '☆', '✦']], ['hearts', '愛心', ['♥︎', '♡', '❤︎']], ['sparkles', '閃亮', ['✧', '✦', '⋆']], ['flowers', '花花', ['✿', '❀', '❁']], ['bubbles', '泡泡', ['○', '◦', '°']]];
   var JSD = 'https://cdn.jsdelivr.net/gh/';
   var FONTS = [
@@ -1157,8 +1157,7 @@
     photoUrl = URL.createObjectURL(file);
     var bg = $('sim-bg'); bg.style.backgroundImage = 'url("' + photoUrl + '")'; bg.classList.add('has-photo');
     $('sim-photo-clear').hidden = false;
-    if (S.finish === 'flat') setFinish('glass');
-    toast('配玻璃質感最好看');
+    toast('背景照片放好了');
   });
   $('sim-photo-clear').addEventListener('click', function () {
     var bg = $('sim-bg'); bg.style.backgroundImage = ''; bg.classList.remove('has-photo'); this.hidden = true; $('sim-photo').value = '';

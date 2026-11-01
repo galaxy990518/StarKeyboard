@@ -57,6 +57,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("com.google.mlkit:digital-ink-recognition:18.1.0")
     implementation("com.google.mlkit:translate:17.0.3")
+    // 空白鍵圖案自動去背（第一次用時 Google Play 服務會下載模型）
+    implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")
 }

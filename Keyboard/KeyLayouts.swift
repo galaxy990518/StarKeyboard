@@ -58,6 +58,8 @@ enum KeyFace: Equatable {
 enum KeyKind { case normal, special, accent }
 
 struct KeySpec {
+    /// 空白鍵的字以這個開頭＝畫自己的圖片（SpaceArt）
+    static let spaceArtMark = "\u{2060}🖼"
     var face: KeyFace
     var action: KeyAction
     /// 以「一個字母鍵」為單位；0 = 填滿剩下的寬度

@@ -110,12 +110,6 @@
 .sim-phone[data-finish="puffy"] .sim-key.down > .face { transform: scale(1.06, .86); transition-timing-function: cubic-bezier(.3,1.6,.6,1); }
 .sim-phone[data-finish="puffy"] .sim-key.wide .gloss { left: 12%; top: 18%; width: 22%; height: 22%; }
 /* 質感：玻璃 */
-.sim-phone[data-finish="glass"] .sim-key svg.shape use { fill-opacity: .42; stroke: #ffffffd9; stroke-width: 1.4px; vector-effect: non-scaling-stroke; }
-.sim-phone[data-finish="glass"] .sim-key.accent svg.shape use { fill-opacity: .8; }
-.sim-phone[data-finish="glass"] .sim-key svg.shape { filter: drop-shadow(0 2px 3px color-mix(in srgb, var(--key-shadow) 35%, transparent)); }
-.sim-phone[data-finish="glass"] .sim-key .gloss { display: block; left: 12%; right: 12%; top: calc(var(--label-y, 50%) - 32%); height: 30%; border-radius: 999px; background: linear-gradient(#ffffffb0, #ffffff10); }
-.sim-phone[data-finish="glass"] .sim-key.wide .gloss { top: 14%; }
-.sim-phone[data-finish="glass"] .sim-keyboard { -webkit-backdrop-filter: saturate(1.2); }
 .sim-key .shade { display: none; position: absolute; inset: 0; pointer-events: none; }
 
 /* 面板 */
@@ -194,7 +188,6 @@
 .sim-key svg.shape use.shade { --key: url(#sim-shade-flat); --detail: transparent; display: none; fill-opacity: 1 !important; stroke: none !important; }
 .sim-phone[data-soft="1"] .sim-key svg.shape use.shade { display: inline; }
 .sim-phone[data-finish="puffy"] .sim-key svg.shape use.shade { --key: url(#sim-shade-puffy); display: inline; }
-.sim-phone[data-finish="glass"] .sim-key svg.shape use.shade { --key: url(#sim-shade-glass); display: inline; }
 @media (max-width: 480px) { .sim-chat { height: 112px; } }
 .sim-hue { background: linear-gradient(90deg,#f66,#fc6,#6d8,#6cf,#a8f,#f6a); border-radius: 999px; height: 8px; -webkit-appearance: none; appearance: none; }
 .sim-hue::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0005; }
@@ -212,3 +205,10 @@
 #sim-custom .sim-chips button { border: 0; border-radius: 12px; padding: 6px 12px; background: #0000000d; font: inherit; font-size: 13px; cursor: pointer; color: inherit; }
 #sim-custom .sim-chips button.on { background: var(--accent, #ff8fb1); color: #fff; font-weight: 700; }
 .sim-targets button::before { content: ''; display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--dot, #ccc); border: 2px solid #fff; vertical-align: -2px; margin-right: 6px; }
+
+/* 立體：按鍵有厚度（側面是按鍵顏色調暗），按下去往下沉 */
+.sim-phone[data-finish="raised"] .sim-key svg.shape { filter: drop-shadow(0 4px 0 color-mix(in srgb, var(--key) 70%, #000)); }
+.sim-phone[data-finish="raised"] .sim-key svg.shape use.shade { --key: url(#sim-shade-raised); display: inline; }
+.sim-phone[data-finish="raised"] .sim-key .shade { display: block; }
+.sim-phone[data-finish="raised"] .sim-key.down > .face { transform: translateY(3px); }
+.sim-phone[data-finish="raised"] .sim-key.down svg.shape { filter: none; }

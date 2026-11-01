@@ -62,7 +62,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private let settings = KeyboardSettings.shared
-    private lazy var clipboardTransfer = ClipboardTransferController(presenter: self, store: clipStore) { [weak self] in
+    private lazy var clipboardTransfer = ClipboardTransferController(presenter: self, store: clipStore, style: { [unowned self] in self.style }) { [weak self] in
         (self?.panelView as? ClipboardPanelView)?.reload()
     }
     private lazy var clipStore = ClipboardStore(fileURL: Storage.url("clipboard.json"), limit: settings.clipLimit)
@@ -101,6 +101,8 @@ final class KeyboardViewController: UIInputViewController {
     private var hangul = HangulComposer()
     private var hangulShown = ""             // 韓文：已經放進輸入框、還在拼的那個字
     private var candidates: [Candidate] = []
+    /// 每個字的部首（候選字面板用部首篩選）
+    private var radicals: [Character: String] = [:]
     private var suggestions: [String] = []
     private var suggestionSource: SuggestionSource = .association
     private var panel: PanelKind?
@@ -234,6 +236,7 @@ final class KeyboardViewController: UIInputViewController {
             let pinyinCore = ZhuyinEngine(db: db, userModel: pinyinUser, column: "plain", sharedIndex: index)
             let pinyin = PinyinEngine(engine: pinyinCore, table: PinyinEngine.loadTable(from: db))
             let converter = ChineseConverter(db: db)
+            let radicals = Radicals.load(from: db)
             let prefixes = zhuyin.syllablePrefixes()
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -242,6 +245,7 @@ final class KeyboardViewController: UIInputViewController {
                 self.zhuyin.engine = zhuyin
                 self.pinyinEngineStore = pinyin
                 self.converterStore = converter
+                self.radicals = radicals
                 self.learningModels = [zhuyinUser, pinyinUser]
                 if !prefixes.isEmpty { self.composer.validPrefixes = prefixes }
                 if self.isComposing { self.updateCandidatesNow() }
@@ -818,7 +822,7 @@ final class KeyboardViewController: UIInputViewController {
                 guard !text.isEmpty else { return nil }
                 return Candidate(text: text, span: c.span, kind: c.kind, reading: c.reading)
             }
-            candidates = withShortcuts(cleaned).filter { !PhoneticText.containsPhonetic($0.text) && !$0.text.isEmpty }
+            candidates = withRawZhuyin(withShortcuts(cleaned).filter { !PhoneticText.containsPhonetic($0.text) && !$0.text.isEmpty })
             zhuyin.candidates = candidates
         }
         if !isComposing { closeCandidatePanel() }
@@ -874,13 +878,21 @@ final class KeyboardViewController: UIInputViewController {
             zhuyin.candidates = []
         }
         if !composer.readings.isEmpty && pinyinBuffer.isEmpty && kanaBuffer.isEmpty {
-            candidates = withShortcuts(candidates).filter { !PhoneticText.containsPhonetic($0.text) && !$0.text.isEmpty }
+            candidates = withRawZhuyin(withShortcuts(candidates).filter { !PhoneticText.containsPhonetic($0.text) && !$0.text.isEmpty })
             zhuyin.candidates = candidates
         }
         if !isComposing { closeCandidatePanel() }
         candidatePanel?.setCandidates(candidates.map { $0.text })
         refreshTopBar()
         refreshReturnTitle()
+    }
+
+    /// 直接送出注音本身（例如 ㄓㄜㄧㄤㄇ）：放在第 4 個（前面是最常用的字詞）
+    private func withRawZhuyin(_ list: [Candidate]) -> [Candidate] {
+        let raw = String(composer.keys.filter { $0 != "ˉ" && $0 != "*" && $0 != "~" && $0 != " " })
+        guard !raw.isEmpty, !list.contains(where: { $0.text == raw }) else { return list }
+        let at = min(3, list.count)
+        return Array(list.prefix(at)) + [Candidate(text: raw, span: composer.readings.count, kind: .raw)] + Array(list.dropFirst(at))
     }
 
     /// 快捷片語：打的字（整句）或注音（例如 ㄉㄓ）和縮寫一樣，就把片語放在第二個
@@ -1169,6 +1181,7 @@ final class KeyboardViewController: UIInputViewController {
         p.onSelect = { [weak self] i in self?.selectCandidate(at: i, learn: true) }
         p.onBack = { [weak self] in self?.closeCandidatePanel() }
         p.onBackspace = { [weak self] in self?.backspace() }
+        p.radicalOf = { [weak self] c in self?.radicals[c] }
         p.setCandidates(candidates.map { $0.text })
         p.frame = contentView.bounds
         // 不透明的底，而且先把後面的按鍵藏起來，候選字才不會跟按鍵疊在一起看不清楚
@@ -1293,6 +1306,9 @@ final class KeyboardViewController: UIInputViewController {
             p.onClearBackground = { [weak self] in self?.clearBackground() }
             p.onAdjustPhoto = { [weak self] in self?.startPhotoAdjust() }
             p.onPasteFont = { [weak self] in self?.pasteFont() }
+            p.onDownloadFont = { [weak self] id in self?.downloadFont(id) }
+            p.onPasteSpaceImage = { [weak self] in self?.pasteSpaceImage() }
+            p.onPasteSpaceEmoji = { [weak self] in self?.pasteSpaceEmoji() }
             p.onResetLearning = { [weak self] in
                 self?.engine?.resetLearning()
                 self?.toast("已清除選字學習紀錄")
@@ -1753,6 +1769,61 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
+    /// 空白鍵的圖：剪貼簿裡的 GIF（保持會動）或圖片
+    private func pasteSpaceImage() {
+        guard hasFullAccess else { toast("要先開啟「允許完整取用」"); return }
+        let pb = UIPasteboard.general
+        do {
+            if let gif = pb.data(forPasteboardType: "com.compuserve.gif") {
+                guard gif.count <= SpaceArt.maxBytes else { toast("這個 GIF 太大了（超過 3MB），換小一點的"); return }
+                try SpaceArt.save(gifData: gif)
+            } else if let img = pb.image {
+                try SpaceArt.save(image: img)
+            } else {
+                toast("剪貼簿裡沒有圖片，先「拷貝」一張圖片或 GIF")
+                return
+            }
+            settings.spaceStyle = "image"
+            settingsChanged()
+            toast("空白鍵換好了")
+        } catch {
+            toast("存檔失敗")
+        }
+    }
+
+    /// 空白鍵的表符：剪貼簿裡剛複製的表情或顏文字（太長的只留前面）
+    private func pasteSpaceEmoji() {
+        guard hasFullAccess else { toast("要先開啟「允許完整取用」"); return }
+        guard let s = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else {
+            toast("先複製一個表情符號或顏文字")
+            return
+        }
+        settings.spaceEmoji = String(s.prefix(12))
+        settings.spaceStyle = "emoji"
+        settingsChanged()
+        toast("空白鍵換好了")
+    }
+
+    /// 下載字體包裡的字體，好了就換成它
+    private func downloadFont(_ id: String) {
+        guard hasFullAccess else {
+            toast("要先開啟「允許完整取用」才能下載")
+            return
+        }
+        let name = KeyFont(rawValue: id)?.title ?? "字體"
+        toast("正在下載「\(name)」…")
+        FontPacks.download(id) { [weak self] ok in
+            guard let self = self else { return }
+            if ok {
+                self.settings.fontID = id
+                self.settingsChanged()
+                self.toast("「\(name)」下載好了")
+            } else {
+                self.toast("下載失敗，檢查一下網路再試")
+            }
+        }
+    }
+
     /// 從剪貼簿收字體：App 放的（tw.nuonuo.font）或「檔案」App 拷貝的字體檔
     private func pasteFont() {
         guard hasFullAccess else {
@@ -1836,8 +1907,15 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private var spaceTitle: String {
-        let deco = style.theme.decoration
-        return deco.isEmpty ? mode.title : "\(deco) \(mode.title)"
+        switch settings.spaceStyle {
+        // 圖片：按鍵自己畫圖，這裡的字只用來讓換圖時按鍵重畫（看不到）
+        case "image" where SpaceArt.hasImage: return KeySpec.spaceArtMark + SpaceArt.version
+        case "emoji": return settings.spaceEmoji
+        case "text": return mode.title
+        default:
+            let deco = style.theme.decoration
+            return deco.isEmpty ? mode.title : "\(deco) \(mode.title)"
+        }
     }
 
     private func refreshReturnTitle() {

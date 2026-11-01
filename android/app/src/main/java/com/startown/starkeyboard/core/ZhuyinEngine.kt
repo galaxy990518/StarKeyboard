@@ -3,7 +3,8 @@ package com.startown.starkeyboard.core
 import java.io.File
 
 data class Candidate(val text: String, val span: Int, val kind: Kind) {
-    enum class Kind { SENTENCE, PHRASE, LITERAL }
+    /** RAW：使用者要直接送出注音本身（ㄓㄜㄧㄤㄇ） */
+    enum class Kind { SENTENCE, PHRASE, LITERAL, RAW }
 }
 
 data class Scored(val text: String, val score: Double)

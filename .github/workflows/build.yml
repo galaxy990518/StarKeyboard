@@ -38,6 +38,9 @@ jobs:
           git clone --depth 1 https://github.com/openvanilla/McBopomofo.git "$RUNNER_TEMP/McBopomofo"
           make -C "$RUNNER_TEMP/McBopomofo/Source/Data" data.txt
           for f in TSCharacters TSPhrases; do curl -sSfL -o "$RUNNER_TEMP/$f.txt" "https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/$f.txt"; done
+          curl -sSfL -o "$RUNNER_TEMP/Unihan.zip" https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip
+          unzip -q -o "$RUNNER_TEMP/Unihan.zip" Unihan_IRGSources.txt -d "$RUNNER_TEMP"
+          export UNIHAN="$RUNNER_TEMP/Unihan_IRGSources.txt"
           python3 tools/build_dict.py "$RUNNER_TEMP/McBopomofo/Source/Data/data.txt" Keyboard/Resources/zhuyin.sqlite "$RUNNER_TEMP/TSCharacters.txt" "$RUNNER_TEMP/TSPhrases.txt"
           cp "$RUNNER_TEMP/McBopomofo/LICENSE.txt" Keyboard/Resources/McBopomofo-LICENSE.txt
 
@@ -58,6 +61,10 @@ jobs:
           curl -sSfL -o "$RUNNER_TEMP/naikai.ttf" https://raw.githubusercontent.com/max32002/naikaifont/master/tw/NaikaiFont-Regular-Lite.ttf
           curl -sSfL -o "$RUNNER_TEMP/cubic.ttf" https://raw.githubusercontent.com/ACh-K/Cubic-11/main/fonts/ttf/Cubic_11.ttf
           "$RUNNER_TEMP/venv/bin/python" tools/build_fonts.py Keyboard/Resources/zhuyin.sqlite Keyboard/Resources/Fonts huninn="$RUNNER_TEMP/huninn.ttf" iansui="$IANSUI" wenkai="$RUNNER_TEMP/wenkai.ttf" gensen="$GENSEN" naikai="$RUNNER_TEMP/naikai.ttf" cubic="$RUNNER_TEMP/cubic.ttf"
+          # 只有粉圓放進 App，其他字體做成「要用再下載」的字體包，鍵盤才不會越來越大
+          mkdir -p FontPack
+          for f in iansui wenkai gensen naikai cubic; do mv "Keyboard/Resources/Fonts/$f.ttf" FontPack/ 2>/dev/null || true; done
+          ls -la Keyboard/Resources/Fonts FontPack
 
       - name: 下載英文常用字表（滑行輸入用；FrequencyWords，CC BY-SA 4.0）
         run: |
@@ -120,6 +127,15 @@ jobs:
           files: StarKeyboard.ipa
           prerelease: ${{ github.ref_name != 'main' }}
           make_latest: ${{ github.ref_name == 'main' }}
+
+      # 字體包：放在固定的 font-pack 發佈裡（預發佈，不會變成最新版），鍵盤按「下載」時從這裡拿
+      - name: 上傳可下載的字體包
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view font-pack >/dev/null 2>&1 || gh release create font-pack --title "糯糯鍵盤 字體包" --notes "鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。" --prerelease --latest=false
+          gh release upload font-pack FontPack/*.ttf --clobber
 
       - uses: actions/upload-artifact@v4
         if: always()

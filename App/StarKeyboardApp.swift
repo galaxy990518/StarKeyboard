@@ -2,6 +2,8 @@ import SwiftUI
 import PhotosUI
 import UIKit
 import UniformTypeIdentifiers
+import Vision
+import CoreImage
 
 @main
 struct StarKeyboardApp: App {
@@ -16,6 +18,8 @@ struct ContentView: View {
     @State private var testText = ""
     @State private var showingPhotoPicker = false
     @State private var showingFontPicker = false
+    /// 挑照片要做什麼：photo 背景／貼圖、cutout 空白鍵（去背）、space 空白鍵（不去背）
+    @State private var pickPurpose = "photo"
     @State private var message: String?
     @State private var latest: ReleaseInfo?
     /// 檢查新版：checking 檢查中、done 檢查完、failed 連不上
@@ -99,7 +103,7 @@ struct ContentView: View {
                 }
 
                 Section {
-                    Button { showingPhotoPicker = true } label: {
+                    Button { pickPurpose = "photo"; showingPhotoPicker = true } label: {
                         Label("挑一張照片", systemImage: "photo.on.rectangle.angled")
                     }
                     Text("照片會被複製到剪貼簿。接著打開鍵盤：\n• 當背景：⚙️ 設定 › 背景圖片 › 從剪貼簿貼上圖片\n• 做成貼圖：☺ 表符 › ⭐ 我的 › ＋ › 把剪貼簿的圖片做成貼圖")
@@ -107,6 +111,20 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 } header: {
                     Text("背景圖片與自製貼圖")
+                }
+
+                Section {
+                    Button { pickPurpose = "cutout"; showingPhotoPicker = true } label: {
+                        Label("挑照片（自動去背）", systemImage: "scissors")
+                    }
+                    Button { pickPurpose = "space"; showingPhotoPicker = true } label: {
+                        Label("挑照片（不去背）", systemImage: "photo")
+                    }
+                    Text("做成空白鍵中間的小圖。挑好會先複製起來，接著打開鍵盤：⚙️ 設定 › 空白鍵 › 貼上圖片／GIF。自動去背要 iOS 17 以上。GIF 動圖請在相簿或聊天裡直接「拷貝」，再到鍵盤貼上。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("空白鍵圖案")
                 }
 
                 Section {
@@ -144,7 +162,7 @@ struct ContentView: View {
                 KeyboardPhotoPicker { image in
                     showingPhotoPicker = false
                     guard let image = image else { return }
-                    copyPhoto(image)
+                    if pickPurpose == "photo" { copyPhoto(image) } else { copySpaceImage(image, cutout: pickPurpose == "cutout") }
                 }
             }
             .fileImporter(isPresented: $showingFontPicker, allowedContentTypes: [.font]) { result in
@@ -200,6 +218,48 @@ struct ContentView: View {
             Text(text).font(.footnote).foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
+    }
+
+    /// 空白鍵的小圖：可以先自動去背（iOS 17 的 Vision 抓主體），存成透明底的 PNG 複製起來
+    @MainActor
+    private func copySpaceImage(_ image: UIImage, cutout: Bool) {
+        let side: CGFloat = 900
+        let longest = max(image.size.width, image.size.height)
+        let scale = min(1, side / longest)
+        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        var result = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
+        var note = ""
+        if cutout {
+            if #available(iOS 17.0, *), let cut = Self.removeBackground(result) {
+                result = cut
+            } else {
+                note = "（這張找不到主體，或手機版本低於 iOS 17，所以沒有去背）"
+            }
+        }
+        guard let png = result.pngData() else { message = "處理失敗，換一張試試。"; return }
+        UIPasteboard.general.setData(png, forPasteboardType: "public.png")
+        message = "複製好了！\(note)\n現在打開鍵盤，到 ⚙️ 設定 › 空白鍵 按「貼上圖片／GIF」。"
+    }
+
+    @available(iOS 17.0, *)
+    private static func removeBackground(_ image: UIImage) -> UIImage? {
+        guard let cg = image.cgImage else { return nil }
+        let request = VNGenerateForegroundInstanceMaskRequest()
+        let handler = VNImageRequestHandler(cgImage: cg, options: [:])
+        do {
+            try handler.perform([request])
+            guard let obs = request.results?.first else { return nil }
+            let buffer = try obs.generateMaskedImage(ofInstances: obs.allInstances, from: handler, croppedToInstancesExtent: true)
+            let ci = CIImage(cvPixelBuffer: buffer)
+            guard let out = CIContext().createCGImage(ci, from: ci.extent) else { return nil }
+            return UIImage(cgImage: out)
+        } catch {
+            return nil
+        }
     }
 
     /// 字體檔放到剪貼簿（只在這台手機、10 分鐘後消失），鍵盤再從剪貼簿收下

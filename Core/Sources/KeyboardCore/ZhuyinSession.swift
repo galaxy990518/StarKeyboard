@@ -159,10 +159,11 @@ final class ZhuyinSession {
     func pick(_ index: Int, learn: Bool) -> String {
         guard composer.isComposing, index >= 0, index < candidates.count else { return "" }
         let c = candidates[index]
-        let text = PhoneticText.commit(c.text)
+        // 只有「直接送出注音」那一個候選會留下注音符號，其他一律拿掉
+        let text = c.kind == .raw ? c.text : PhoneticText.commit(c.text)
         let used = c.reading.map { $0.components(separatedBy: "-") } ?? Array(composer.readings.prefix(c.span))
         let sentenceOK = c.kind == .sentence && learnableSentence(readings: used, text: text)
-        if c.kind != .literal && !text.isEmpty && (learn || c.kind == .phrase || sentenceOK) {
+        if c.kind != .literal && c.kind != .raw && !text.isEmpty && (learn || c.kind == .phrase || sentenceOK) {
             engine?.learn(readings: used, text: text)
             picks.append((used, text))
         } else {

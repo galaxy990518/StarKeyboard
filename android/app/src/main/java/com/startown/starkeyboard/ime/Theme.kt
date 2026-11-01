@@ -392,9 +392,9 @@ data class KeyboardStyle(
     val shapeScale: Float = 1.15f,
 )
 
-/** 按鍵質感：平面、胖胖（圓滾滾有立體感、按下去會壓扁）、玻璃（半透明、亮亮的邊） */
+/** 按鍵質感：平面、胖胖（圓滾滾、按下去會壓扁）、立體（有厚度、按下去往下沉） */
 enum class KeyFinish(val title: String) {
-    FLAT("平面"), PUFFY("胖胖"), GLASS("玻璃");
+    FLAT("平面"), PUFFY("胖胖"), RAISED("立體");
 }
 
 /** 按下按鍵時冒出來的小圖案 */
@@ -423,7 +423,48 @@ enum class KeySound(val id: String, val title: String) {
 /** 按鍵和候選字用的字體（App 裡附的免費字體，SIL OFL 1.1） */
 enum class KeyFont(val id: String, val title: String) {
     SYSTEM("system", "系統"), HUNINN("huninn", "粉圓"), IANSUI("iansui", "芫荽"), WENKAI("wenkai", "文楷"),
-    GENSEN("gensen", "源泉圓體"), NAIKAI("naikai", "內海"), CUBIC("cubic", "像素"),
+    GENSEN("gensen", "源泉圓體"), NAIKAI("naikai", "內海"), CUBIC("cubic", "像素");
+
+    /** 放在 App 裡的字體；其他的要用時才下載（FontPacks） */
+    val bundled get() = this == SYSTEM || this == HUNINN
+}
+
+/** 要用再下載的字體：放在 GitHub 的 font-pack 發佈，下載後存在 App 自己的空間，可以移除、之後再下載 */
+object FontPacks {
+    fun remote(id: String) = "https://github.com/z3332111-cloud/StarKeyboard/releases/download/font-pack/$id.ttf"
+    fun file(context: Context, id: String) = java.io.File(java.io.File(context.filesDir, "fontpack").apply { mkdirs() }, "$id.ttf")
+
+    /** 可以直接用（內建、已下載、或自己匯入的） */
+    fun isReady(context: Context, id: String): Boolean {
+        if (id.startsWith("user:")) return UserFonts.file(context, id).exists()
+        val f = KeyFont.values().firstOrNull { it.id == id } ?: return false
+        return f.bundled || file(context, id).exists()
+    }
+
+    /** 在背景下載，完成後在主執行緒回報 */
+    fun download(context: Context, id: String, done: (Boolean) -> Unit) {
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        Thread {
+            val ok = runCatching {
+                val conn = java.net.URL(remote(id)).openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 15000; conn.readTimeout = 30000; conn.instanceFollowRedirects = true
+                require(conn.responseCode == 200)
+                val tmp = java.io.File(context.cacheDir, "$id.part")
+                conn.inputStream.use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                require(Typeface.Builder(tmp).build() != null)
+                val target = file(context, id)
+                target.delete()
+                require(tmp.renameTo(target))
+                KeyFonts.forget(id)
+            }.isSuccess
+            main.post { done(ok) }
+        }.start()
+    }
+
+    fun remove(context: Context, id: String) {
+        file(context, id).delete()
+        KeyFonts.forget(id)
+    }
 }
 
 object KeyFonts {
@@ -434,10 +475,49 @@ object KeyFonts {
         if (id.startsWith("user:")) UserFonts.file(context, id).takeIf { it.exists() }?.let { f ->
             runCatching { Typeface.Builder(f).build() }.getOrNull()
         }
-        else runCatching { Typeface.createFromAsset(context.assets, "fonts/$id.ttf") }.getOrNull()
+        else FontPacks.file(context, id).takeIf { it.exists() }?.let { f -> runCatching { Typeface.Builder(f).build() }.getOrNull() }
+            ?: runCatching { Typeface.createFromAsset(context.assets, "fonts/$id.ttf") }.getOrNull()
     }
 
     fun forget(id: String) { cache.remove(id) }
+}
+
+/** 空白鍵上的小圖：自己的圖片（PNG，去背後是透明底）或 GIF 動圖 */
+object SpaceArt {
+    /** 空白鍵的字以這個開頭＝畫自己的圖片 */
+    const val MARK = "\u2060🖼"
+    const val MAX_BYTES = 3 * 1024 * 1024
+    private fun png(context: Context) = java.io.File(context.filesDir, "space.png")
+    private fun gif(context: Context) = java.io.File(context.filesDir, "space.gif")
+
+    fun hasImage(context: Context) = png(context).exists() || gif(context).exists()
+    fun file(context: Context) = gif(context).takeIf { it.exists() } ?: png(context).takeIf { it.exists() }
+    /** 換圖時會變，用來讓按鍵重畫 */
+    fun version(context: Context) = file(context)?.lastModified()?.toString() ?: "0"
+
+    fun saveGif(context: Context, bytes: ByteArray) {
+        require(bytes.size <= MAX_BYTES) { "這個 GIF 太大了（超過 3MB），換小一點的" }
+        clear(context)
+        gif(context).writeBytes(bytes)
+    }
+
+    fun saveImage(context: Context, bitmap: android.graphics.Bitmap) {
+        clear(context)
+        val scale = minOf(1f, 200f / maxOf(bitmap.width, bitmap.height))
+        val small = android.graphics.Bitmap.createScaledBitmap(bitmap, maxOf(1, (bitmap.width * scale).toInt()), maxOf(1, (bitmap.height * scale).toInt()), true)
+        png(context).outputStream().use { small.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    fun clear(context: Context) { png(context).delete(); gif(context).delete() }
+
+    /** 讀圖：Android 9 以上 GIF 會動，舊手機只顯示第一格 */
+    fun load(context: Context): android.graphics.drawable.Drawable? {
+        val f = file(context) ?: return null
+        return runCatching {
+            if (android.os.Build.VERSION.SDK_INT >= 28) android.graphics.ImageDecoder.decodeDrawable(android.graphics.ImageDecoder.createSource(f))
+            else android.graphics.drawable.BitmapDrawable(context.resources, android.graphics.BitmapFactory.decodeFile(f.path))
+        }.getOrNull()
+    }
 }
 
 /** 使用者自己匯入的字體（自己買的、自己用）：檔案在 App 自己的空間，id 是 "user:" 開頭 */
@@ -658,13 +738,20 @@ class KeyboardSettings(context: Context) {
     var customSaturation2: Float
         get() = p.getFloat("customSaturation2", 0.55f)
         set(v) = p.edit().putFloat("customSaturation2", v).apply()
+    /** 空白鍵：theme 主題符號＋輸入法名字、image 自己的圖片／GIF、emoji 表符、text 只有字 */
+    var spaceStyle: String
+        get() = p.getString("spaceStyle", "theme") ?: "theme"
+        set(v) = p.edit().putString("spaceStyle", v).apply()
+    var spaceEmoji: String
+        get() = p.getString("spaceEmoji", "🐰") ?: "🐰"
+        set(v) = p.edit().putString("spaceEmoji", v).apply()
     var customDark: Boolean
         get() = p.getBoolean("customDark", false)
         set(v) = p.edit().putBoolean("customDark", v).apply()
     val theme: KeyboardTheme
         get() = if (themeId == "custom") KeyboardTheme.custom(customHue, customSaturation, customDark, customHue2, customSaturation2) else KeyboardTheme.named(themeId)
     var keyFinish: KeyFinish
-        get() = runCatching { KeyFinish.valueOf(p.getString("keyFinish", "FLAT")!!) }.getOrDefault(KeyFinish.FLAT)
+        get() = runCatching { KeyFinish.valueOf(p.getString("keyFinish", "FLAT")!!.replace("GLASS", "RAISED")) }.getOrDefault(KeyFinish.FLAT)
         set(v) = p.edit().putString("keyFinish", v.name).apply()
     var keySoundStyle: String
         get() = p.getString("keySoundStyle", KeySound.SYSTEM.id) ?: KeySound.SYSTEM.id

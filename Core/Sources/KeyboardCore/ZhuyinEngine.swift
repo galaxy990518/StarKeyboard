@@ -5,6 +5,7 @@ struct Candidate: Equatable {
         case sentence   // 整串自動組好的句子
         case phrase     // 字典裡的詞或單字
         case literal    // 查不到，直接用注音符號
+        case raw        // 使用者要直接送出注音本身（ㄓㄜㄧㄤㄇ）
     }
 
     let text: String

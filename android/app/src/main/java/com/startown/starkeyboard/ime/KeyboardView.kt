@@ -45,6 +45,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         var shading: LinearGradient? = null
         var body: RectF = RectF()
         var detailAlpha = 0.4f
+        var depth = 0f   // 立體：按鍵側面的厚度
         var scale = 1f
         var pressed = false
         var animator: ValueAnimator? = null
@@ -157,6 +158,9 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 outer.inset(-outer.width() * grow / 2, -outer.height() * grow / 2)
             }
             if (outer.width() < 4 || outer.height() < 4) continue
+            // 立體：按鍵往上留出側面的厚度
+            k.depth = if (style.finish == KeyFinish.RAISED) minOf(4.5f * dp, outer.height() * 0.12f) else 0f
+            outer.bottom -= k.depth
             k.path = style.shape.path(outer, dp)
             k.detail = style.shape.detailPath(outer, dp)
             val a = style.keyAlpha
@@ -164,11 +168,12 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             val shadeColors = when (style.finish) {
                 KeyFinish.FLAT -> intArrayOf(Color.WHITE.withAlpha(a * 0.30f), Color.TRANSPARENT, Color.BLACK.withAlpha(a * 0.04f))
                 KeyFinish.PUFFY -> intArrayOf(Color.WHITE.withAlpha(a * 0.5f), Color.TRANSPARENT, Color.BLACK.withAlpha(a * (if (dark) 0.22f else 0.10f)))
-                KeyFinish.GLASS -> intArrayOf(Color.WHITE.withAlpha(if (dark) 0.22f else 0.45f), Color.WHITE.withAlpha(0.04f), Color.WHITE.withAlpha(if (dark) 0.08f else 0.2f))
+                // 立體：按鍵調得很透明也看得到上亮下暗
+                KeyFinish.RAISED -> maxOf(a, 0.6f).let { v -> intArrayOf(Color.WHITE.withAlpha(v * (if (dark) 0.3f else 0.55f)), Color.TRANSPARENT, Color.BLACK.withAlpha(v * (if (dark) 0.25f else 0.12f))) }
             }
             k.shading = if (style.shape.isSoftShape || style.finish != KeyFinish.FLAT) LinearGradient(0f, outer.top, 0f, outer.bottom,
                 shadeColors, floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP) else null
-            k.shadow = Path(k.path).apply { offset(0f, (if (style.finish == KeyFinish.PUFFY) 3f else 1.5f) * dp) }
+            k.shadow = Path(k.path).apply { offset(0f, if (k.depth > 0) k.depth else (if (style.finish == KeyFinish.PUFFY) 3f else 1.5f) * dp) }
             k.body = style.shape.bodyRect(outer, dp)
             k.detailAlpha = style.shape.detailOpacity(outer)
         }
@@ -186,32 +191,34 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             }
             canvas.save()
             val finish = style.finish
+            // 按下去的程度 0～1
+            val press = ((1f - k.scale) * 10f).coerceIn(0f, 1f)
             if (k.scale != 1f) {
-                // 胖胖的鍵按下去會被壓扁
                 val d = 1f - k.scale
+                // 胖胖的鍵按下去會被壓扁；立體的鍵往下沉
                 if (finish == KeyFinish.PUFFY) canvas.scale(1f + d * 0.6f, 1f - d * 1.4f, k.frame.centerX(), k.frame.centerY())
+                else if (finish == KeyFinish.RAISED) canvas.translate(0f, k.depth * press * 0.85f)
                 else canvas.scale(k.scale, k.scale, k.frame.centerX(), k.frame.centerY())
             }
             val a = style.keyAlpha
-            fillPaint.color = t.shadow.withAlpha(when (finish) {
-                KeyFinish.FLAT -> if (style.shape.isSoftShape) a * 0.32f else minOf(1f, a + 0.1f)
-                KeyFinish.PUFFY -> minOf(1f, a * 0.75f)
-                KeyFinish.GLASS -> a * 0.18f
-            })
+            fillPaint.color = when (finish) {
+                KeyFinish.FLAT -> t.shadow.withAlpha(if (style.shape.isSoftShape) a * 0.32f else minOf(1f, a + 0.1f))
+                KeyFinish.PUFFY -> t.shadow.withAlpha(minOf(1f, a * 0.75f))
+                // 側面用按鍵本身的顏色調暗，透明的鍵也一定看得到
+                KeyFinish.RAISED -> darker(fill, if (t.dark) 0.55f else 0.78f).withAlpha(maxOf(a, 0.85f) * (1f - press))
+            }
+            // 影子只畫在按鍵外面，按鍵調透明時才不會看到兩層疊在一起
+            canvas.save()
+            canvas.clipOutPath(k.path)
             canvas.drawPath(k.shadow, fillPaint)
-            fillPaint.color = fill.withAlpha(if (finish == KeyFinish.GLASS) a * (if (k.spec.kind == KeyKind.ACCENT) 0.78f else 0.42f) else a)
+            canvas.restore()
+            fillPaint.color = fill.withAlpha(a)
             canvas.drawPath(k.path, fillPaint)
             if (finish == KeyFinish.PUFFY) {
                 // 左上角一顆圓圓的反光，看起來鼓鼓的
                 val b = k.body
                 fillPaint.color = Color.WHITE.withAlpha(if (t.dark) 0.3f else 0.75f)
                 canvas.drawOval(RectF(b.left + b.width() * 0.14f, b.top + b.height() * 0.1f, b.left + b.width() * 0.46f, b.top + b.height() * 0.3f), fillPaint)
-            } else if (finish == KeyFinish.GLASS) {
-                // 上半部一條亮亮的反光
-                val b = k.body
-                val g = RectF(b.left + b.width() * 0.1f, b.top + b.height() * 0.07f, b.right - b.width() * 0.1f, b.top + b.height() * 0.41f)
-                fillPaint.color = Color.WHITE.withAlpha(if (t.dark) 0.18f else 0.55f)
-                canvas.drawRoundRect(g, g.height() / 2, g.height() / 2, fillPaint)
             } else if (style.shape == KeyShape.JELLY) {
                 val b = k.body
                 val gh = maxOf(2.5f * dp, b.height() * 0.16f)
@@ -227,11 +234,6 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             }
             fillPaint.color = style.shape.detailColor(t).withAlpha(style.keyAlpha * k.detailAlpha)
             canvas.drawPath(k.detail, fillPaint)
-            if (finish == KeyFinish.GLASS) {
-                rimPaint.strokeWidth = dp
-                rimPaint.color = Color.WHITE.withAlpha(if (t.dark) 0.35f else 0.85f)
-                canvas.drawPath(k.path, rimPaint)
-            }
             drawLabel(canvas, k, text)
             canvas.restore()
         }
@@ -239,7 +241,41 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         drawParticles(canvas)
     }
 
+    private fun darker(c: Int, f: Float) = Color.rgb((Color.red(c) * f).toInt(), (Color.green(c) * f).toInt(), (Color.blue(c) * f).toInt())
+
+    // 空白鍵的圖（GIF 會動）：換圖時才重新讀
+    private var spaceArt: android.graphics.drawable.Drawable? = null
+    private var spaceArtKey = ""
+    // Drawable 只記得 callback 的弱參照，要自己留著
+    private val spaceArtCallback = object : android.graphics.drawable.Drawable.Callback {
+        override fun invalidateDrawable(who: android.graphics.drawable.Drawable) { invalidate() }
+        override fun scheduleDrawable(who: android.graphics.drawable.Drawable, what: Runnable, `when`: Long) { postDelayed(what, `when` - android.os.SystemClock.uptimeMillis()) }
+        override fun unscheduleDrawable(who: android.graphics.drawable.Drawable, what: Runnable) { removeCallbacks(what) }
+    }
+
+    private fun drawSpaceArt(canvas: Canvas, k: Key): Boolean {
+        if (!k.spec.label.startsWith(SpaceArt.MARK)) return false
+        if (spaceArtKey != k.spec.label) {
+            spaceArtKey = k.spec.label
+            (spaceArt as? android.graphics.drawable.Animatable)?.stop()
+            spaceArt = SpaceArt.load(context)?.also { d ->
+                d.callback = spaceArtCallback
+                (d as? android.graphics.drawable.Animatable)?.start()
+            }
+        }
+        val d = spaceArt ?: return false
+        // 小小的放在正中間，維持原本的比例
+        val h = k.body.height() * 0.8f
+        val iw = d.intrinsicWidth.coerceAtLeast(1).toFloat(); val ih = d.intrinsicHeight.coerceAtLeast(1).toFloat()
+        val w = minOf(h * iw / ih, k.body.width() * 0.6f)
+        val hh = w * ih / iw
+        d.setBounds((k.body.centerX() - w / 2).toInt(), (k.body.centerY() - hh / 2).toInt(), (k.body.centerX() + w / 2).toInt(), (k.body.centerY() + hh / 2).toInt())
+        d.draw(canvas)
+        return true
+    }
+
     private fun drawLabel(canvas: Canvas, k: Key, color: Int) {
+        if (drawSpaceArt(canvas, k)) return
         textPaint.color = color
         textPaint.typeface = KeyFonts.get(context, style.fontId)
             ?: if (k.spec.kind == KeyKind.NORMAL) Typeface.DEFAULT else Typeface.DEFAULT_BOLD

@@ -554,15 +554,16 @@ struct KeyboardStyle {
     var shapeScale: CGFloat = 1.15
 }
 
-/// 按鍵質感：平面、胖胖（圓滾滾有立體感、按下去會壓扁）、玻璃（半透明、亮亮的邊）
+/// 按鍵質感：平面、胖胖（圓滾滾、按下去會壓扁）、立體（有厚度、按下去往下沉）
+/// 立體的存檔名沿用舊的 "glass"，以前選玻璃的人會直接變成立體
 enum KeyFinish: String, CaseIterable {
-    case flat, puffy, glass
+    case flat, puffy, raised = "glass"
 
     var title: String {
         switch self {
         case .flat: return "平面"
         case .puffy: return "胖胖"
-        case .glass: return "玻璃"
+        case .raised: return "立體"
         }
     }
 }
@@ -621,6 +622,55 @@ enum KeyFont: String, CaseIterable {
         case .cubic: return "像素"
         }
     }
+
+    /// 放在 App 裡的字體；其他的要用時才下載（FontPacks）
+    var bundled: Bool { self == .system || self == .huninn }
+}
+
+/// 要用再下載的字體：放在 GitHub 的 font-pack 發佈，下載後存在鍵盤自己的空間，可以移除、之後再下載
+enum FontPacks {
+    static func remote(_ id: String) -> URL {
+        URL(string: "https://github.com/z3332111-cloud/StarKeyboard/releases/download/font-pack/\(id).ttf")!
+    }
+
+    private static var dir: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let d = base.appendingPathComponent("FontPack", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }
+
+    private static func file(_ id: String) -> URL { dir.appendingPathComponent(id + ".ttf") }
+
+    /// 已經下載好的字體檔
+    static func url(_ id: String) -> URL? {
+        guard let f = KeyFont(rawValue: id), !f.bundled else { return nil }
+        let u = file(id)
+        return FileManager.default.fileExists(atPath: u.path) ? u : nil
+    }
+
+    /// 可以直接用（內建、已下載、或使用者自己匯入的）
+    static func isReady(_ id: String) -> Bool {
+        if id.hasPrefix("user:") { return UserFonts.url(id) != nil }
+        guard let f = KeyFont(rawValue: id) else { return false }
+        return f.bundled || url(id) != nil
+    }
+
+    static func download(_ id: String, done: @escaping (Bool) -> Void) {
+        URLSession.shared.downloadTask(with: remote(id)) { tmp, response, _ in
+            var ok = false
+            if let tmp = tmp, (response as? HTTPURLResponse)?.statusCode == 200,
+               let provider = CGDataProvider(url: tmp as CFURL), CGFont(provider) != nil {
+                try? FileManager.default.removeItem(at: file(id))
+                ok = (try? FileManager.default.moveItem(at: tmp, to: file(id))) != nil
+            }
+            DispatchQueue.main.async { done(ok) }
+        }.resume()
+    }
+
+    static func remove(_ id: String) {
+        try? FileManager.default.removeItem(at: file(id))
+    }
 }
 
 enum KeyFonts {
@@ -637,7 +687,7 @@ enum KeyFonts {
     /// 第一次用時把字體檔註冊給系統，記住它的名字
     private static func postScriptName(_ id: String) -> String? {
         if let n = names[id] { return n }
-        guard let url = UserFonts.url(id) ?? Bundle.main.url(forResource: id, withExtension: "ttf")
+        guard let url = UserFonts.url(id) ?? FontPacks.url(id) ?? Bundle.main.url(forResource: id, withExtension: "ttf")
                 ?? Bundle.main.url(forResource: id, withExtension: "ttf", subdirectory: "Fonts"),
               let provider = CGDataProvider(url: url as CFURL),
               let cg = CGFont(provider),
@@ -645,6 +695,72 @@ enum KeyFonts {
         CTFontManagerRegisterGraphicsFont(cg, nil)
         names[id] = name
         return name
+    }
+}
+
+/// 空白鍵上的小圖：自己的圖片（PNG，去背後的透明底）或 GIF 動圖，存在鍵盤自己的空間
+enum SpaceArt {
+    private static var dir: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        return base
+    }
+    private static var png: URL { dir.appendingPathComponent("space.png") }
+    private static var gif: URL { dir.appendingPathComponent("space.gif") }
+    static let maxBytes = 3 * 1024 * 1024
+    private static var cache: (String, UIImage?)?
+
+    static var hasImage: Bool { FileManager.default.fileExists(atPath: png.path) || FileManager.default.fileExists(atPath: gif.path) }
+
+    /// 換圖時會變，用來讓按鍵重畫
+    static var version: String {
+        let url = FileManager.default.fileExists(atPath: gif.path) ? gif : png
+        let date = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date) ?? nil
+        return String(Int(date?.timeIntervalSince1970 ?? 0))
+    }
+
+    static func save(gifData: Data) throws {
+        clear()
+        try gifData.write(to: gif, options: .atomic)
+    }
+
+    static func save(image: UIImage) throws {
+        clear()
+        guard let data = image.resized(maxSide: 200).pngData() else { throw CocoaError(.fileWriteUnknown) }
+        try data.write(to: png, options: .atomic)
+    }
+
+    static func clear() {
+        try? FileManager.default.removeItem(at: png)
+        try? FileManager.default.removeItem(at: gif)
+        cache = nil
+    }
+
+    /// 讀圖（GIF 會變成會動的圖，每格縮小到 160 像素，記憶體才不會爆）
+    static func image() -> UIImage? {
+        let v = version
+        if let c = cache, c.0 == v { return c.1 }
+        var result: UIImage?
+        if FileManager.default.fileExists(atPath: gif.path), let src = CGImageSourceCreateWithURL(gif as CFURL, nil) {
+            let count = min(CGImageSourceGetCount(src), 80)
+            var frames: [UIImage] = []
+            var total = 0.0
+            let opts = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: 160,
+                        kCGImageSourceCreateThumbnailWithTransform: true] as CFDictionary
+            for i in 0..<count {
+                guard let cg = CGImageSourceCreateThumbnailAtIndex(src, i, opts) else { continue }
+                frames.append(UIImage(cgImage: cg))
+                let props = CGImageSourceCopyPropertiesAtIndex(src, i, nil) as? [CFString: Any]
+                let g = props?[kCGImagePropertyGIFDictionary] as? [CFString: Any]
+                let d = (g?[kCGImagePropertyGIFUnclampedDelayTime] as? Double) ?? (g?[kCGImagePropertyGIFDelayTime] as? Double) ?? 0.1
+                total += d < 0.02 ? 0.1 : d
+            }
+            result = frames.count > 1 ? UIImage.animatedImage(with: frames, duration: total) : frames.first
+        } else if FileManager.default.fileExists(atPath: png.path) {
+            result = UIImage(contentsOfFile: png.path)
+        }
+        cache = (v, result)
+        return result
     }
 }
 
@@ -880,6 +996,15 @@ final class KeyboardSettings {
     var customSaturation2: Double {
         get { double("customSaturation2", 0.55) }
         set { d.set(newValue, forKey: "customSaturation2") }
+    }
+    /// 空白鍵：theme 主題符號＋輸入法名字、image 自己的圖片／GIF、emoji 表符、text 只有字
+    var spaceStyle: String {
+        get { d.string(forKey: "spaceStyle") ?? "theme" }
+        set { d.set(newValue, forKey: "spaceStyle") }
+    }
+    var spaceEmoji: String {
+        get { d.string(forKey: "spaceEmoji") ?? "🐰" }
+        set { d.set(newValue, forKey: "spaceEmoji") }
     }
     var customDark: Bool {
         get { bool("customDark", false) }

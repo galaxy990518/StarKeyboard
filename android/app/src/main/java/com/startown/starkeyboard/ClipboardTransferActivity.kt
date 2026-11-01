@@ -47,7 +47,10 @@ class ClipboardTransferActivity : Activity() {
                 message("已跳過標示為敏感的內容。")
             } else {
                 val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
+                val backup = text?.trim()?.takeIf { it.startsWith("{") || it.startsWith("[") }?.let { t -> runCatching { ClipboardArchive.decodeContents(t.toByteArray(), plainText = false) }.getOrNull() }
                 if (text.isNullOrBlank()) message("目前沒有複製的文字。")
+                // iPhone 匯出的備份文字（JSON）直接照備份匯入，保留釘選和分類
+                else if (backup != null) confirm(backup.entries, backup.categories)
                 else AlertDialog.Builder(this).setTitle("文字怎麼分筆？")
                     .setItems(arrayOf("每行一筆", "整段一筆（保留換行）")) { _, index ->
                         safely { confirm(ClipboardArchive.textEntries(text, index == 0)) }

@@ -169,18 +169,59 @@ class EmojiPanel(
 
 /** 展開的候選字（全部列出來） */
 @SuppressLint("ViewConstructor")
-class CandidatePanel(context: Context, style: KeyboardStyle, onSelect: (Int) -> Unit, onBack: () -> Unit, onBackspace: () -> Unit) : LinearLayout(context) {
+class CandidatePanel(context: Context, private val style: KeyboardStyle, onSelect: (Int) -> Unit, onBack: () -> Unit, onBackspace: () -> Unit,
+                     private val radicalOf: (Char) -> String? = { null }) : LinearLayout(context) {
     private val grid = ChipGrid(context, style)
+    // 部首篩選：上面一排部首，點了只留那個部首的單字
+    private val radicalScroll = HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false }
+    private val radicalRow = LinearLayout(context).apply { orientation = HORIZONTAL; setPadding(dpi(8f), dpi(4f), dpi(8f), dpi(2f)) }
+    private var all: List<String> = emptyList()
+    private var shown: List<Int> = emptyList()
+    private var filter: String? = null
 
     init {
         orientation = VERTICAL
-        grid.onSelect = onSelect
+        grid.onSelect = { i -> shown.getOrNull(i)?.let(onSelect) }
+        radicalScroll.addView(radicalRow)
+        addView(radicalScroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         addView(grid, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
         addView(PanelBottomBar(context, style, emptyList(), -1, "▲", onBack = onBack, onTab = {}, onBackspace = onBackspace),
             LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
     }
 
-    fun setCandidates(texts: List<String>) = grid.setItems(texts.map { ChipGrid.Item.Text(it) }, false)
+    fun setCandidates(texts: List<String>) {
+        if (texts == all) return
+        all = texts
+        filter = null
+        apply()
+    }
+
+    private fun apply() {
+        val f = filter
+        shown = all.indices.filter { i -> f == null || (all[i].length == 1 && radicalOf(all[i][0]) == f) }
+        grid.setItems(shown.map { ChipGrid.Item.Text(all[it]) }, false)
+        buildRadicals()
+    }
+
+    /** 候選裡單字的部首，出現越多次的排越前面 */
+    private fun buildRadicals() {
+        radicalRow.removeAllViews()
+        val counts = LinkedHashMap<String, Int>()
+        for (t in all) if (t.length == 1) radicalOf(t[0])?.let { counts[it] = (counts[it] ?: 0) + 1 }
+        val list = counts.entries.sortedByDescending { it.value }.map { it.key }
+        radicalScroll.visibility = if (list.size >= 2) VISIBLE else GONE
+        if (list.size < 2) return
+        val t = style.theme
+        for (value in listOf<String?>(null) + list) {
+            val on = filter == value
+            radicalRow.addView(Tap(context, value ?: "全部", if (value == null) 14f else 17f, if (on) t.accentText else t.keyText, on) {
+                filter = value; apply()
+            }.apply {
+                background = roundRect(if (on) t.accent else t.key.withAlpha(0.7f), dp(12f))
+                KeyFonts.get(context, style.fontId)?.let { typeface = it }
+            }, LayoutParams(dpi(if (value == null) 52f else 40f), dpi(30f)).apply { rightMargin = dpi(6f) })
+        }
+    }
 }
 
 /** 剪貼簿紀錄：點一下貼上、📌 釘選、✕ 刪除 */
@@ -339,6 +380,9 @@ class SettingsPanel(
     private val onAddShortcut: () -> Unit,
     private val onResetLearning: () -> Unit,
     private val onImportFont: () -> Unit,
+    private val onDownloadFont: (String) -> Unit,
+    private val onPickSpaceImage: () -> Unit,
+    private val onPasteSpaceEmoji: () -> Unit,
     onBack: () -> Unit,
 ) : LinearLayout(context) {
     private val col = LinearLayout(context).apply { orientation = VERTICAL; setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(12f)) }
@@ -577,7 +621,17 @@ class SettingsPanel(
         choices(KeyFinish.values().map { it.title }, settings.keyFinish.ordinal) {
             settings.keyFinish = KeyFinish.values()[it]; onChange()
         }
-        note("胖胖：圓滾滾有立體感，按下去會壓扁。玻璃：半透明亮亮的，配背景照片最好看。")
+        note("胖胖：圓滾滾，按下去會壓扁。立體：按鍵有厚度，按下去會往下沉；按鍵調透明也看得出來。")
+
+        header("空白鍵")
+        val spaceModes = listOf("theme" to "主題符號", "image" to "我的圖片", "emoji" to "表符", "text" to "只有字")
+        choices(spaceModes.map { it.second }, spaceModes.indexOfFirst { it.first == settings.spaceStyle }.coerceAtLeast(0)) {
+            if (spaceModes[it].first == "image" && !SpaceArt.hasImage(context)) onPickSpaceImage()
+            else { settings.spaceStyle = spaceModes[it].first; onChange() }
+        }
+        button("🖼 挑圖片／GIF（可以自動去背）") { onPickSpaceImage() }
+        button("😊 貼上剛複製的表符") { onPasteSpaceEmoji() }
+        note("空白鍵只放一個小圖：照片可以自動去背，也可以用 GIF 動圖，或複製一個表情符號、顏文字再按「貼上」。")
 
         header("按鍵特效（按下去冒出小圖案）")
         choices(KeyEffect.values().map { it.title }, KeyEffect.values().indexOfFirst { it.id == settings.keyEffect }) {
@@ -589,23 +643,31 @@ class SettingsPanel(
         for (group in allFonts.chunked(4)) {
             val fonts = LinearLayout(context).apply { orientation = HORIZONTAL }
             for ((id, title) in group) {
-            val selected = id == settings.fontId
-            fonts.addView(Tap(context, title, 16f, if (selected) t.accentText else t.keyText, selected) {
-                settings.fontId = id; onChange()
+            val ready = FontPacks.isReady(context, id)
+            val selected = id == settings.fontId && ready
+            fonts.addView(Tap(context, if (ready) title else "⬇ $title", if (ready) 16f else 15f, if (selected) t.accentText else t.keyText, selected) {
+                if (ready) { settings.fontId = id; onChange() } else onDownloadFont(id)
             }.apply {
                 background = roundRect(if (selected) t.accent else t.key.withAlpha(0.6f), dp(12f))
-                KeyFonts.get(context, id)?.let { typeface = it }
+                if (ready) KeyFonts.get(context, id)?.let { typeface = it }
                 maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
             }, LayoutParams(0, dpi(40f), 1f).apply { rightMargin = dpi(6f); bottomMargin = dpi(6f) })
             }
             repeat(4 - group.size) { fonts.addView(View(context), LayoutParams(0, dpi(40f), 1f)) }
             col.addView(fonts)
         }
+        KeyFont.values().firstOrNull { it.id == settings.fontId && !it.bundled && FontPacks.isReady(context, it.id) }?.let { f ->
+            button("移除「${f.title}」（之後可以再下載）") {
+                FontPacks.remove(context, f.id)
+                settings.fontId = KeyFont.SYSTEM.id; onChange()
+            }
+        }
         button("＋ 匯入我的字體（自己買的 .ttf／.otf）") { onImportFont() }
         if (settings.fontId.startsWith("user:")) button("刪掉這個字體") {
             UserFonts.remove(context, settings.fontId)
             settings.fontId = KeyFont.SYSTEM.id; onChange()
         }
+        note("有 ⬇ 的字體按一下才下載（要有網路），不用的可以移除，鍵盤就不會越來越大。")
         note("字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。")
 
         header("大小（邊拖邊看）")

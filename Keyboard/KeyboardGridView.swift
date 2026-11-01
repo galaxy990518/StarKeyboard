@@ -26,6 +26,10 @@ final class KeyButton: UIView {
     private let detailLayer = CAShapeLayer()
     private let cushionLayer = CAGradientLayer()
     private let cushionMask = CAShapeLayer()
+    // 影子只畫在按鍵外面（按鍵調透明時才不會看到兩層疊在一起）
+    private let shadowMask = CAShapeLayer()
+    // 立體：側面的厚度
+    private var depth: CGFloat = 0
     private let label = UILabel()
     private let icon = UIImageView()
 
@@ -35,6 +39,8 @@ final class KeyButton: UIView {
         super.init(frame: .zero)
         isUserInteractionEnabled = false
         addSubview(content)
+        shadowMask.fillRule = .evenOdd
+        shadowLayer.mask = shadowMask
         content.layer.addSublayer(shadowLayer)
         content.layer.addSublayer(bodyLayer)
         content.layer.addSublayer(glossLayer)
@@ -68,9 +74,12 @@ final class KeyButton: UIView {
             let grow = style.shapeScale - 1
             outer = outer.insetBy(dx: -outer.width * grow / 2, dy: -outer.height * grow / 2)
         }
-        let path = style.shape.path(in: outer)
         let finish = style.finish
-        var shift = CGAffineTransform(translationX: 0, y: finish == .puffy ? 3 : 1.5)
+        // 立體：按鍵往上留出側面的厚度
+        depth = finish == .raised ? min(4.5, outer.height * 0.12) : 0
+        outer.size.height -= depth
+        let path = style.shape.path(in: outer)
+        var shift = CGAffineTransform(translationX: 0, y: depth > 0 ? depth : (finish == .puffy ? 3 : 1.5))
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         bodyLayer.path = path
@@ -83,17 +92,18 @@ final class KeyButton: UIView {
         detailLayer.path = style.shape.detailPath(in: outer)
         detailLayer.opacity = Float(style.shape.detailOpacity(in: outer))
         shadowLayer.path = path.copy(using: &shift)
+        shadowLayer.frame = bounds
+        shadowMask.frame = bounds
+        let hole = CGMutablePath()
+        hole.addRect(bounds.insetBy(dx: -bounds.width, dy: -bounds.height))
+        hole.addPath(path)
+        shadowMask.path = hole
         let body = style.shape.bodyRect(in: outer)
         if finish == .puffy {
             // 左上角一顆圓圓的反光，看起來鼓鼓的
             let gloss = CGRect(x: body.minX + body.width * 0.14, y: body.minY + body.height * 0.1,
                                width: body.width * 0.32, height: body.height * 0.2)
             glossLayer.path = UIBezierPath(ovalIn: gloss).cgPath
-        } else if finish == .glass {
-            // 上半部一條亮亮的反光
-            let gloss = CGRect(x: body.minX + body.width * 0.1, y: body.minY + body.height * 0.07,
-                               width: body.width * 0.8, height: body.height * 0.34)
-            glossLayer.path = UIBezierPath(roundedRect: gloss, cornerRadius: gloss.height / 2).cgPath
         } else if style.shape == .jelly {
             let gloss = CGRect(x: body.minX + body.width * 0.2, y: body.minY + 2.5,
                                width: body.width * 0.6, height: max(2.5, body.height * 0.16))
@@ -117,9 +127,27 @@ final class KeyButton: UIView {
         // 字的框左右放寬一點，字放大時才不會被縮小
         label.frame = art ? textRect.insetBy(dx: -textRect.width * 0.15, dy: -textRect.height * 0.2) : textRect.insetBy(dx: 2, dy: 0)
         icon.frame = textRect
+        if icon.contentMode == .scaleAspectFit {
+            // 空白鍵的圖：小小的放在正中間
+            let h = textRect.height * 0.8
+            icon.frame = CGRect(x: textRect.midX - h * 1.5, y: textRect.midY - h / 2, width: h * 3, height: h)
+        }
+    }
+
+    /// 空白鍵要畫自己的圖片
+    private var spaceArt: UIImage? {
+        guard case .text(let s) = spec.face, s.hasPrefix(KeySpec.spaceArtMark) else { return nil }
+        return SpaceArt.image()
     }
 
     private func updateFace() {
+        if let art = spaceArt {
+            label.isHidden = true
+            icon.isHidden = false
+            icon.contentMode = .scaleAspectFit
+            icon.image = art
+            return
+        }
         switch spec.face {
         case .text(let s):
             label.isHidden = false
@@ -167,14 +195,14 @@ final class KeyButton: UIView {
             shadowLayer.fillColor = t.shadow.withAlphaComponent(min(1, a * 0.75)).cgColor
             cushionLayer.colors = [UIColor.white.withAlphaComponent(a * 0.5).cgColor,
                                    UIColor.clear.cgColor, UIColor.black.withAlphaComponent(a * (t.isDark ? 0.22 : 0.10)).cgColor]
-        case .glass:
-            // 半透明＋白色細邊，背景照片會透出來
-            bodyLayer.fillColor = fill.withAlphaComponent(a * (spec.kind == .accent ? 0.78 : 0.42)).cgColor
-            bodyLayer.strokeColor = UIColor.white.withAlphaComponent(t.isDark ? 0.35 : 0.85).cgColor
-            bodyLayer.lineWidth = 1
-            shadowLayer.fillColor = t.shadow.withAlphaComponent(a * 0.18).cgColor
-            cushionLayer.colors = [UIColor.white.withAlphaComponent(t.isDark ? 0.22 : 0.45).cgColor,
-                                   UIColor.white.withAlphaComponent(0.04).cgColor, UIColor.white.withAlphaComponent(t.isDark ? 0.08 : 0.2).cgColor]
+        case .raised:
+            // 側面用按鍵本身的顏色調暗，按鍵調得很透明也一定看得出厚度；按下去時側面消失（沉下去了）
+            bodyLayer.fillColor = fill.withAlphaComponent(a).cgColor
+            bodyLayer.strokeColor = nil
+            shadowLayer.fillColor = fill.darker(t.isDark ? 0.55 : 0.78).withAlphaComponent(isPressed ? 0 : max(a, 0.85)).cgColor
+            let v = max(a, 0.6)
+            cushionLayer.colors = [UIColor.white.withAlphaComponent(v * (t.isDark ? 0.3 : 0.55)).cgColor,
+                                   UIColor.clear.cgColor, UIColor.black.withAlphaComponent(v * (t.isDark ? 0.25 : 0.12)).cgColor]
         }
         detailLayer.fillColor = style.shape.detailColor(theme: t).withAlphaComponent(style.keyAlpha).cgColor
         glossLayer.fillColor = UIColor.white.withAlphaComponent(style.finish == .puffy ? (t.isDark ? 0.3 : 0.75) : (t.isDark ? 0.18 : 0.55)).cgColor
@@ -188,8 +216,11 @@ final class KeyButton: UIView {
         if isPressed {
             UIView.animate(withDuration: 0.05, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
                 // 胖胖的鍵按下去會被壓扁
-                self.content.transform = self.style.finish == .puffy
-                    ? CGAffineTransform(scaleX: 1.06, y: 0.86) : CGAffineTransform(scaleX: 0.9, y: 0.9)
+                switch self.style.finish {
+                case .puffy: self.content.transform = CGAffineTransform(scaleX: 1.06, y: 0.86)
+                case .raised: self.content.transform = CGAffineTransform(translationX: 0, y: self.depth * 0.85)
+                case .flat: self.content.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+                }
             }
         } else {
             // 放開後很快回到原狀。0.3 秒的彈簧會讓按鍵浮起的樣子留在畫面上。
@@ -501,5 +532,14 @@ final class KeyboardGridView: UIView {
     private func stopRepeat() {
         repeatTimer?.invalidate()
         repeatTimer = nil
+    }
+}
+
+extension UIColor {
+    /// 調暗（立體按鍵的側面）
+    func darker(_ f: CGFloat) -> UIColor {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        getRed(&r, green: &g, blue: &b, alpha: &a)
+        return UIColor(red: r * f, green: g * f, blue: b * f, alpha: a)
     }
 }

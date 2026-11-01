@@ -114,6 +114,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private var editorCursor: Int? = null
     // 打注音打到一半，游標在注音中間時是第幾個鍵的前面；null = 在最後面（平常的打法）
     private var zyCursor: Int? = null
+    /** 每個字的部首（候選字面板用部首篩選），第一次打開面板時才讀 */
+    private var radicals: Map<Char, String>? = null
     // 搜尋剪貼簿找到的（候選列的順序）
     private var clipResults: List<ClipItem> = emptyList()
     private var editorPurpose = EditorPurpose.EMOTICON
@@ -474,7 +476,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             mainHandler.post {
                 if (generation != candidateGeneration) return@post
                 if (pinyinBuffer.isNotEmpty() || kanaBuffer.isNotEmpty()) return@post
-                candidates = withShortcuts(list).filter { it.text.isNotEmpty() && ZhuyinEngine.commit(it.text) == it.text }
+                candidates = withRawZhuyin(withShortcuts(list).filter { it.text.isNotEmpty() && ZhuyinEngine.commit(it.text) == it.text })
                 candidatePanel?.setCandidates(candidates.map { it.text })
                 refreshTopBar()
                 refreshReturnTitle()
@@ -804,7 +806,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             } ?: emptyList()
         }
         if (composer.readings.isNotEmpty() && pinyinBuffer.isEmpty() && kanaBuffer.isEmpty()) {
-            candidates = withShortcuts(candidates)
+            candidates = withRawZhuyin(withShortcuts(candidates))
         }
         if (!isComposing) {
             currentInputConnection?.setComposingText("", 1)
@@ -857,6 +859,14 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     } catch (e: Exception) {
         CrashLog.record(this, e)
         null
+    }
+
+    /** 直接送出注音本身（例如 ㄓㄜㄧㄤㄇ）：放在第 4 個（前面是最常用的字詞） */
+    private fun withRawZhuyin(list: List<Candidate>): List<Candidate> {
+        val raw = composer.keys.filter { it != 'ˉ' && it != '*' && it != '~' && it != ' ' }.joinToString("")
+        if (raw.isEmpty() || list.any { it.text == raw }) return list
+        val at = minOf(3, list.size)
+        return list.take(at) + Candidate(raw, composer.readings.size, Candidate.Kind.RAW) + list.drop(at)
     }
 
     /** 快捷片語：打的字（整句）或注音（例如 ㄉㄓ）和縮寫一樣，就把片語放在第二個 */
@@ -945,11 +955,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         }
         if (composer.isComposing) {
             val c = candidates.getOrNull(i) ?: return
-            val text = ZhuyinEngine.commit(c.text)
+            // 只有「直接送出注音」那一個候選會留下注音符號，其他一律拿掉
+            val text = if (c.kind == Candidate.Kind.RAW) c.text else ZhuyinEngine.commit(c.text)
             val used = composer.readings.take(c.span)
             val sentenceOk = c.kind == Candidate.Kind.SENTENCE &&
                 synchronized(dictLock) { engine?.learnableSentence(used, text) } == true
-            if (c.kind != Candidate.Kind.LITERAL && text.isNotEmpty() && (learn || c.kind == Candidate.Kind.PHRASE || sentenceOk)) {
+            if (c.kind != Candidate.Kind.LITERAL && c.kind != Candidate.Kind.RAW && text.isNotEmpty() && (learn || c.kind == Candidate.Kind.PHRASE || sentenceOk)) {
                 synchronized(dictLock) { engine?.learn(used, text) }
             }
             if (text.isNotEmpty()) output(text)
@@ -1101,7 +1112,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             closeCandidatePanel()
             return
         }
-        val p = CandidatePanel(this, style, { selectCandidate(it, true) }, { closeCandidatePanel() }, { backspace() })
+        val rad = radicals ?: SQLitePhraseSource.radicals(this).also { radicals = it }
+        val p = CandidatePanel(this, style, { selectCandidate(it, true) }, { closeCandidatePanel() }, { backspace() }, { rad[it] })
         p.setCandidates(candidates.map { it.text })
         content.addView(p, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         candidatePanel = p
@@ -1286,6 +1298,13 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 shortcuts = shortcuts,
                 onAddShortcut = { beginEditor(EditorPurpose.SHORTCUT_PHRASE) },
                 onResetLearning = { engine?.resetLearning(); toast("已清除選字學習紀錄") },
+                onDownloadFont = { id -> downloadFont(id) },
+                onPickSpaceImage = {
+                    startActivity(Intent(this, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        .putExtra(MainActivity.EXTRA_PICK, MainActivity.PICK_SPACE))
+                },
+                onPasteSpaceEmoji = { pasteSpaceEmoji() },
                 onImportFont = {
                     startActivity(Intent(this, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1365,6 +1384,30 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             openPanel(PanelKind.SETTINGS)
         }
         refreshTopBar()
+    }
+
+    /** 空白鍵的表符：剪貼簿裡剛複製的表情或顏文字（太長的只留前面） */
+    private fun pasteSpaceEmoji() {
+        val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val s = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()?.trim()
+        if (s.isNullOrEmpty()) { toast("先複製一個表情符號或顏文字"); return }
+        settings.spaceEmoji = s.take(12)
+        settings.spaceStyle = "emoji"
+        settingsChanged()
+        toast("空白鍵換好了")
+    }
+
+    /** 下載字體包裡的字體，好了就換成它 */
+    private fun downloadFont(id: String) {
+        val name = KeyFont.values().firstOrNull { it.id == id }?.title ?: "字體"
+        toast("正在下載「$name」…")
+        FontPacks.download(this, id) { ok ->
+            if (ok) {
+                settings.fontId = id
+                settingsChanged()
+                toast("「$name」下載好了")
+            } else toast("下載失敗，檢查一下網路再試")
+        }
     }
 
     private fun openApp() {
@@ -1693,7 +1736,13 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             }
         }
 
-    private val spaceTitle get() = style.theme.decoration.let { if (it.isEmpty()) mode.title else "$it ${mode.title}" }
+    private val spaceTitle: String get() = when (settings.spaceStyle) {
+        // 圖片：按鍵自己畫圖，這裡的字只用來讓換圖時按鍵重畫（看不到）
+        "image" -> if (SpaceArt.hasImage(this)) SpaceArt.MARK + SpaceArt.version(this) else mode.title
+        "emoji" -> settings.spaceEmoji
+        "text" -> mode.title
+        else -> style.theme.decoration.let { if (it.isEmpty()) mode.title else "$it ${mode.title}" }
+    }
 
     private fun refreshReturnTitle() {
         if (returnTitle != lastReturnTitle) rebuildKeys()

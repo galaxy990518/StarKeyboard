@@ -34,6 +34,7 @@ class MainActivity : Activity() {
         const val PICK_BACKGROUND = 1
         const val PICK_STICKER = 2
         const val PICK_FONT = 3
+        const val PICK_SPACE = 4
     }
 
     private val pink = Color.parseColor("#E8577E")
@@ -156,6 +157,10 @@ class MainActivity : Activity() {
         button("挑一張照片做成貼圖") { pick(PICK_STICKER) }
         text("貼圖會出現在鍵盤的 ☺ 表符 › ⭐ 我的。支援傳圖片的 App（像 LINE、Messenger）會直接送出圖片，不支援的會先複製，再長按貼上。")
 
+        title("空白鍵圖案")
+        button("挑圖片或 GIF 做成空白鍵的小圖") { pick(PICK_SPACE) }
+        text("照片可以選自動去背；GIF 會保持會動（Android 9 以上）。之後在鍵盤 ⚙ 設定 › 空白鍵 可以換回主題符號或改用表符。")
+
         title("我的字體")
         button("匯入我的字體（.ttf／.otf）") { pick(PICK_FONT) }
         text("可以用自己買的字體，只在自己的鍵盤上顯示。匯入後到鍵盤 ⚙ 設定 › 字體 選它；不要的話選它再按「刪掉這個字體」。中文字體檔通常比較大，超過 40MB 的鍵盤裝不下。")
@@ -215,6 +220,10 @@ class MainActivity : Activity() {
             importFont(uri)
             return
         }
+        if (requestCode == PICK_SPACE) {
+            pickedSpace(uri)
+            return
+        }
         val bitmap = load(uri, if (requestCode == PICK_STICKER) 512 else 1000) ?: run {
             toast("讀不到這張照片")
             return
@@ -243,6 +252,58 @@ class MainActivity : Activity() {
                 toast("做好貼圖了！在鍵盤的 ☺ › ⭐ 我的")
             }
         }
+    }
+
+    /** 空白鍵的圖：GIF 原樣保存；照片問要不要去背 */
+    private fun pickedSpace(uri: Uri) {
+        val isGif = contentResolver.getType(uri) == "image/gif"
+        if (isGif) {
+            runCatching {
+                val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("讀不到這個檔案")
+                com.startown.starkeyboard.ime.SpaceArt.saveGif(this, bytes)
+            }.onSuccess { spaceDone() }.onFailure { toast(it.message ?: "讀不到這個 GIF") }
+            return
+        }
+        val bitmap = load(uri, 900) ?: run { toast("讀不到這張照片"); return }
+        android.app.AlertDialog.Builder(this).setTitle("要自動去背嗎？")
+            .setMessage("去背會只留下主角（人、動物、物品），第一次用要等它下載一下。")
+            .setPositiveButton("自動去背") { _, _ -> cutout(bitmap) }
+            .setNegativeButton("不用") { _, _ -> saveSpace(bitmap) }
+            .show()
+    }
+
+    private fun cutout(bitmap: Bitmap) {
+        toast("去背中…")
+        val options = com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions.Builder()
+            .enableForegroundBitmap().build()
+        com.google.mlkit.vision.segmentation.subject.SubjectSegmentation.getClient(options)
+            .process(com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap, 0))
+            .addOnSuccessListener { result ->
+                val fg = result.foregroundBitmap
+                if (fg == null) { toast("找不到主角，先用原圖"); saveSpace(bitmap) } else saveSpace(trim(fg))
+            }
+            .addOnFailureListener { toast("沒辦法去背（可能還在下載，等一下再試），先用原圖"); saveSpace(bitmap) }
+    }
+
+    /** 把透明的邊裁掉，主角才會大大的 */
+    private fun trim(b: Bitmap): Bitmap {
+        var l = b.width; var t = b.height; var r = -1; var btm = -1
+        val row = IntArray(b.width)
+        for (y in 0 until b.height) {
+            b.getPixels(row, 0, b.width, 0, y, b.width, 1)
+            for (x in 0 until b.width) if ((row[x] ushr 24) > 16) { if (x < l) l = x; if (x > r) r = x; if (y < t) t = y; btm = y }
+        }
+        return if (r < l || btm < t) b else Bitmap.createBitmap(b, l, t, r - l + 1, btm - t + 1)
+    }
+
+    private fun saveSpace(bitmap: Bitmap) {
+        runCatching { com.startown.starkeyboard.ime.SpaceArt.saveImage(this, bitmap) }
+            .onSuccess { spaceDone() }.onFailure { toast("存檔失敗") }
+    }
+
+    private fun spaceDone() {
+        KeyboardSettings(this).spaceStyle = "image"
+        toast("空白鍵換好了！打開鍵盤看看")
     }
 
     /** 把挑好的字體檔存進鍵盤，順便換成這個字體 */

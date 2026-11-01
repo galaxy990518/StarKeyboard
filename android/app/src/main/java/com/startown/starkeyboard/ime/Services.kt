@@ -30,6 +30,20 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
     private var context = ContextModel.EMPTY
 
     companion object {
+        /** 每個字的部首（字典裡的 radicals 表，來自 Unicode Unihan）；舊字典沒有這張表就是空的 */
+        fun radicals(context: Context): Map<Char, String> = runCatching {
+            val map = HashMap<Char, String>()
+            SQLiteDatabase.openDatabase(File(context.filesDir, "zhuyin.sqlite").path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                db.rawQuery("SELECT ch, rad FROM radicals", null).use { c ->
+                    while (c.moveToNext()) {
+                        val ch = c.getString(0) ?: continue
+                        if (ch.length == 1) map[ch[0]] = c.getString(1) ?: continue
+                    }
+                }
+            }
+            map
+        }.getOrDefault(emptyMap())
+
         fun open(context: Context, column: String = "reading"): SQLitePhraseSource? = runCatching {
             val file = File(context.filesDir, "zhuyin.sqlite")
             val stamp = File(context.filesDir, "zhuyin.version")

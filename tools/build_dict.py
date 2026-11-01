@@ -19,6 +19,7 @@ import os
 import re
 import sqlite3
 import sys
+import unicodedata
 
 SYLLABLE = "[ㄅ-ㄩˊˇˋ˙]+"
 READING = re.compile("^%s(-%s)*$" % (SYLLABLE, SYLLABLE))
@@ -169,6 +170,27 @@ def main(src, dst, opencc):
                     continue
                 if gram and n > 0:
                     ngrams.append((gram, n))
+    # 部首（打注音後用部首找字）：Unicode 的 Unihan 字表 kRSUnicode（Unicode 授權，可自由使用）。
+    # 環境變數 UNIHAN 指到 Unihan_IRGSources.txt；沒有就不建這張表，鍵盤會把部首按鈕藏起來。
+    db.execute("CREATE TABLE radicals(ch TEXT PRIMARY KEY, rad TEXT NOT NULL)")
+    unihan = os.environ.get("UNIHAN")
+    if unihan and os.path.exists(unihan):
+        singles_set = {p for (r, p) in best if len(p) == 1}
+        rows = []
+        with open(unihan, encoding="utf-8") as f:
+            for line in f:
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) != 3 or parts[1] != "kRSUnicode":
+                    continue
+                ch = chr(int(parts[0][2:], 16))
+                if ch not in singles_set:
+                    continue
+                num = int(parts[2].split()[0].split(".")[0].rstrip("'\""))
+                if 1 <= num <= 214:
+                    # 康熙部首區的字（⽊）轉成一般的字（木）
+                    rows.append((ch, unicodedata.normalize("NFKC", chr(0x2F00 + num - 1))))
+        db.executemany("INSERT OR REPLACE INTO radicals VALUES (?, ?)", rows)
+        print("部首 %d 字" % len(rows))
     db.execute("CREATE TABLE ngrams(gram TEXT PRIMARY KEY, n INTEGER NOT NULL)")
     db.executemany("INSERT INTO ngrams VALUES (?, ?)", ngrams)
     db.commit()

@@ -232,6 +232,8 @@ final class EmojiPanelView: UIView {
 /// 展開的候選字（全部列出來）
 final class CandidatePanelView: UIView {
     var onSelect: ((Int) -> Void)?
+    /// 查一個字的部首；有的話上面會出現一排部首可以篩選
+    var radicalOf: ((Character) -> String?)?
     var onBack: (() -> Void)?
     var onBackspace: (() -> Void)?
     var style: KeyboardStyle {
@@ -245,6 +247,10 @@ final class CandidatePanelView: UIView {
     private let grid: ChipGridView
     private let bar: PanelBottomBar
     private var displayedCandidates: [String] = []
+    // 部首篩選：上面一排部首，點了只留那個部首的單字
+    private let radicalScroll = UIScrollView()
+    private var radicalFilter: String?
+    private var shownIndex: [Int] = []
 
     init(style: KeyboardStyle) {
         self.style = style
@@ -253,9 +259,14 @@ final class CandidatePanelView: UIView {
         super.init(frame: .zero)
         backgroundColor = style.theme.backgroundBottom.withAlphaComponent(1)
         grid.cellStyle = .chip
-        grid.onSelect = { [weak self] i in self?.onSelect?(i) }
+        grid.onSelect = { [weak self] i in
+            guard let self = self, i < self.shownIndex.count else { return }
+            self.onSelect?(self.shownIndex[i])
+        }
         bar.onBack = { [weak self] in self?.onBack?() }
         bar.onBackspace = { [weak self] in self?.onBackspace?() }
+        radicalScroll.showsHorizontalScrollIndicator = false
+        addSubview(radicalScroll)
         addSubview(grid)
         addSubview(bar)
     }
@@ -265,14 +276,67 @@ final class CandidatePanelView: UIView {
     func setCandidates(_ texts: [String]) {
         guard texts != displayedCandidates else { return }
         displayedCandidates = texts
-        grid.items = texts.map { .text($0) }
+        radicalFilter = nil
+        applyFilter()
+    }
+
+    /// 候選裡單字的部首，出現越多次的排越前面
+    private var radicalList: [String] {
+        guard let of = radicalOf else { return [] }
+        var count: [String: Int] = [:]
+        var order: [String] = []
+        for t in displayedCandidates where t.count == 1 {
+            guard let r = of(t.first!) else { continue }
+            if count[r] == nil { order.append(r) }
+            count[r, default: 0] += 1
+        }
+        return order.sorted { count[$0]! > count[$1]! }
+    }
+
+    private func applyFilter() {
+        shownIndex = displayedCandidates.indices.filter { i in
+            guard let f = radicalFilter else { return true }
+            let t = displayedCandidates[i]
+            return t.count == 1 && radicalOf?(t.first!) == f
+        }
+        grid.items = shownIndex.map { .text(displayedCandidates[$0]) }
         grid.scrollToTop()
+        buildRadicalRow()
+        setNeedsLayout()
+    }
+
+    private func buildRadicalRow() {
+        radicalScroll.subviews.forEach { $0.removeFromSuperview() }
+        let list = radicalList
+        radicalScroll.isHidden = list.count < 2
+        guard list.count >= 2 else { return }
+        var x: CGFloat = 8
+        for (title, value) in [("全部", nil as String?)] + list.map { ("部首 " + $0, Optional($0)) } {
+            let b = UIButton(type: .custom)
+            let on = radicalFilter == value
+            b.setTitle(value == nil ? title : value!, for: .normal)
+            b.titleLabel?.font = KeyFonts.font(style.fontID, size: value == nil ? 14 : 17, weight: on ? .bold : .regular)
+            b.setTitleColor(on ? style.theme.accentText : style.theme.keyText, for: .normal)
+            b.backgroundColor = on ? style.theme.accent : style.theme.key.withAlphaComponent(0.7)
+            b.layer.cornerRadius = 12
+            let w: CGFloat = value == nil ? 52 : 40
+            b.frame = CGRect(x: x, y: 4, width: w, height: 30)
+            b.addAction(UIAction { [weak self] _ in
+                self?.radicalFilter = value
+                self?.applyFilter()
+            }, for: .touchUpInside)
+            radicalScroll.addSubview(b)
+            x += w + 6
+        }
+        radicalScroll.contentSize = CGSize(width: x + 2, height: 38)
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         let barH: CGFloat = 40
-        grid.frame = CGRect(x: 0, y: 0, width: bounds.width, height: bounds.height - barH)
+        let top: CGFloat = radicalScroll.isHidden ? 0 : 38
+        radicalScroll.frame = CGRect(x: 0, y: 0, width: bounds.width, height: top)
+        grid.frame = CGRect(x: 0, y: top, width: bounds.width, height: bounds.height - barH - top)
         bar.frame = CGRect(x: 0, y: bounds.height - barH, width: bounds.width, height: barH)
     }
 }

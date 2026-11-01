@@ -7,6 +7,9 @@ final class SettingsPanelView: UIView {
     var onClearBackground: (() -> Void)?
     var onAdjustPhoto: (() -> Void)?
     var onPasteFont: (() -> Void)?
+    var onDownloadFont: ((String) -> Void)?
+    var onPasteSpaceImage: (() -> Void)?
+    var onPasteSpaceEmoji: (() -> Void)?
     var onAddShortcut: (() -> Void)?
     var onResetLearning: (() -> Void)?
     var onBack: (() -> Void)?
@@ -115,7 +118,25 @@ final class SettingsPanelView: UIView {
             self?.settings.keyFinish = KeyFinish.allCases[i]
             self?.onChange?()
         })
-        stack.addArrangedSubview(note("胖胖：圓滾滾有立體感，按下去會壓扁。玻璃：半透明亮亮的，配背景照片最好看。"))
+        stack.addArrangedSubview(note("胖胖：圓滾滾，按下去會壓扁。立體：按鍵有厚度，按下去會往下沉；按鍵調透明也看得出來。"))
+
+        stack.addArrangedSubview(header("空白鍵"))
+        let spaceModes = [("theme", "主題符號"), ("image", "我的圖片"), ("emoji", "表符"), ("text", "只有字")]
+        stack.addArrangedSubview(choiceRow(spaceModes.map { $0.1 }, selected: spaceModes.firstIndex { $0.0 == settings.spaceStyle } ?? 0) { [weak self] i in
+            guard let self = self else { return }
+            if spaceModes[i].0 == "image" && !SpaceArt.hasImage {
+                self.onPasteSpaceImage?()
+            } else {
+                self.settings.spaceStyle = spaceModes[i].0
+                self.onChange?()
+            }
+            self.rebuild()
+        })
+        stack.addArrangedSubview(buttonRow([
+            ("🖼 貼上圖片／GIF", { [weak self] in self?.onPasteSpaceImage?() }),
+            ("😊 貼上表符", { [weak self] in self?.onPasteSpaceEmoji?() }),
+        ]))
+        stack.addArrangedSubview(note("先「拷貝」一張圖片、GIF、表情符號或顏文字，再按上面的按鈕，空白鍵就只放那個小圖。想幫照片去背：打開「糯糯鍵盤」App →「空白鍵圖案」挑照片，會自動去背並複製好。"))
 
         stack.addArrangedSubview(header("按鍵特效（按下去冒出小圖案）"))
         stack.addArrangedSubview(choiceRow(KeyEffect.allCases.map { $0.title },
@@ -126,6 +147,14 @@ final class SettingsPanelView: UIView {
 
         stack.addArrangedSubview(header("字體（按鍵和候選字）"))
         stack.addArrangedSubview(fontRow())
+        if let f = KeyFont(rawValue: settings.fontID), !f.bundled, FontPacks.isReady(f.rawValue) {
+            stack.addArrangedSubview(buttonRow([("移除「\(f.title)」（之後可以再下載）", { [weak self] in
+                guard let self = self else { return }
+                FontPacks.remove(f.rawValue)
+                self.settings.fontID = KeyFont.system.rawValue
+                self.onChange?()
+            })]))
+        }
         if settings.fontID.hasPrefix("user:") {
             stack.addArrangedSubview(buttonRow([
                 ("＋ 貼上我的字體", { [weak self] in self?.onPasteFont?() }),
@@ -139,6 +168,7 @@ final class SettingsPanelView: UIView {
         } else {
             stack.addArrangedSubview(buttonRow([("＋ 貼上我的字體（自己買的字體）", { [weak self] in self?.onPasteFont?() })]))
         }
+        stack.addArrangedSubview(note("有 ⬇ 的字體按一下才下載（要開「允許完整取用」和網路），不用的可以移除，鍵盤就不會越來越大。"))
         stack.addArrangedSubview(note("匯入自己的字體：打開「糯糯鍵盤」App 按「匯入我的字體」挑 .ttf／.otf 檔，再回來按上面的按鈕。也可以在「檔案」App 長按字體檔「拷貝」。"))
         stack.addArrangedSubview(note("字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。"))
 
@@ -541,16 +571,18 @@ final class SettingsPanelView: UIView {
                 row.heightAnchor.constraint(equalToConstant: 40).isActive = true
                 column.addArrangedSubview(row)
             }
-            let selected = font.0 == settings.fontID
+            let ready = FontPacks.isReady(font.0)
+            let selected = font.0 == settings.fontID && ready
             let b = UIButton(type: .custom)
             b.layer.cornerRadius = 12
             b.backgroundColor = selected ? style.theme.accent : style.theme.key.withAlphaComponent(0.6)
-            b.setTitle(font.1, for: .normal)
+            b.setTitle(ready ? font.1 : "⬇ " + font.1, for: .normal)
             b.setTitleColor(selected ? style.theme.accentText : style.theme.keyText, for: .normal)
-            b.titleLabel?.font = KeyFonts.font(font.0, size: 16, weight: selected ? .bold : .regular)
+            b.titleLabel?.font = ready ? KeyFonts.font(font.0, size: 16, weight: selected ? .bold : .regular) : .rounded(15)
             b.titleLabel?.adjustsFontSizeToFitWidth = true
             b.titleLabel?.minimumScaleFactor = 0.6
             b.addAction(UIAction { [weak self] _ in
+                guard ready else { self?.onDownloadFont?(font.0); return }
                 self?.settings.fontID = font.0
                 self?.onChange?()
             }, for: .touchUpInside)
