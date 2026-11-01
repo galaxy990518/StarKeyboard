@@ -33,6 +33,7 @@ class MainActivity : Activity() {
         const val EXTRA_PICK = "pick"
         const val PICK_BACKGROUND = 1
         const val PICK_STICKER = 2
+        const val PICK_FONT = 3
     }
 
     private val pink = Color.parseColor("#E8577E")
@@ -155,6 +156,10 @@ class MainActivity : Activity() {
         button("挑一張照片做成貼圖") { pick(PICK_STICKER) }
         text("貼圖會出現在鍵盤的 ☺ 表符 › ⭐ 我的。支援傳圖片的 App（像 LINE、Messenger）會直接送出圖片，不支援的會先複製，再長按貼上。")
 
+        title("我的字體")
+        button("匯入我的字體（.ttf／.otf）") { pick(PICK_FONT) }
+        text("可以用自己買的字體，只在自己的鍵盤上顯示。匯入後到鍵盤 ⚙ 設定 › 字體 選它；不要的話選它再按「刪掉這個字體」。中文字體檔通常比較大，超過 40MB 的鍵盤裝不下。")
+
         title("使用小提醒")
         text("• 注音是大千排列。空白鍵＝一聲；打完按空白送出整句，或點上面的候選字一段一段選。")
         text("• 拼音：給習慣漢語拼音的人（例如馬來西亞朋友）。到鍵盤 ⚙ 設定 › 輸入法打開「拼音」，打 nihao 或只打聲母 nh 就出「你好」，預設繁體字（設定裡可以改簡體）。")
@@ -189,6 +194,12 @@ class MainActivity : Activity() {
     }
 
     private fun pick(what: Int) {
+        if (what == PICK_FONT) {
+            // 字體檔的類型各家檔案 App 標得不一樣，全部都讓她挑，讀進來再檢查
+            @Suppress("DEPRECATION")
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"), what)
+            return
+        }
         val intent = Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE)
         @Suppress("DEPRECATION")
         startActivityForResult(Intent.createChooser(intent, "挑一張照片"), what)
@@ -200,6 +211,10 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         val uri = data?.data ?: return
         if (resultCode != RESULT_OK) return
+        if (requestCode == PICK_FONT) {
+            importFont(uri)
+            return
+        }
         val bitmap = load(uri, if (requestCode == PICK_STICKER) 512 else 1000) ?: run {
             toast("讀不到這張照片")
             return
@@ -227,6 +242,34 @@ class MainActivity : Activity() {
                 EmoticonStore(filesDir).addSticker(out.toByteArray())
                 toast("做好貼圖了！在鍵盤的 ☺ › ⭐ 我的")
             }
+        }
+    }
+
+    /** 把挑好的字體檔存進鍵盤，順便換成這個字體 */
+    private fun importFont(uri: android.net.Uri) {
+        runCatching {
+            var name = "我的字體"
+            contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) name = c.getString(0).substringBeforeLast('.')
+            }
+            val bytes = contentResolver.openInputStream(uri)?.use { input ->
+                val out = ByteArrayOutputStream()
+                val buffer = ByteArray(65536)
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    require(out.size() + n <= com.startown.starkeyboard.ime.UserFonts.MAX_BYTES) { "字體檔超過 40MB，鍵盤裝不下" }
+                    out.write(buffer, 0, n)
+                }
+                out.toByteArray()
+            } ?: error("讀不到這個檔案")
+            val item = com.startown.starkeyboard.ime.UserFonts.add(this, bytes, name)
+            KeyboardSettings(this).fontId = item.id
+            item
+        }.onSuccess {
+            toast("加好了！鍵盤已經換成「${it.name}」")
+        }.onFailure {
+            toast(it.message ?: "讀不到這個字體")
         }
     }
 

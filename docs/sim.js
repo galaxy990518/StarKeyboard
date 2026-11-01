@@ -56,7 +56,11 @@
     });
   }());
   // 自訂配色：色相 0～1、濃淡、深色（和 App 的 KeyboardTheme.custom 一樣的算法）
-  var CUSTOM = { hue: 0.92, sat: 0.55, dark: false };
+  // hue2 < 0 = 單色；雙色時第二色管功能鍵、強調色、背景下半
+  var CUSTOM = { hue: 0.92, sat: 0.55, hue2: -1, sat2: 0.55, dark: false, second: false };
+  var SWATCHES = [[0.95, 0.45], [0.97, 0.65], [0, 0.7], [0.03, 0.5], [0.08, 0.7], [0.07, 0.35], [0.13, 0.7],
+    [0.12, 0.3], [0.24, 0.55], [0.36, 0.6], [0.42, 0.45], [0.49, 0.6], [0.56, 0.5], [0.61, 0.65],
+    [0.65, 0.8], [0.72, 0.38], [0.75, 0.6], [0.83, 0.4], [0.88, 0.6], [0, 0.25], [0.6, 0.06]];
   function hsb(h, s, v) {
     s = Math.min(1, Math.max(0, s)); v = Math.min(1, Math.max(0, v));
     var f = function (n) { var k = (n + h * 6) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
@@ -64,8 +68,9 @@
   }
   function customTheme() {
     var h = CUSTOM.hue, s = Math.max(0.05, CUSTOM.sat);
-    if (CUSTOM.dark) return { name: '自訂', top: hsb(h, s * .5, .22), bottom: hsb(h, s * .5, .28), key: hsb(h, s * .45, .40), text: hsb(h, .06, .98), special: hsb(h, s * .5, .30), specialText: hsb(h, .2, .88), accent: hsb(h, s * .55, .95), accentText: hsb(h, s * .5, .22), shadow: hsb(h, s * .5, .12), dark: true };
-    return { name: '自訂', top: hsb(h, s * .15, 1), bottom: hsb(h, s * .25, .97), key: '#ffffff', text: hsb(h, s * .6 + .2, .45), special: hsb(h, s * .35, .95), specialText: hsb(h, s * .7, .38), accent: hsb(h, s * .6, .9), accentText: '#ffffff', shadow: hsb(h, s * .4, .82) };
+    var two = CUSTOM.hue2 >= 0, h2 = two ? CUSTOM.hue2 : h, s2 = two ? Math.max(0.05, CUSTOM.sat2) : s;
+    if (CUSTOM.dark) return { name: '自訂', top: hsb(h, s * .5, .22), bottom: hsb(h2, s2 * .5, .28), key: hsb(h, s * .45, .40), text: hsb(h, .06, .98), special: hsb(h2, s2 * .5, .30), specialText: hsb(h2, .2, .88), accent: hsb(h2, s2 * .55, .95), accentText: hsb(h2, s2 * .5, .22), shadow: hsb(h, s * .5, .12), dark: true };
+    return { name: '自訂', top: hsb(h, s * .15, 1), bottom: hsb(h2, s2 * .25, .97), key: '#ffffff', text: hsb(h, s * .6 + .2, .45), special: hsb(h2, s2 * .35, .95), specialText: hsb(h2, s2 * .7, .38), accent: hsb(h2, s2 * .6, .9), accentText: '#ffffff', shadow: hsb(h, s * .4, .82) };
   }
   THEMES.custom = customTheme();
   var FINISHES = [['flat', '平面'], ['puffy', '胖胖'], ['glass', '玻璃']];
@@ -1094,10 +1099,50 @@
     var t = THEMES[it[0]]; b.textContent = ''; b.title = t.name; b.setAttribute('aria-label', t.name);
     var sw = el('span'); sw.style.setProperty('--swatch', it[0] === 'custom' ? 'conic-gradient(#ff8fb1,#ffd36e,#8fe3a8,#7cc7ff,#b79cf0,#ff8fb1)' : 'linear-gradient(135deg,' + t.top + ' 50%,' + t.accent + ' 50%)'); b.appendChild(sw);
   });
-  ['hue', 'sat'].forEach(function (k) {
-    var input = document.getElementById('sim-custom-' + k);
-    if (input) input.addEventListener('input', function () { CUSTOM[k] = Number(this.value); setTheme('custom'); });
-  });
+  // 自訂配色：色票＋單色／雙色＋濃淡
+  function paintCustom() {
+    var second = CUSTOM.hue2 >= 0 && CUSTOM.second;
+    var h = second ? CUSTOM.hue2 : CUSTOM.hue, s = second ? CUSTOM.sat2 : CUSTOM.sat;
+    document.querySelectorAll('#sim-swatches button').forEach(function (b, i) {
+      b.classList.toggle('on', Math.abs(SWATCHES[i][0] - h) < 0.005 && Math.abs(SWATCHES[i][1] - s) < 0.02);
+    });
+    var targets = document.getElementById('sim-custom-targets');
+    targets.hidden = CUSTOM.hue2 < 0;
+    targets.querySelectorAll('button').forEach(function (b) {
+      var sec = b.dataset.t === '2';
+      b.classList.toggle('on', sec === CUSTOM.second);
+      b.style.setProperty('--dot', hsb(sec ? CUSTOM.hue2 : CUSTOM.hue, sec ? CUSTOM.sat2 : CUSTOM.sat, 0.95));
+    });
+    document.querySelectorAll('#sim-custom-mode button').forEach(function (b) { b.classList.toggle('on', (b.dataset.m === '2') === (CUSTOM.hue2 >= 0)); });
+    document.getElementById('sim-custom-sat').value = s;
+  }
+  (function () {
+    var box = document.getElementById('sim-swatches');
+    if (!box) return;
+    SWATCHES.forEach(function (sw) {
+      var b = el('button'); b.type = 'button'; b.style.background = hsb(sw[0], sw[1], 0.95); b.setAttribute('aria-label', '顏色');
+      b.addEventListener('click', function () {
+        if (CUSTOM.hue2 >= 0 && CUSTOM.second) { CUSTOM.hue2 = sw[0]; CUSTOM.sat2 = sw[1]; } else { CUSTOM.hue = sw[0]; CUSTOM.sat = sw[1]; }
+        setTheme('custom'); paintCustom();
+      });
+      box.appendChild(b);
+    });
+    document.querySelectorAll('#sim-custom-mode button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (b.dataset.m === '2' && CUSTOM.hue2 < 0) { CUSTOM.hue2 = (CUSTOM.hue + 0.5) % 1; CUSTOM.sat2 = CUSTOM.sat; CUSTOM.second = true; }
+        if (b.dataset.m === '1') { CUSTOM.hue2 = -1; CUSTOM.second = false; }
+        setTheme('custom'); paintCustom();
+      });
+    });
+    document.querySelectorAll('#sim-custom-targets button').forEach(function (b) {
+      b.addEventListener('click', function () { CUSTOM.second = b.dataset.t === '2'; paintCustom(); });
+    });
+    document.getElementById('sim-custom-sat').addEventListener('input', function () {
+      if (CUSTOM.hue2 >= 0 && CUSTOM.second) CUSTOM.sat2 = Number(this.value); else CUSTOM.sat = Number(this.value);
+      setTheme('custom'); paintCustom();
+    });
+    paintCustom();
+  }());
   var darkBox = document.getElementById('sim-custom-dark');
   if (darkBox) darkBox.addEventListener('change', function () { CUSTOM.dark = this.checked; setTheme('custom'); });
   $('sim-height').addEventListener('input', function () { phone.style.setProperty('--row-h', (46 * this.value) + 'px'); });

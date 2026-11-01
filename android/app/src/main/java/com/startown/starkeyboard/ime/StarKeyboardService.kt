@@ -1286,6 +1286,11 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 shortcuts = shortcuts,
                 onAddShortcut = { beginEditor(EditorPurpose.SHORTCUT_PHRASE) },
                 onResetLearning = { engine?.resetLearning(); toast("已清除選字學習紀錄") },
+                onImportFont = {
+                    startActivity(Intent(this, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        .putExtra(MainActivity.EXTRA_PICK, MainActivity.PICK_FONT))
+                },
                 onBack = { closePanel() })
         }
         // 面板墊一層半透明的底，放背景照片時字和按鈕才看得清楚（設定的字多，墊厚一點）

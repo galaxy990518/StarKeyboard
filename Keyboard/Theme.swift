@@ -149,28 +149,43 @@ struct KeyboardTheme {
     static func named(_ id: String) -> KeyboardTheme {
         if id == "custom" {
             let s = KeyboardSettings.shared
-            return custom(hue: s.customHue, saturation: s.customSaturation, dark: s.customDark)
+            return custom(hue: s.customHue, saturation: s.customSaturation, dark: s.customDark,
+                          hue2: s.customHue2 < 0 ? nil : s.customHue2, saturation2: s.customSaturation2)
         }
         return all.first { $0.id == id } ?? all[0]
     }
 
-    /// 自訂配色：選一個顏色（色相）和濃淡，其他顏色自動配
-    static func custom(hue: Double, saturation: Double, dark: Bool) -> KeyboardTheme {
+    /// 自訂配色用的色票：(色相, 濃淡)
+    static let swatches: [(Double, Double)] = [
+        (0.95, 0.45), (0.97, 0.65), (0.0, 0.7), (0.03, 0.5), (0.08, 0.7), (0.07, 0.35), (0.13, 0.7),
+        (0.12, 0.3), (0.24, 0.55), (0.36, 0.6), (0.42, 0.45), (0.49, 0.6), (0.56, 0.5), (0.61, 0.65),
+        (0.65, 0.8), (0.72, 0.38), (0.75, 0.6), (0.83, 0.4), (0.88, 0.6), (0.0, 0.25), (0.6, 0.06),
+    ]
+
+    /// 色票上看到的顏色
+    static func swatchColor(_ hue: Double, _ saturation: Double) -> UIColor {
+        UIColor(hue: CGFloat(hue), saturation: CGFloat(saturation), brightness: 0.95, alpha: 1)
+    }
+
+    /// 自訂配色：主色（按鍵的字、背景上半）＋第二色（功能鍵、強調色、背景下半），沒選第二色就全部用主色
+    static func custom(hue: Double, saturation: Double, dark: Bool, hue2: Double? = nil, saturation2: Double = 0.55) -> KeyboardTheme {
         let h = CGFloat(hue), s = CGFloat(min(max(saturation, 0.05), 1))
+        let h2 = hue2.map { CGFloat($0) } ?? h, s2 = hue2 == nil ? s : CGFloat(min(max(saturation2, 0.05), 1))
         func c(_ sat: CGFloat, _ bri: CGFloat) -> UIColor { UIColor(hue: h, saturation: min(1, sat), brightness: min(1, bri), alpha: 1) }
+        func d(_ sat: CGFloat, _ bri: CGFloat) -> UIColor { UIColor(hue: h2, saturation: min(1, sat), brightness: min(1, bri), alpha: 1) }
         if dark {
             return KeyboardTheme(id: "custom", name: "自訂",
-                                 backgroundTop: c(s * 0.5, 0.22), backgroundBottom: c(s * 0.5, 0.28),
+                                 backgroundTop: c(s * 0.5, 0.22), backgroundBottom: d(s2 * 0.5, 0.28),
                                  key: c(s * 0.45, 0.40), keyText: c(0.06, 0.98),
-                                 specialKey: c(s * 0.5, 0.30), specialText: c(0.2, 0.88),
-                                 accent: c(s * 0.55, 0.95), accentText: c(s * 0.5, 0.22),
+                                 specialKey: d(s2 * 0.5, 0.30), specialText: d(0.2, 0.88),
+                                 accent: d(s2 * 0.55, 0.95), accentText: d(s2 * 0.5, 0.22),
                                  shadow: c(s * 0.5, 0.12), decoration: "🎨", isDark: true)
         }
         return KeyboardTheme(id: "custom", name: "自訂",
-                             backgroundTop: c(s * 0.15, 1), backgroundBottom: c(s * 0.25, 0.97),
+                             backgroundTop: c(s * 0.15, 1), backgroundBottom: d(s2 * 0.25, 0.97),
                              key: .white, keyText: c(s * 0.6 + 0.2, 0.45),
-                             specialKey: c(s * 0.35, 0.95), specialText: c(s * 0.7, 0.38),
-                             accent: c(s * 0.6, 0.9), accentText: .white,
+                             specialKey: d(s2 * 0.35, 0.95), specialText: d(s2 * 0.7, 0.38),
+                             accent: d(s2 * 0.6, 0.9), accentText: .white,
                              shadow: c(s * 0.4, 0.82), decoration: "🎨", isDark: false)
     }
 }
@@ -613,7 +628,7 @@ enum KeyFonts {
 
     /// 選的字體；系統字體或讀不到時用圓體
     static func font(_ id: String, size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
-        guard id != KeyFont.system.rawValue, let name = postScriptName(id), let f = UIFont(name: name, size: size) else {
+        guard id != KeyFont.system.rawValue, !id.isEmpty, let name = postScriptName(id), let f = UIFont(name: name, size: size) else {
             return .rounded(size, weight)
         }
         return f
@@ -622,7 +637,7 @@ enum KeyFonts {
     /// 第一次用時把字體檔註冊給系統，記住它的名字
     private static func postScriptName(_ id: String) -> String? {
         if let n = names[id] { return n }
-        guard let url = Bundle.main.url(forResource: id, withExtension: "ttf")
+        guard let url = UserFonts.url(id) ?? Bundle.main.url(forResource: id, withExtension: "ttf")
                 ?? Bundle.main.url(forResource: id, withExtension: "ttf", subdirectory: "Fonts"),
               let provider = CGDataProvider(url: url as CFURL),
               let cg = CGFont(provider),
@@ -630,6 +645,59 @@ enum KeyFonts {
         CTFontManagerRegisterGraphicsFont(cg, nil)
         names[id] = name
         return name
+    }
+}
+
+/// 使用者自己匯入的字體（自己買的、自己用）：檔案存在鍵盤自己的空間，id 是 "user:" 開頭
+enum UserFonts {
+    struct Item: Codable { let id: String; let name: String }
+    static let maxBytes = 40 * 1024 * 1024
+    private static let key = "userFonts"
+
+    private static var dir: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let d = base.appendingPathComponent("UserFonts", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }
+
+    static var all: [Item] {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let list = try? JSONDecoder().decode([Item].self, from: data) else { return [] }
+        return list.filter { FileManager.default.fileExists(atPath: file($0.id).path) }
+    }
+
+    private static func save(_ list: [Item]) {
+        UserDefaults.standard.set(try? JSONEncoder().encode(list), forKey: key)
+    }
+
+    private static func file(_ id: String) -> URL {
+        dir.appendingPathComponent(String(id.dropFirst(5)) + ".font")
+    }
+
+    static func url(_ id: String) -> URL? {
+        guard id.hasPrefix("user:") else { return nil }
+        let f = file(id)
+        return FileManager.default.fileExists(atPath: f.path) ? f : nil
+    }
+
+    enum ImportError: Error { case tooBig, notFont }
+
+    /// 存一個字體檔；不是字體或太大就丟錯
+    static func add(_ data: Data, name: String?) throws -> Item {
+        guard data.count <= maxBytes else { throw ImportError.tooBig }
+        guard let provider = CGDataProvider(data: data as CFData), let cg = CGFont(provider) else { throw ImportError.notFont }
+        let fontName = (cg.fullName as String?) ?? (cg.postScriptName as String?) ?? "我的字體"
+        let display = name.flatMap { $0.isEmpty ? nil : $0 } ?? fontName
+        let item = Item(id: "user:" + UUID().uuidString, name: String(display.prefix(12)))
+        try data.write(to: file(item.id), options: .atomic)
+        save(all + [item])
+        return item
+    }
+
+    static func remove(_ id: String) {
+        try? FileManager.default.removeItem(at: file(id))
+        save(all.filter { $0.id != id })
     }
 }
 
@@ -803,6 +871,15 @@ final class KeyboardSettings {
     var customSaturation: Double {
         get { double("customSaturation", 0.55) }
         set { d.set(newValue, forKey: "customSaturation") }
+    }
+    /// 第二色：-1 = 單色（不用第二色）
+    var customHue2: Double {
+        get { double("customHue2", -1) }
+        set { d.set(newValue, forKey: "customHue2") }
+    }
+    var customSaturation2: Double {
+        get { double("customSaturation2", 0.55) }
+        set { d.set(newValue, forKey: "customSaturation2") }
     }
     var customDark: Bool {
         get { bool("customDark", false) }

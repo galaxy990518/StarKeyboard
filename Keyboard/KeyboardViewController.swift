@@ -1292,6 +1292,7 @@ final class KeyboardViewController: UIInputViewController {
             p.onPasteBackground = { [weak self] in self?.pasteBackground() }
             p.onClearBackground = { [weak self] in self?.clearBackground() }
             p.onAdjustPhoto = { [weak self] in self?.startPhotoAdjust() }
+            p.onPasteFont = { [weak self] in self?.pasteFont() }
             p.onResetLearning = { [weak self] in
                 self?.engine?.resetLearning()
                 self?.toast("已清除選字學習紀錄")
@@ -1749,6 +1750,35 @@ final class KeyboardViewController: UIInputViewController {
             startPhotoAdjust()
         } catch {
             toast("存檔失敗")
+        }
+    }
+
+    /// 從剪貼簿收字體：App 放的（tw.nuonuo.font）或「檔案」App 拷貝的字體檔
+    private func pasteFont() {
+        guard hasFullAccess else {
+            toast("要先開啟「允許完整取用」")
+            return
+        }
+        let pb = UIPasteboard.general
+        let known = ["tw.nuonuo.font", "public.truetype-ttf-font", "public.opentype-font", "public.font", "public.truetype-font"]
+        let types = pb.types
+        guard let type = known.first(where: { types.contains($0) })
+                ?? types.first(where: { $0.lowercased().contains("font") || $0.hasSuffix("ttf") || $0.hasSuffix("otf") }),
+              let data = pb.data(forPasteboardType: type) else {
+            toast("剪貼簿裡沒有字體，先到 App 按「匯入我的字體」")
+            return
+        }
+        let name = (pb.value(forPasteboardType: "tw.nuonuo.fontname") as? String)
+            ?? (pb.data(forPasteboardType: "tw.nuonuo.fontname")).flatMap { String(data: $0, encoding: .utf8) }
+        do {
+            let item = try UserFonts.add(data, name: name)
+            settings.fontID = item.id
+            settingsChanged()
+            toast("已加入字體「\(item.name)」")
+        } catch UserFonts.ImportError.tooBig {
+            toast("字體檔太大（超過 40MB），鍵盤裝不下")
+        } catch {
+            toast("讀不到這個字體，請用 .ttf 或 .otf 檔")
         }
     }
 

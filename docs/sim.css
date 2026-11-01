@@ -204,3 +204,11 @@
 /* 造型大小：貓咪、熊熊這類可以畫得比按鍵大一點 */
 .sim-key .artbox { transform: translate(-50%, -50%) scale(var(--ss, 1.15)); }
 .sim-key.down .artbox { transform: translate(-50%, -50%) scale(calc(var(--ss, 1.15) * 0.92)); }
+
+.sim-swatches { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 8px 0 4px; }
+.sim-swatches button { aspect-ratio: 1; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 3px #0003; cursor: pointer; padding: 0; }
+.sim-swatches button.on { border: 3px solid #43262f; }
+#sim-custom .sim-chips { display: flex; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
+#sim-custom .sim-chips button { border: 0; border-radius: 12px; padding: 6px 12px; background: #0000000d; font: inherit; font-size: 13px; cursor: pointer; color: inherit; }
+#sim-custom .sim-chips button.on { background: var(--accent, #ff8fb1); color: #fff; font-weight: 700; }
+.sim-targets button::before { content: ''; display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--dot, #ccc); border: 2px solid #fff; vertical-align: -2px; margin-right: 6px; }

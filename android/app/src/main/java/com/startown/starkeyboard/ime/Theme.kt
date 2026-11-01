@@ -49,15 +49,28 @@ data class KeyboardTheme(
 
         fun named(id: String) = all.firstOrNull { it.id == id } ?: all[0]
 
-        /** 自訂配色：選一個顏色（色相 0～1）和濃淡，其他顏色自動配 */
-        fun custom(hue: Float, saturation: Float, dark: Boolean): KeyboardTheme {
+        /** 自訂配色用的色票：(色相, 濃淡)，和 iPhone 版一樣 */
+        val swatches = listOf(
+            0.95f to 0.45f, 0.97f to 0.65f, 0.0f to 0.7f, 0.03f to 0.5f, 0.08f to 0.7f, 0.07f to 0.35f, 0.13f to 0.7f,
+            0.12f to 0.3f, 0.24f to 0.55f, 0.36f to 0.6f, 0.42f to 0.45f, 0.49f to 0.6f, 0.56f to 0.5f, 0.61f to 0.65f,
+            0.65f to 0.8f, 0.72f to 0.38f, 0.75f to 0.6f, 0.83f to 0.4f, 0.88f to 0.6f, 0.0f to 0.25f, 0.6f to 0.06f,
+        )
+
+        /** 色票上看到的顏色 */
+        fun swatchColor(hue: Float, saturation: Float) = Color.HSVToColor(floatArrayOf(hue.coerceIn(0f, 1f) * 360f, saturation.coerceIn(0f, 1f), 0.95f))
+
+        /** 自訂配色：主色（按鍵的字、背景上半）＋第二色（功能鍵、強調色、背景下半），hue2 < 0 就全部用主色 */
+        fun custom(hue: Float, saturation: Float, dark: Boolean, hue2: Float = -1f, saturation2: Float = 0.55f): KeyboardTheme {
             val h = hue.coerceIn(0f, 1f) * 360f
             val s = saturation.coerceIn(0.05f, 1f)
+            val h2 = if (hue2 < 0) h else hue2.coerceIn(0f, 1f) * 360f
+            val s2 = if (hue2 < 0) s else saturation2.coerceIn(0.05f, 1f)
             fun hsb(sat: Float, bri: Float) = Color.HSVToColor(floatArrayOf(h, sat.coerceIn(0f, 1f), bri.coerceIn(0f, 1f)))
-            return if (dark) KeyboardTheme("custom", "自訂", hsb(s * 0.5f, 0.22f), hsb(s * 0.5f, 0.28f), hsb(s * 0.45f, 0.40f), hsb(0.06f, 0.98f),
-                hsb(s * 0.5f, 0.30f), hsb(0.2f, 0.88f), hsb(s * 0.55f, 0.95f), hsb(s * 0.5f, 0.22f), hsb(s * 0.5f, 0.12f), "🎨", true)
-            else KeyboardTheme("custom", "自訂", hsb(s * 0.15f, 1f), hsb(s * 0.25f, 0.97f), Color.WHITE, hsb(s * 0.6f + 0.2f, 0.45f),
-                hsb(s * 0.35f, 0.95f), hsb(s * 0.7f, 0.38f), hsb(s * 0.6f, 0.9f), Color.WHITE, hsb(s * 0.4f, 0.82f), "🎨", false)
+            fun hsb2(sat: Float, bri: Float) = Color.HSVToColor(floatArrayOf(h2, sat.coerceIn(0f, 1f), bri.coerceIn(0f, 1f)))
+            return if (dark) KeyboardTheme("custom", "自訂", hsb(s * 0.5f, 0.22f), hsb2(s2 * 0.5f, 0.28f), hsb(s * 0.45f, 0.40f), hsb(0.06f, 0.98f),
+                hsb2(s2 * 0.5f, 0.30f), hsb2(0.2f, 0.88f), hsb2(s2 * 0.55f, 0.95f), hsb2(s2 * 0.5f, 0.22f), hsb(s * 0.5f, 0.12f), "🎨", true)
+            else KeyboardTheme("custom", "自訂", hsb(s * 0.15f, 1f), hsb2(s2 * 0.25f, 0.97f), Color.WHITE, hsb(s * 0.6f + 0.2f, 0.45f),
+                hsb2(s2 * 0.35f, 0.95f), hsb2(s2 * 0.7f, 0.38f), hsb2(s2 * 0.6f, 0.9f), Color.WHITE, hsb(s * 0.4f, 0.82f), "🎨", false)
         }
     }
 }
@@ -418,7 +431,56 @@ object KeyFonts {
 
     /** 系統字體或讀不到時回傳 null（用內建字體） */
     fun get(context: Context, id: String): Typeface? = if (id == KeyFont.SYSTEM.id) null else cache.getOrPut(id) {
-        runCatching { Typeface.createFromAsset(context.assets, "fonts/$id.ttf") }.getOrNull()
+        if (id.startsWith("user:")) UserFonts.file(context, id).takeIf { it.exists() }?.let { f ->
+            runCatching { Typeface.Builder(f).build() }.getOrNull()
+        }
+        else runCatching { Typeface.createFromAsset(context.assets, "fonts/$id.ttf") }.getOrNull()
+    }
+
+    fun forget(id: String) { cache.remove(id) }
+}
+
+/** 使用者自己匯入的字體（自己買的、自己用）：檔案在 App 自己的空間，id 是 "user:" 開頭 */
+object UserFonts {
+    data class Item(val id: String, val name: String)
+    const val MAX_BYTES = 40 * 1024 * 1024
+
+    private fun dir(context: Context) = java.io.File(context.filesDir, "userfonts").apply { mkdirs() }
+    fun file(context: Context, id: String) = java.io.File(dir(context), id.removePrefix("user:") + ".font")
+    private fun prefs(context: Context) = context.getSharedPreferences("keyboard", Context.MODE_PRIVATE)
+
+    fun all(context: Context): List<Item> {
+        val raw = prefs(context).getString("userFonts", null) ?: return emptyList()
+        return runCatching {
+            val arr = org.json.JSONArray(raw)
+            (0 until arr.length()).map { arr.getJSONObject(it) }.map { Item(it.getString("id"), it.getString("name")) }
+        }.getOrDefault(emptyList()).filter { file(context, it.id).exists() }
+    }
+
+    private fun save(context: Context, list: List<Item>) {
+        val arr = org.json.JSONArray()
+        list.forEach { arr.put(org.json.JSONObject().put("id", it.id).put("name", it.name)) }
+        prefs(context).edit().putString("userFonts", arr.toString()).apply()
+    }
+
+    /** 存一個字體檔；太大或不是字體就丟錯（訊息直接給使用者看） */
+    fun add(context: Context, bytes: ByteArray, name: String): Item {
+        require(bytes.size <= MAX_BYTES) { "字體檔超過 40MB，鍵盤裝不下" }
+        val item = Item("user:" + java.util.UUID.randomUUID(), name.ifBlank { "我的字體" }.take(12))
+        val f = file(context, item.id)
+        f.writeBytes(bytes)
+        if (runCatching { Typeface.Builder(f).build() }.getOrNull() == null) {
+            f.delete()
+            error("讀不到這個字體，請用 .ttf 或 .otf 檔")
+        }
+        save(context, all(context) + item)
+        return item
+    }
+
+    fun remove(context: Context, id: String) {
+        file(context, id).delete()
+        KeyFonts.forget(id)
+        save(context, all(context).filter { it.id != id })
     }
 }
 
@@ -589,11 +651,18 @@ class KeyboardSettings(context: Context) {
     var customSaturation: Float
         get() = p.getFloat("customSaturation", 0.55f)
         set(v) = p.edit().putFloat("customSaturation", v).apply()
+    /** 第二色：-1 = 單色 */
+    var customHue2: Float
+        get() = p.getFloat("customHue2", -1f)
+        set(v) = p.edit().putFloat("customHue2", v).apply()
+    var customSaturation2: Float
+        get() = p.getFloat("customSaturation2", 0.55f)
+        set(v) = p.edit().putFloat("customSaturation2", v).apply()
     var customDark: Boolean
         get() = p.getBoolean("customDark", false)
         set(v) = p.edit().putBoolean("customDark", v).apply()
     val theme: KeyboardTheme
-        get() = if (themeId == "custom") KeyboardTheme.custom(customHue, customSaturation, customDark) else KeyboardTheme.named(themeId)
+        get() = if (themeId == "custom") KeyboardTheme.custom(customHue, customSaturation, customDark, customHue2, customSaturation2) else KeyboardTheme.named(themeId)
     var keyFinish: KeyFinish
         get() = runCatching { KeyFinish.valueOf(p.getString("keyFinish", "FLAT")!!) }.getOrDefault(KeyFinish.FLAT)
         set(v) = p.edit().putString("keyFinish", v.name).apply()

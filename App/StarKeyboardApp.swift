@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import UIKit
+import UniformTypeIdentifiers
 
 @main
 struct StarKeyboardApp: App {
@@ -14,6 +15,7 @@ struct StarKeyboardApp: App {
 struct ContentView: View {
     @State private var testText = ""
     @State private var showingPhotoPicker = false
+    @State private var showingFontPicker = false
     @State private var message: String?
     @State private var latest: ReleaseInfo?
     /// 檢查新版：checking 檢查中、done 檢查完、failed 連不上
@@ -107,6 +109,17 @@ struct ContentView: View {
                     Text("背景圖片與自製貼圖")
                 }
 
+                Section {
+                    Button { showingFontPicker = true } label: {
+                        Label("匯入我的字體", systemImage: "textformat")
+                    }
+                    Text("可以用自己買的字體（.ttf／.otf），只在自己的鍵盤上顯示。挑好檔案後會先複製起來，接著打開鍵盤：⚙️ 設定 › 字體 › 貼上我的字體。中文字體檔通常比較大，超過 40MB 的鍵盤裝不下。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("我的字體")
+                }
+
                 Section("使用小提醒") {
                     tip("剪貼簿分類", "預設只顯示「全部、📌 釘選」。按側邊固定的「＋」，在跳出的命名小框用下方鍵盤取名，按「建立」後才出現新分頁；取消不會新增；點每筆右邊的資料夾按鈕選歸類。資料夾管理可改名或移除分類，移除後內容留在未分類。已分類或釘選的內容不會被容量上限或「清暫存」自動清掉。JSON 備份包含分類。")
                     tip("剪貼簿", "iOS 不讓鍵盤在背景偷看剪貼簿，所以是「打開鍵盤的時候」才把剛複製的東西記下來。複製完切到要打字的地方就會記到。")
@@ -133,6 +146,9 @@ struct ContentView: View {
                     guard let image = image else { return }
                     copyPhoto(image)
                 }
+            }
+            .fileImporter(isPresented: $showingFontPicker, allowedContentTypes: [.font]) { result in
+                if case .success(let url) = result { copyFont(url) }
             }
             .alert(message ?? "", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
                 Button("好") {}
@@ -184,6 +200,28 @@ struct ContentView: View {
             Text(text).font(.footnote).foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
+    }
+
+    /// 字體檔放到剪貼簿（只在這台手機、10 分鐘後消失），鍵盤再從剪貼簿收下
+    private func copyFont(_ url: URL) {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url) else {
+            message = "讀不到這個檔案，請再試一次。"
+            return
+        }
+        guard data.count <= 40 * 1024 * 1024 else {
+            message = "這個字體檔超過 40MB，鍵盤裝不下。可以找同一套字體比較小的版本（例如只有常用字的）。"
+            return
+        }
+        guard let provider = CGDataProvider(data: data as CFData), CGFont(provider) != nil else {
+            message = "這個檔案不是可以用的字體，請挑 .ttf 或 .otf 檔。"
+            return
+        }
+        let name = url.deletingPathExtension().lastPathComponent
+        UIPasteboard.general.setItems([["tw.nuonuo.font": data, "tw.nuonuo.fontname": name]],
+                                      options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(600)])
+        message = "字體複製好了！現在打開鍵盤，到 ⚙️ 設定 › 字體 按「貼上我的字體」。"
     }
 
     @MainActor

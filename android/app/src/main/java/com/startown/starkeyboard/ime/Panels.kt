@@ -338,10 +338,20 @@ class SettingsPanel(
     private val shortcuts: ShortcutStore,
     private val onAddShortcut: () -> Unit,
     private val onResetLearning: () -> Unit,
+    private val onImportFont: () -> Unit,
     onBack: () -> Unit,
 ) : LinearLayout(context) {
     private val col = LinearLayout(context).apply { orientation = VERTICAL; setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(12f)) }
-    private val t = style.theme
+    private var t = style.theme
+    // 自訂配色：現在點色票是改主色還是第二色
+    private var editingSecond = false
+
+    /** 在原地重畫設定（捲動位置不變），用在點色票這種不換主題的改變 */
+    private fun rebuildHere() {
+        t = settings.theme
+        col.removeAllViews()
+        build()
+    }
 
     init {
         orientation = VERTICAL
@@ -409,6 +419,56 @@ class SettingsPanel(
         col.addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dpi(6f) })
     }
 
+    /** 雙色時選「現在要改哪個顏色」：兩顆按鈕，前面有目前的顏色 */
+    private fun colorTargetRow() {
+        val row = LinearLayout(context).apply { orientation = HORIZONTAL }
+        val items = listOf(Triple("● 主色（按鍵的字）", KeyboardTheme.swatchColor(settings.customHue, settings.customSaturation), false),
+            Triple("● 第二色（功能鍵）", KeyboardTheme.swatchColor(settings.customHue2, settings.customSaturation2), true))
+        for ((title, color, second) in items) {
+            val selected = editingSecond == second
+            val label = android.text.SpannableString(title).apply {
+                setSpan(android.text.style.ForegroundColorSpan(color), 0, 1, 0)
+                setSpan(android.text.style.RelativeSizeSpan(1.6f), 0, 1, 0)
+            }
+            row.addView(Tap(context, "", 13f, if (selected) t.accentText else t.keyText, selected) {
+                editingSecond = second; rebuildHere()
+            }.apply {
+                text = label
+                background = roundRect(if (selected) t.accent else t.key.withAlpha(0.6f), dp(12f))
+            }, LayoutParams(0, dpi(40f), 1f).apply { rightMargin = dpi(6f); topMargin = dpi(4f) })
+        }
+        col.addView(row)
+    }
+
+    /** 色票：一格一個圓點，點了就換顏色（選中的有粗框） */
+    private fun swatchGrid() {
+        val second = settings.customHue2 >= 0f && editingSecond
+        val curH = if (second) settings.customHue2 else settings.customHue
+        val curS = if (second) settings.customSaturation2 else settings.customSaturation
+        for (group in KeyboardTheme.swatches.chunked(7)) {
+            val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            for ((h, sat) in group) {
+                val selected = kotlin.math.abs(h - curH) < 0.005f && kotlin.math.abs(sat - curS) < 0.02f
+                val cell = FrameLayout(context)
+                cell.addView(View(context).apply {
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.OVAL
+                        setColor(KeyboardTheme.swatchColor(h, sat))
+                        setStroke(if (selected) dpi(3f) else dpi(1f), if (selected) t.keyText else android.graphics.Color.WHITE)
+                    }
+                }, FrameLayout.LayoutParams(dpi(30f), dpi(30f), Gravity.CENTER))
+                cell.setOnClickListener {
+                    if (second) { settings.customHue2 = h; settings.customSaturation2 = sat }
+                    else { settings.customHue = h; settings.customSaturation = sat }
+                    onChange(); rebuildHere()
+                }
+                row.addView(cell, LayoutParams(0, dpi(38f), 1f))
+            }
+            repeat(7 - group.size) { row.addView(View(context), LayoutParams(0, dpi(38f), 1f)) }
+            col.addView(row)
+        }
+    }
+
     /** 一排選項，選中的那個是主題色 */
     private fun choices(titles: List<String>, selected: Int, onSelect: (Int) -> Unit) {
         val scroll = HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false }
@@ -460,7 +520,7 @@ class SettingsPanel(
     private fun build() {
         header("主題")
         val themes = LinearLayout(context).apply { orientation = HORIZONTAL }
-        for (theme in KeyboardTheme.all + KeyboardTheme.custom(settings.customHue, settings.customSaturation, settings.customDark)) {
+        for (theme in KeyboardTheme.all + KeyboardTheme.custom(settings.customHue, settings.customSaturation, settings.customDark, settings.customHue2, settings.customSaturation2)) {
             val selected = theme.id == settings.themeId
             val cell = LinearLayout(context).apply { orientation = VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dpi(4f), 0, dpi(4f), 0) }
             cell.addView(View(context).apply {
@@ -476,9 +536,26 @@ class SettingsPanel(
         }
         col.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(themes) })
         if (settings.themeId == "custom") {
-            // 自訂配色：拖拉選顏色和濃淡，深淺色可以切換
-            slider("顏色", settings.customHue, 0f, 1f) { settings.customHue = it }
-            slider("濃淡", settings.customSaturation, 0.1f, 1f) { settings.customSaturation = it }
+            // 自訂配色：點色票選顏色；雙色時可以分別選主色和第二色
+            val two = settings.customHue2 >= 0f
+            choices(listOf("單色", "雙色"), if (two) 1 else 0) {
+                if (it == 1 && settings.customHue2 < 0f) {
+                    // 第二色先配一個對比色（色相轉半圈）
+                    settings.customHue2 = (settings.customHue + 0.5f) % 1f
+                    settings.customSaturation2 = settings.customSaturation
+                    editingSecond = true
+                } else if (it == 0) {
+                    settings.customHue2 = -1f
+                    editingSecond = false
+                }
+                onChange(); rebuildHere()
+            }
+            if (two) colorTargetRow()
+            swatchGrid()
+            val second = two && editingSecond
+            slider("濃淡", if (second) settings.customSaturation2 else settings.customSaturation, 0.05f, 1f) {
+                if (second) { settings.customSaturation2 = it } else { settings.customSaturation = it }
+            }
             choices(listOf("淺色", "深色"), if (settings.customDark) 1 else 0) { settings.customDark = it == 1; onChange() }
         }
 
@@ -508,19 +585,26 @@ class SettingsPanel(
         }
 
         header("字體（按鍵和候選字）")
-        for (group in KeyFont.values().toList().chunked(4)) {
+        val allFonts = KeyFont.values().map { it.id to it.title } + UserFonts.all(context).map { it.id to it.name }
+        for (group in allFonts.chunked(4)) {
             val fonts = LinearLayout(context).apply { orientation = HORIZONTAL }
-            for (font in group) {
-            val selected = font.id == settings.fontId
-            fonts.addView(Tap(context, font.title, 16f, if (selected) t.accentText else t.keyText, selected) {
-                settings.fontId = font.id; onChange()
+            for ((id, title) in group) {
+            val selected = id == settings.fontId
+            fonts.addView(Tap(context, title, 16f, if (selected) t.accentText else t.keyText, selected) {
+                settings.fontId = id; onChange()
             }.apply {
                 background = roundRect(if (selected) t.accent else t.key.withAlpha(0.6f), dp(12f))
-                KeyFonts.get(context, font.id)?.let { typeface = it }
+                KeyFonts.get(context, id)?.let { typeface = it }
+                maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
             }, LayoutParams(0, dpi(40f), 1f).apply { rightMargin = dpi(6f); bottomMargin = dpi(6f) })
             }
             repeat(4 - group.size) { fonts.addView(View(context), LayoutParams(0, dpi(40f), 1f)) }
             col.addView(fonts)
+        }
+        button("＋ 匯入我的字體（自己買的 .ttf／.otf）") { onImportFont() }
+        if (settings.fontId.startsWith("user:")) button("刪掉這個字體") {
+            UserFonts.remove(context, settings.fontId)
+            settings.fontId = KeyFont.SYSTEM.id; onChange()
         }
         note("字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。")
 

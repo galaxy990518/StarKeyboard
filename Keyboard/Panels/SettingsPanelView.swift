@@ -6,6 +6,7 @@ final class SettingsPanelView: UIView {
     var onPasteBackground: (() -> Void)?
     var onClearBackground: (() -> Void)?
     var onAdjustPhoto: (() -> Void)?
+    var onPasteFont: (() -> Void)?
     var onAddShortcut: (() -> Void)?
     var onResetLearning: (() -> Void)?
     var onBack: (() -> Void)?
@@ -28,6 +29,8 @@ final class SettingsPanelView: UIView {
     private let bar: PanelBottomBar
     // 換主題會重建，要記住主題那排橫向捲到哪
     private weak var themeScroll: UIScrollView?
+    // 自訂配色：現在點色票是改主色還是第二色
+    private var editingSecond = false
 
     init(settings: KeyboardSettings, hasFullAccess: Bool, style: KeyboardStyle, shortcuts: ShortcutStore) {
         self.settings = settings
@@ -74,13 +77,27 @@ final class SettingsPanelView: UIView {
         stack.addArrangedSubview(header("主題"))
         stack.addArrangedSubview(themeRow())
         if settings.themeID == "custom" {
-            // 自訂配色：拖拉選顏色和濃淡，深淺色可以切換
-            stack.addArrangedSubview(sliderRow("顏色", value: Float(settings.customHue), range: 0...1) { [weak self] v in
-                self?.settings.customHue = Double(v)
-                self?.onChange?()
+            // 自訂配色：點色票選顏色；雙色時可以分別選主色和第二色
+            let two = settings.customHue2 >= 0
+            stack.addArrangedSubview(choiceRow(["單色", "雙色"], selected: two ? 1 : 0) { [weak self] i in
+                guard let self = self else { return }
+                if i == 1 && self.settings.customHue2 < 0 {
+                    // 第二色先配一個對比色（色相轉半圈）
+                    self.settings.customHue2 = (self.settings.customHue + 0.5).truncatingRemainder(dividingBy: 1)
+                    self.settings.customSaturation2 = self.settings.customSaturation
+                    self.editingSecond = true
+                } else if i == 0 {
+                    self.settings.customHue2 = -1
+                    self.editingSecond = false
+                }
+                self.onChange?()
+                self.rebuild()
             })
-            stack.addArrangedSubview(sliderRow("濃淡", value: Float(settings.customSaturation), range: 0.1...1) { [weak self] v in
-                self?.settings.customSaturation = Double(v)
+            if two { stack.addArrangedSubview(colorTargetRow()) }
+            stack.addArrangedSubview(swatchGrid())
+            let second = two && editingSecond
+            stack.addArrangedSubview(sliderRow("濃淡", value: Float(second ? settings.customSaturation2 : settings.customSaturation), range: 0.05...1) { [weak self] v in
+                if second { self?.settings.customSaturation2 = Double(v) } else { self?.settings.customSaturation = Double(v) }
                 self?.onChange?()
             })
             stack.addArrangedSubview(choiceRow(["淺色", "深色"], selected: settings.customDark ? 1 : 0) { [weak self] i in
@@ -109,6 +126,20 @@ final class SettingsPanelView: UIView {
 
         stack.addArrangedSubview(header("字體（按鍵和候選字）"))
         stack.addArrangedSubview(fontRow())
+        if settings.fontID.hasPrefix("user:") {
+            stack.addArrangedSubview(buttonRow([
+                ("＋ 貼上我的字體", { [weak self] in self?.onPasteFont?() }),
+                ("刪掉這個字體", { [weak self] in
+                    guard let self = self else { return }
+                    UserFonts.remove(self.settings.fontID)
+                    self.settings.fontID = KeyFont.system.rawValue
+                    self.onChange?()
+                }),
+            ]))
+        } else {
+            stack.addArrangedSubview(buttonRow([("＋ 貼上我的字體（自己買的字體）", { [weak self] in self?.onPasteFont?() })]))
+        }
+        stack.addArrangedSubview(note("匯入自己的字體：打開「糯糯鍵盤」App 按「匯入我的字體」挑 .ttf／.otf 檔，再回來按上面的按鈕。也可以在「檔案」App 長按字體檔「拷貝」。"))
         stack.addArrangedSubview(note("字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。"))
 
         stack.addArrangedSubview(header("大小（邊拖邊看）"))
@@ -500,7 +531,8 @@ final class SettingsPanelView: UIView {
         column.axis = .vertical
         column.spacing = 8
         var row = UIStackView()
-        for (index, font) in KeyFont.allCases.enumerated() {
+        let fonts = KeyFont.allCases.map { ($0.rawValue, $0.title) } + UserFonts.all.map { ($0.id, $0.name) }
+        for (index, font) in fonts.enumerated() {
             if index % 4 == 0 {
                 row = UIStackView()
                 row.axis = .horizontal
@@ -509,20 +541,109 @@ final class SettingsPanelView: UIView {
                 row.heightAnchor.constraint(equalToConstant: 40).isActive = true
                 column.addArrangedSubview(row)
             }
-            let selected = font.rawValue == settings.fontID
+            let selected = font.0 == settings.fontID
             let b = UIButton(type: .custom)
             b.layer.cornerRadius = 12
             b.backgroundColor = selected ? style.theme.accent : style.theme.key.withAlphaComponent(0.6)
-            b.setTitle(font.title, for: .normal)
+            b.setTitle(font.1, for: .normal)
             b.setTitleColor(selected ? style.theme.accentText : style.theme.keyText, for: .normal)
-            b.titleLabel?.font = KeyFonts.font(font.rawValue, size: 16, weight: selected ? .bold : .regular)
+            b.titleLabel?.font = KeyFonts.font(font.0, size: 16, weight: selected ? .bold : .regular)
+            b.titleLabel?.adjustsFontSizeToFitWidth = true
+            b.titleLabel?.minimumScaleFactor = 0.6
             b.addAction(UIAction { [weak self] _ in
-                self?.settings.fontID = font.rawValue
+                self?.settings.fontID = font.0
                 self?.onChange?()
             }, for: .touchUpInside)
             row.addArrangedSubview(b)
         }
         while row.arrangedSubviews.count < 4 { row.addArrangedSubview(UIView()) }
+        return column
+    }
+
+    /// 雙色時選「現在要改哪個顏色」：兩顆按鈕，裡面有目前的顏色
+    private func colorTargetRow() -> UIView {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.distribution = .fillEqually
+        row.spacing = 8
+        row.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        let items: [(String, Double, Double, Bool)] = [
+            ("主色（按鍵的字）", settings.customHue, settings.customSaturation, false),
+            ("第二色（功能鍵）", settings.customHue2, settings.customSaturation2, true),
+        ]
+        for (title, h, sat, second) in items {
+            let selected = editingSecond == second
+            let b = UIButton(type: .custom)
+            b.layer.cornerRadius = 12
+            b.backgroundColor = selected ? style.theme.accent : style.theme.key.withAlphaComponent(0.6)
+            b.setTitle("  " + title, for: .normal)
+            b.titleLabel?.font = .rounded(13, selected ? .bold : .regular)
+            b.titleLabel?.adjustsFontSizeToFitWidth = true
+            b.setTitleColor(selected ? style.theme.accentText : style.theme.keyText, for: .normal)
+            let dot = UIView(frame: CGRect(x: 8, y: 10, width: 20, height: 20))
+            dot.isUserInteractionEnabled = false
+            dot.backgroundColor = KeyboardTheme.swatchColor(h, sat)
+            dot.layer.cornerRadius = 10
+            dot.layer.borderWidth = 2
+            dot.layer.borderColor = UIColor.white.cgColor
+            b.addSubview(dot)
+            b.contentEdgeInsets = UIEdgeInsets(top: 0, left: 26, bottom: 0, right: 4)
+            b.addAction(UIAction { [weak self] _ in
+                self?.editingSecond = second
+                self?.rebuild()
+            }, for: .touchUpInside)
+            row.addArrangedSubview(b)
+        }
+        return row
+    }
+
+    /// 色票：一格一個圓點，點了就換顏色（選中的有框）
+    private func swatchGrid() -> UIView {
+        let column = UIStackView()
+        column.axis = .vertical
+        column.spacing = 6
+        let second = settings.customHue2 >= 0 && editingSecond
+        let curH = second ? settings.customHue2 : settings.customHue
+        let curS = second ? settings.customSaturation2 : settings.customSaturation
+        var row = UIStackView()
+        for (index, sw) in KeyboardTheme.swatches.enumerated() {
+            if index % 7 == 0 {
+                row = UIStackView()
+                row.axis = .horizontal
+                row.distribution = .fillEqually
+                row.spacing = 6
+                row.heightAnchor.constraint(equalToConstant: 38).isActive = true
+                column.addArrangedSubview(row)
+            }
+            let selected = abs(sw.0 - curH) < 0.005 && abs(sw.1 - curS) < 0.02
+            let b = UIButton(type: .custom)
+            let dot = UIView()
+            dot.isUserInteractionEnabled = false
+            dot.backgroundColor = KeyboardTheme.swatchColor(sw.0, sw.1)
+            dot.layer.cornerRadius = 15
+            dot.layer.borderWidth = selected ? 3 : 1
+            dot.layer.borderColor = (selected ? style.theme.keyText : UIColor.white).cgColor
+            dot.translatesAutoresizingMaskIntoConstraints = false
+            b.addSubview(dot)
+            NSLayoutConstraint.activate([
+                dot.widthAnchor.constraint(equalToConstant: 30), dot.heightAnchor.constraint(equalToConstant: 30),
+                dot.centerXAnchor.constraint(equalTo: b.centerXAnchor), dot.centerYAnchor.constraint(equalTo: b.centerYAnchor),
+            ])
+            b.addAction(UIAction { [weak self] _ in
+                guard let self = self else { return }
+                if second {
+                    self.settings.customHue2 = sw.0
+                    self.settings.customSaturation2 = sw.1
+                } else {
+                    self.settings.customHue = sw.0
+                    self.settings.customSaturation = sw.1
+                }
+                self.onChange?()
+                self.rebuild()
+            }, for: .touchUpInside)
+            row.addArrangedSubview(b)
+        }
+        while row.arrangedSubviews.count < 7 { row.addArrangedSubview(UIView()) }
         return column
     }
 
