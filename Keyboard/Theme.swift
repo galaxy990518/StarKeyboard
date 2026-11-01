@@ -552,6 +552,8 @@ struct KeyboardStyle {
     var finish = KeyFinish.flat
     /// 線條造型（貓咪、熊熊…）放大幾倍；可以超出按鍵一點點，看起來比較大顆
     var shapeScale: CGFloat = 1.15
+    /// 按下去那顆鍵變大、往上跳一下（看得到按到哪顆，也不會擋住按鍵特效）
+    var popKeys = true
 }
 
 /// 按鍵質感：平面、胖胖（圓滾滾、按下去會壓扁）、立體（有厚度、按下去往下沉）
@@ -1018,7 +1020,7 @@ final class KeyboardSettings {
         get { d.string(forKey: "keySoundStyle") ?? KeySound.system.rawValue }
         set { d.set(newValue, forKey: "keySoundStyle") }
     }
-    /// 按下去時上面跳出放大的字
+    /// 按下去那顆鍵變大跳起來
     var keyPreview: Bool {
         get { bool("keyPreview", true) }
         set { d.set(newValue, forKey: "keyPreview") }

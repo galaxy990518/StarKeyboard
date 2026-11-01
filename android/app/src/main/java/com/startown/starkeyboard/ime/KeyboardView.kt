@@ -25,7 +25,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     var onLongPress: ((KeySpec) -> Unit)? = null
     var onCursorMove: ((Int) -> Unit)? = null
     /** 按下去時上面跳出放大的字（看得到自己按到哪一顆） */
-    var showsPreview = true
+    var showsPreview = false
     private var previewKey: Key? = null
     private val previewPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val previewText = Paint(Paint.ANTI_ALIAS_FLAG).also { it.textAlign = Paint.Align.CENTER }
@@ -192,7 +192,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         val t = style.theme
-        for (k in keys) {
+        // 按下去變大的鍵最後畫，才不會被旁邊的鍵蓋住
+        for (k in if (style.popKeys) keys.sortedBy { if (it.scale != 1f) 1 else 0 } else keys) {
             val fill: Int
             val text: Int
             when (k.spec.kind) {
@@ -204,7 +205,12 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             val finish = style.finish
             // 按下去的程度 0～1
             val press = ((1f - k.scale) * 10f).coerceIn(0f, 1f)
-            if (k.scale != 1f) {
+            if (k.scale != 1f && style.popKeys && k.spec.action.isCharacter) {
+                // 按下去那顆變大、往上跳一下：看得到按到哪顆；按鍵特效在後面才畫，會在它上面
+                canvas.translate(0f, -k.frame.height() * 0.22f * press)
+                val s = 1f + 0.25f * press
+                canvas.scale(s, s, k.frame.centerX(), k.frame.centerY())
+            } else if (k.scale != 1f) {
                 val d = 1f - k.scale
                 // 胖胖的鍵按下去會被壓扁；立體的鍵往下沉
                 if (finish == KeyFinish.PUFFY) canvas.scale(1f + d * 0.6f, 1f - d * 1.4f, k.frame.centerX(), k.frame.centerY())
@@ -248,7 +254,6 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             drawLabel(canvas, k, text)
             canvas.restore()
         }
-        previewKey?.let { drawPreview(canvas, it) }
         drawTrail(canvas)
         drawParticles(canvas)
     }

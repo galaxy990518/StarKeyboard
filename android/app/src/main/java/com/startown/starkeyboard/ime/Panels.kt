@@ -624,7 +624,7 @@ class SettingsPanel(
         }
         note("胖胖：圓滾滾，按下去會壓扁。立體：按鍵有厚度，按下去會往下沉；按鍵調透明也看得出來。")
 
-        toggle("按鍵放大泡泡（按下去上面跳出大大的字，看得到按到哪顆）", settings.keyPreview) { settings.keyPreview = it; onChange() }
+        toggle("按鍵放大（按下去那顆會變大跳起來，看得到按到哪顆）", settings.keyPreview) { settings.keyPreview = it; onChange() }
 
         header("空白鍵")
         val spaceModes = listOf("theme" to "主題符號", "image" to "我的圖片", "emoji" to "表符", "text" to "只有字")
