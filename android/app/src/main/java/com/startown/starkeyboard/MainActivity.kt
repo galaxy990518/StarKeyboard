@@ -96,13 +96,13 @@ class MainActivity : Activity() {
                     })
                     text(info.notes, updateBox)
                     updateBox.addView(TextView(this).apply {
-                        text = "⚠️ 更新前請先匯出剪貼簿！移除舊版時，剪貼簿紀錄、分類和自訂表符會一起被刪掉。"
+                        text = "直接下載安裝就能蓋過舊版，設定和剪貼簿都會留著，不用刪舊版。"
                         textSize = 15f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.parseColor("#B5612A"))
                         setPadding(0, px(6f), 0, px(4f))
                     })
-                    button("① 先匯出剪貼簿（存成檔案）", updateBox) { startActivity(Intent(this, ClipboardTransferActivity::class.java)) }
-                    text("② 下載新版 APK。目前要先移除舊版（長按糯糯鍵盤圖示 › 解除安裝）再點開新的安裝檔安裝，裝好後重新選一次鍵盤。\n③ 打開「剪貼簿匯入／匯出」，把剛剛存的檔案匯入回來。", updateBox)
-                    button("② 下載新版", updateBox) {
+                    text("下載後到「檔案」App 的下載資料夾點新的安裝檔，按「更新」。想保險的話可以先備份剪貼簿（不一定要）。", updateBox)
+                    button("備份剪貼簿（存成檔案，可以不做）", updateBox) { startActivity(Intent(this, ClipboardTransferActivity::class.java)) }
+                    button("下載新版", updateBox) {
                         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl ?: info.pageUrl)))
                     }
                 }
