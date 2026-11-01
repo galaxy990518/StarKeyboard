@@ -383,6 +383,7 @@ class SettingsPanel(
     private val onDownloadFont: (String) -> Unit,
     private val onPickSpaceImage: () -> Unit,
     private val onPasteSpaceEmoji: () -> Unit,
+    private val onCopyTypingLog: () -> Unit,
     onBack: () -> Unit,
 ) : LinearLayout(context) {
     private val col = LinearLayout(context).apply { orientation = VERTICAL; setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(12f)) }
@@ -623,6 +624,8 @@ class SettingsPanel(
         }
         note("胖胖：圓滾滾，按下去會壓扁。立體：按鍵有厚度，按下去會往下沉；按鍵調透明也看得出來。")
 
+        toggle("按鍵放大泡泡（按下去上面跳出大大的字，看得到按到哪顆）", settings.keyPreview) { settings.keyPreview = it; onChange() }
+
         header("空白鍵")
         val spaceModes = listOf("theme" to "主題符號", "image" to "我的圖片", "emoji" to "表符", "text" to "只有字")
         choices(spaceModes.map { it.second }, spaceModes.indexOfFirst { it.first == settings.spaceStyle }.coerceAtLeast(0)) {
@@ -632,6 +635,10 @@ class SettingsPanel(
         button("🖼 挑圖片／GIF（可以自動去背）") { onPickSpaceImage() }
         button("😊 貼上剛複製的表符") { onPasteSpaceEmoji() }
         note("空白鍵只放一個小圖：照片可以自動去背，也可以用 GIF 動圖，或複製一個表情符號、顏文字再按「貼上」。")
+
+        header("注音被拆開了？")
+        button("📋 複製剛剛的打字紀錄") { onCopyTypingLog() }
+        note("打字時注音被拆開（例如「我覺得」變「我居約得」），先不要刪，直接打開 ⚙ 按這個，再貼給開發的人。紀錄是最近 80 次按鍵的注音、時間和選過的字。")
 
         header("按鍵特效（按下去冒出小圖案）")
         choices(KeyEffect.values().map { it.title }, KeyEffect.values().indexOfFirst { it.id == settings.keyEffect }) {

@@ -257,7 +257,8 @@ final class ZhuyinEngine {
         // ~ 只是「可能是兩個字」的記號，查字典時拿掉
         let syllables = readings.map { $0.hasSuffix("~") ? String($0.dropLast()) : $0 }
         merge(phrases(syllables[...]), 0)
-        for j in syllables.indices {
+        // 很長的一串不每個音節都猜錯字（太慢）；詞最多 4 個字時才猜
+        for j in syllables.indices where syllables.count <= 4 {
             for alt in alternatives(for: syllables[j]) {
                 var variant = syllables
                 variant[j] = alt.reading
@@ -287,19 +288,23 @@ final class ZhuyinEngine {
     /// 一個音節可能是哪些音打錯了（只留字典裡真的有的）
     func alternatives(for reading: String) -> [(reading: String, penalty: Double)] {
         if let cached = alternativeCache[reading] { return cached }
-        if reading.hasSuffix("*") { return [] }   // 沒打完的音節本來就聲調不限，不用再猜
+        // 沒打聲調的音節（ㄎㄜ*）聲調本來就不限，只猜「按到旁邊的鍵」；只打一個注音的簡拼範圍已經很大，不猜
+        let open = reading.hasSuffix("*")
+        let body = open ? String(reading.dropLast()) : reading
+        if open && body.count < 2 { return [] }
         var syllable = Syllable()
-        for c in reading { syllable.put(c) }
+        for c in body { syllable.put(c) }
         var out: [(reading: String, penalty: Double)] = []
-        var seen: Set<String> = [reading]
+        var seen: Set<String> = [body]
         func add(_ s: Syllable, _ penalty: Double) {
             let r = s.reading
             guard s.hasSound, !seen.contains(r) else { return }
             seen.insert(r)
-            if !phrases([r][...]).isEmpty { out.append((r, penalty)) }
+            let key = open ? r + "*" : r
+            if !phrases([key][...]).isEmpty { out.append((key, penalty)) }
         }
 
-        if fuzzy.tones {
+        if fuzzy.tones && !open {
             for tone in [nil, "ˊ", "ˇ", "ˋ", "˙"] as [Character?] where tone != syllable.tone {
                 var s = syllable
                 s.tone = tone
@@ -318,9 +323,10 @@ final class ZhuyinEngine {
                 add(s, Self.phoneticPenalty)
             }
         }
-        // 打出來的音根本不存在：多半是按到旁邊的鍵
-        if fuzzy.keyNeighbors && phrases([reading][...]).isEmpty {
-            for c in reading {
+        // 按到旁邊的鍵（上下左右）：打出來的音根本不存在時多半是按錯；存在的話也試，但扣多一點分
+        if fuzzy.keyNeighbors {
+            let penalty = phrases([reading][...]).isEmpty ? Self.neighborPenalty : Self.neighborPenalty - 1.5
+            for c in body {
                 for n in Bopomofo.neighbors[c] ?? [] {
                     var s = syllable
                     switch Bopomofo.kind(of: c) {
@@ -331,7 +337,7 @@ final class ZhuyinEngine {
                     case nil: continue
                     }
                     s.put(n)
-                    add(s, Self.neighborPenalty)
+                    add(s, penalty)
                 }
             }
         }
@@ -539,6 +545,9 @@ final class ZhuyinEngine {
         var sentence = ""
         if let cover = exact.first(where: { $0.corrections == 0 && $0.text.count == n }) {
             sentence = cover.text
+        } else if n > 1, let fixed = exact.first(where: { $0.corrections == 1 && $0.text.count == n }) {
+            // 打出來的音拼不成詞，但改掉一個按到旁邊的鍵就是一個詞（ㄋㄜˇㄞˋ → 可愛）：比單字硬湊的句子可靠
+            sentence = fixed.text
         } else if n > 1 {
             sentence = composedSentence(readings)
         }
@@ -789,6 +798,11 @@ final class ZhuyinEngine {
     /// 所有音節（沒聲調）的開頭，例如 ㄋㄧㄠ → ㄋ、ㄋㄧ、ㄋㄧㄠ（給組字用，判斷注音能不能接在一起）
     func syllablePrefixes() -> Set<String> {
         index.prefixes
+    }
+
+    /// 可以自己成一個字的音節（沒聲調）
+    func completeSyllables() -> Set<String> {
+        index.syllables
     }
 
     /// 聯想整段前文的後續詞，較長的吻合與常用詞優先，也包含已學會的片語。

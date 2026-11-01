@@ -36,30 +36,36 @@ final class PhraseIndex {
 
     /// 單音節（沒聲調）的所有開頭，組字時用來判斷注音能不能接在一起（只有一千多筆，留在記憶體）
     let prefixes: Set<String>
+    /// 可以自己成一個字的音節（沒聲調），例如 ㄩ、ㄐㄩㄝ；「ㄐ」不是
+    let syllables: Set<String>
 
     // 暫存上限：超過就整個清掉重來，記憶體不會一直長
     private static let maxRows = 6000
     private static let maxLookups = 800
     private static let maxNgrams = 4000
 
-    private init(db: SQLiteDB, prefixes: Set<String>, hasNgrams: Bool) {
+    private init(db: SQLiteDB, prefixes: Set<String>, syllables: Set<String>, hasNgrams: Bool) {
         self.db = db
         self.prefixes = prefixes
+        self.syllables = syllables
         self.hasNgrams = hasNgrams
     }
 
     static func load(from db: SQLiteDB) -> PhraseIndex {
         var prefixes = Set<String>()
+        var syllables = Set<String>()
         db.run("SELECT DISTINCT plain FROM phrases WHERE plain NOT LIKE '%-%'") { stmt in
             var prefix = ""
-            for ch in SQLiteDB.text(stmt, 0) {
+            let plain = SQLiteDB.text(stmt, 0)
+            syllables.insert(plain)
+            for ch in plain {
                 prefix.append(ch)
                 prefixes.insert(prefix)
             }
         }
         var hasNgrams = false
         db.run("SELECT 1 FROM ngrams LIMIT 1") { _ in hasNgrams = true }
-        return PhraseIndex(db: db, prefixes: prefixes, hasNgrams: hasNgrams)
+        return PhraseIndex(db: db, prefixes: prefixes, syllables: syllables, hasNgrams: hasNgrams)
     }
 
     // MARK: 對外的查法（和以前的記憶體版本一樣）

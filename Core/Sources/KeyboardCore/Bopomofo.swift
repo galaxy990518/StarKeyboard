@@ -119,6 +119,12 @@ struct ZhuyinComposer {
     private var pendingTone: Character?
     /// 字典裡所有音節的開頭（例如 ㄋ、ㄋㄧ、ㄋㄧㄠ）；有的話，組不出存在的音就自動換下一個字
     var validPrefixes: Set<String>?
+    /// 可以自己成一個字的音節（沒聲調）；「ㄐ」這種不能單獨念的，按空白也不會把它當成一個字
+    var validSyllables: Set<String>?
+    /// 剛被空白鍵（一聲）收起來的音節和時間：下一個注音其實接得上的話，當成空白是不小心碰到的
+    private var spaceClosed: (index: Int, time: Double?)?
+    /// 空白之後多快接著打注音，算是不小心碰到空白（秒）
+    static let accidentalSpaceWindow = 0.35
 
     /// 查字典用的讀音：打完的音節＋正在打的音節（沒打聲調也算，先拿來預覽）
     /// 沒打完的音節後面加 *，例如「ㄋ*」「ㄋㄧ*」；可能是兩個字的再加 ~，例如「ㄎㄞ*~」
@@ -157,10 +163,25 @@ struct ZhuyinComposer {
 
     /// 回傳 false 表示這個符號沒被組字用掉（例如還沒打音就先打聲調）
     @discardableResult
-    mutating func input(_ c: Character) -> Bool {
+    mutating func input(_ c: Character, at time: Double? = nil) -> Bool {
         guard let kind = Bopomofo.kind(of: c) else { return false }
+        let closedBySpace = spaceClosed
+        spaceClosed = nil
         if kind == .tone {
             return putTone(c)
+        }
+        // 快速打字時拇指順便碰到空白鍵（ㄩ 就在空白鍵正上方）：ㄐ＋空白＋ㄩㄝ 還是「覺」，不是「居約」
+        if current.isEmpty, kind != .initial, pendingTone == nil, let sc = closedBySpace, sc.index == syllables.count - 1 {
+            let last = syllables[sc.index]
+            var merged = last
+            merged.put(c)
+            let quick = time != nil && sc.time != nil && time! - sc.time! < Self.accidentalSpaceWindow
+            let impossible = validSyllables.map { !$0.contains(last.reading) } ?? false
+            let joins = validPrefixes?.contains(merged.reading) ?? true
+            if (quick || impossible) && last.tone == nil && !last.startsNew(with: kind) && joins {
+                current = syllables.removeLast()
+                current.open = false
+            }
         }
         // 不打聲調直接打下一個字：前一個字自動結束（ㄋㄏ → 你好）
         if current.hasSound && (current.startsNew(with: kind) || !fits(c)) { closeCurrent() }
@@ -216,14 +237,17 @@ struct ZhuyinComposer {
 
     /// 空白鍵＝一聲。組字區保持開著，不在這裡送出文字。
     @discardableResult
-    mutating func confirmSyllable() -> Bool {
+    mutating func confirmSyllable(at time: Double? = nil) -> Bool {
         guard current.hasSound else { return false }
         // 聲調先到、人又按了空白：那個聲調已經算在這個音上，空白不再把它改成一聲。
         if current.tone == nil, let tone = pendingTone {
             current.tone = tone
         }
         pendingTone = nil
-        finishSyllable(open: false)
+        // 「ㄐ」這種不能單獨念的音按了空白：當成只打開頭的簡拼（ㄐ*），不是一聲的「ㄐ」
+        let alone = current.tone != nil || (validSyllables.map { $0.contains(current.reading) } ?? true)
+        finishSyllable(open: !alone)
+        spaceClosed = (syllables.count - 1, time)
         return true
     }
 
@@ -236,6 +260,7 @@ struct ZhuyinComposer {
 
     @discardableResult
     mutating func backspace() -> Bool {
+        spaceClosed = nil
         if current.hasSound && current.tone == nil && pendingTone != nil {
             pendingTone = nil
             return true
@@ -292,8 +317,10 @@ struct ZhuyinComposer {
     /// 改過按鍵清單之後，從頭重新打一次
     mutating func replay(_ keys: [Character]) {
         let prefixes = validPrefixes
+        let full = validSyllables
         self = ZhuyinComposer()
         validPrefixes = prefixes
+        validSyllables = full
         for k in keys {
             if k == Self.firstTone { confirmSyllable() } else { input(k) }
         }

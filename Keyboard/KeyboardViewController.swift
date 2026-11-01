@@ -238,6 +238,7 @@ final class KeyboardViewController: UIInputViewController {
             let converter = ChineseConverter(db: db)
             let radicals = Radicals.load(from: db)
             let prefixes = zhuyin.syllablePrefixes()
+            let fullSyllables = zhuyin.completeSyllables()
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 zhuyin.fuzzy = self.fuzzyOptions
@@ -248,6 +249,7 @@ final class KeyboardViewController: UIInputViewController {
                 self.radicals = radicals
                 self.learningModels = [zhuyinUser, pinyinUser]
                 if !prefixes.isEmpty { self.composer.validPrefixes = prefixes }
+                if !fullSyllables.isEmpty { self.composer.validSyllables = fullSyllables }
                 if self.isComposing { self.updateCandidatesNow() }
             }
         }
@@ -1314,6 +1316,13 @@ final class KeyboardViewController: UIInputViewController {
             p.onDownloadFont = { [weak self] id in self?.downloadFont(id) }
             p.onPasteSpaceImage = { [weak self] in self?.pasteSpaceImage() }
             p.onPasteSpaceEmoji = { [weak self] in self?.pasteSpaceEmoji() }
+            p.onCopyTypingLog = { [weak self] in
+                guard let self = self else { return }
+                guard self.hasFullAccess else { self.toast("要先開啟「允許完整取用」才能複製"); return }
+                let head = "糯糯鍵盤 v\(ReleaseChecker.currentVersion) iPhone 打字紀錄\n"
+                UIPasteboard.general.string = head + self.zhuyin.log.joined(separator: "\n")
+                self.toast("已複製 \(self.zhuyin.log.count) 筆紀錄，貼給開發的人")
+            }
             p.onResetLearning = { [weak self] in
                 self?.engine?.resetLearning()
                 self?.toast("已清除選字學習紀錄")
@@ -1965,6 +1974,7 @@ final class KeyboardViewController: UIInputViewController {
                                          fullWidthSymbols: settings.fullWidthSymbols)
         grid.setLayout(KeyLayouts.layout(context))
         grid.glideEnabled = mode == .english && layer == .letters && settings.glideTyping
+        grid.showsPreview = settings.keyPreview
 
         let showHandwriting = mode == .handwriting && layer == .letters
         if showHandwriting {

@@ -199,7 +199,9 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
             }
         }
         merge(phrases(readings), 0.0)
+        // 很長的一串不每個音節都猜錯字（太慢）；詞最多 4 個字時才猜
         for (j in readings.indices) {
+            if (readings.size > 4) break
             for ((alt, penalty) in alternatives(readings[j])) {
                 val variant = readings.toMutableList()
                 variant[j] = alt
@@ -214,16 +216,20 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
     /** 一個音節可能是哪些音打錯了（只留字典裡真的有的） */
     fun alternatives(reading: String): List<Pair<String, Double>> {
         alternativeCache[reading]?.let { return it }
-        if (reading.endsWith('*')) return emptyList()   // 沒打完的音節本來就聲調不限，不用再猜
-        val syllable = Syllable.parse(reading)
+        // 沒打聲調的音節（ㄎㄜ*）聲調本來就不限，只猜「按到旁邊的鍵」；只打一個注音的簡拼範圍已經很大，不猜
+        val open = reading.endsWith('*')
+        val body = if (open) reading.dropLast(1) else reading
+        if (open && body.length < 2) return emptyList()
+        val syllable = Syllable.parse(body)
         val out = ArrayList<Pair<String, Double>>()
-        val seen = hashSetOf(reading)
+        val seen = hashSetOf(body)
         fun add(s: Syllable, penalty: Double) {
             val r = s.reading
             if (!s.hasSound || !seen.add(r)) return
-            if (phrases(listOf(r)).isNotEmpty()) out.add(r to penalty)
+            val key = if (open) "$r*" else r
+            if (phrases(listOf(key)).isNotEmpty()) out.add(key to penalty)
         }
-        if (fuzzy.tones) {
+        if (fuzzy.tones && !open) {
             for (tone in listOf(null, 'ˊ', 'ˇ', 'ˋ', '˙')) {
                 if (tone != syllable.tone) add(syllable.copy(tone = tone), TONE_PENALTY)
             }
@@ -232,9 +238,10 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
             syllable.initial?.let { i -> Bopomofo.similar[i]?.let { add(syllable.copy(initial = it), PHONETIC_PENALTY) } }
             syllable.rhyme?.let { f -> Bopomofo.similar[f]?.let { add(syllable.copy(rhyme = it), PHONETIC_PENALTY) } }
         }
-        // 打出來的音根本不存在：多半是按到旁邊的鍵
-        if (fuzzy.keyNeighbors && phrases(listOf(reading)).isEmpty()) {
-            for (c in reading) {
+        // 按到旁邊的鍵（上下左右）：打出來的音根本不存在時多半是按錯；存在的話也試，但扣多一點分
+        if (fuzzy.keyNeighbors) {
+            val penalty = if (phrases(listOf(reading)).isEmpty()) NEIGHBOR_PENALTY else NEIGHBOR_PENALTY - 1.5
+            for (c in body) {
                 for (n in Bopomofo.neighbors[c] ?: emptyList()) {
                     val s = syllable.copy()
                     when (Bopomofo.kind(c)) {
@@ -245,7 +252,7 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
                         null -> continue
                     }
                     s.put(n)
-                    add(s, NEIGHBOR_PENALTY)
+                    add(s, penalty)
                 }
             }
         }
@@ -340,10 +347,13 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         }
         exact.sortWith(order)
         shorter.sortWith(order)
+        // 照打的音查到的詞排在「猜按錯鍵」的詞前面
+        val typed = phrases(readings).map { it.text }.toHashSet()
+        exact.sortBy { if (it.text in typed) 0 else 1 }
         val out = ArrayList<Candidate>()
         val listed = HashSet<String>()
         if (n > 1) {
-            val cover = exact.firstOrNull { it.text.length == n }
+            val cover = exact.firstOrNull { it.text.length == n && it.text in typed } ?: exact.firstOrNull { it.text.length == n }
             val sentence = cover?.text ?: composedSentence(readings)
             if (sentence.isNotEmpty() && commit(sentence) == sentence) {
                 out.add(Candidate(sentence, n, Candidate.Kind.SENTENCE))

@@ -240,6 +240,9 @@ final class KeyboardGridView: UIView {
     var onCursorLine: ((Int) -> Void)?
     /// 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去
     var glideEnabled = false
+    /// 按下去時上面跳出放大的字（看得到自己按到哪一顆）
+    var showsPreview = true
+    private let preview = UILabel()
     var onGlide: (([CGPoint], [Character: CGPoint], CGFloat) -> Void)?
     private let trail = CAShapeLayer()
     var style: KeyboardStyle {
@@ -390,6 +393,43 @@ final class KeyboardGridView: UIView {
         }
     }
 
+    /// 放大泡泡：字鍵按下去時，在按鍵上方跳出一個大大的字
+    private func showPreview(_ key: KeyButton) {
+        guard showsPreview, case .text(let s) = key.spec.face, !s.isEmpty, s.count <= 2,
+              key.spec.action.isCharacter else { hidePreview(); return }
+        let f = key.frame
+        let w = max(f.width * 1.45, 42), h = f.height * 1.2
+        var x = f.midX - w / 2
+        x = min(max(2, x), bounds.width - w - 2)
+        preview.frame = CGRect(x: x, y: f.minY - h + 4, width: w, height: h)
+        preview.text = s
+        preview.textAlignment = .center
+        preview.font = KeyFonts.font(style.fontID, size: h * 0.62, weight: .semibold)
+        preview.textColor = style.theme.keyText
+        preview.backgroundColor = style.theme.key
+        preview.layer.cornerRadius = min(w, h) * 0.42
+        preview.layer.masksToBounds = true
+        preview.layer.borderWidth = 1.5
+        preview.layer.borderColor = style.theme.accent.withAlphaComponent(0.6).cgColor
+        if preview.superview == nil { addSubview(preview) }
+        bringSubviewToFront(preview)
+        let wasHidden = preview.isHidden || preview.alpha == 0
+        preview.isHidden = false
+        preview.alpha = 1
+        if wasHidden {
+            // 彈一下跳出來
+            preview.transform = CGAffineTransform(scaleX: 0.6, y: 0.6).translatedBy(x: 0, y: h * 0.3)
+            UIView.animate(withDuration: 0.12, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.8,
+                           options: [.allowUserInteraction, .beginFromCurrentState]) { self.preview.transform = .identity }
+        }
+    }
+
+    private func hidePreview() {
+        guard !preview.isHidden else { return }
+        UIView.animate(withDuration: 0.06, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState],
+                       animations: { self.preview.alpha = 0 }, completion: { done in if done && self.preview.alpha == 0 { self.preview.isHidden = true } })
+    }
+
     private func fire(_ key: KeyButton) {
         onKey?(key.spec)
     }
@@ -434,6 +474,7 @@ final class KeyboardGridView: UIView {
             var track = Track(key: key, action: key.spec.action, origin: p)
             if glideEnabled && isLetter(key) { track.points.append(p) }
             spawnEffect(from: key)
+            showPreview(key)
             tracks[touch] = track
             switch key.spec.action {
             case .backspace:
@@ -482,6 +523,7 @@ final class KeyboardGridView: UIView {
                     track.key.isPressed = false
                     k.isPressed = true
                     track.key = k
+                    showPreview(k)
                     if !track.points.isEmpty {
                         track.visited += 1
                         if track.visited >= 3 { track.gliding = true }
@@ -494,6 +536,7 @@ final class KeyboardGridView: UIView {
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        defer { if tracks.isEmpty { hidePreview() } }
         for touch in touches.sorted(by: touchOrder) {
             guard let track = tracks.removeValue(forKey: touch) else { continue }
             track.key.isPressed = false
@@ -516,6 +559,7 @@ final class KeyboardGridView: UIView {
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         // 系統把觸控取消時仍送出已經按下的字，避免快速打字時整段注音消失。
+        defer { if tracks.isEmpty { hidePreview() } }
         for touch in touches.sorted(by: touchOrder) {
             guard let track = tracks.removeValue(forKey: touch) else { continue }
             track.key.isPressed = false

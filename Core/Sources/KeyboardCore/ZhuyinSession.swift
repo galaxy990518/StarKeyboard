@@ -26,6 +26,18 @@ final class ZhuyinSession {
     var candidates: [Candidate] = []
     var engine: ZhuyinEngine?
     private var picks: [(readings: [String], text: String)] = []
+    /// 最近的按鍵紀錄（注音被拆開時，使用者可以複製給開發的人看）：時間差、按了什麼、之後組字區長怎樣
+    private(set) var log: [String] = []
+    private var lastLogTime: Double = 0
+
+    func note(_ what: String) {
+        let now = ProcessInfo.processInfo.systemUptime
+        let gap = lastLogTime == 0 ? 0 : Int((now - lastLogTime) * 1000)
+        lastLogTime = now
+        let parts = composer.readings.joined(separator: " ")
+        log.append("+\(gap)ms \(what) → [\(parts)]")
+        if log.count > 80 { log.removeFirst(log.count - 80) }
+    }
 
     /// 很長的句子仍整段留著。超過這個音節數才把前面已經能決定的部分送出，新按的鍵不會被丟掉。
     static let overflowSyllables = 180
@@ -50,9 +62,10 @@ final class ZhuyinSession {
     /// 注音鍵。回傳這次要送進文章的字（通常是空的；緩衝區太長時是前面那段中文）。
     func type(_ c: Character) -> String {
         guard Bopomofo.kind(of: c) != nil else { return "" }
+        defer { note(String(c) + (cursor != nil ? "（游標）" : "")) }
         if let i = cursor { editKeys(insert: c, at: i); return "" }
         if !composer.isComposing { picks = [] }
-        _ = composer.input(c)
+        _ = composer.input(c, at: ProcessInfo.processInfo.systemUptime)
         if composer.syllables.count > Self.overflowSyllables {
             return commitOverflow()
         }
@@ -61,6 +74,7 @@ final class ZhuyinSession {
 
     /// 組字區或還沒用到的聲調處理掉了就回傳 true。
     func backspace() -> Bool {
+        defer { note("刪除") }
         if let i = cursor {
             if i > 0 { editKeys(removeAt: i - 1) }
             return true
@@ -82,9 +96,10 @@ final class ZhuyinSession {
     }
 
     func space() -> Space {
+        defer { note("空白") }
         if let i = cursor { editKeys(insert: ZhuyinComposer.firstTone, at: i); return .stay }
         if composer.hasPendingSyllable {
-            composer.confirmSyllable()
+            composer.confirmSyllable(at: ProcessInfo.processInfo.systemUptime)
             return .stay
         }
         if composer.isComposing {
@@ -159,6 +174,7 @@ final class ZhuyinSession {
     func pick(_ index: Int, learn: Bool) -> String {
         guard composer.isComposing, index >= 0, index < candidates.count else { return "" }
         let c = candidates[index]
+        defer { note("選「\(c.text)」") }
         // 只有「直接送出注音」那一個候選會留下注音符號，其他一律拿掉
         let text = c.kind == .raw ? c.text : PhoneticText.commit(c.text)
         let used = c.reading.map { $0.components(separatedBy: "-") } ?? Array(composer.readings.prefix(c.span))

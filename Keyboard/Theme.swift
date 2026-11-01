@@ -1018,6 +1018,11 @@ final class KeyboardSettings {
         get { d.string(forKey: "keySoundStyle") ?? KeySound.system.rawValue }
         set { d.set(newValue, forKey: "keySoundStyle") }
     }
+    /// 按下去時上面跳出放大的字
+    var keyPreview: Bool {
+        get { bool("keyPreview", true) }
+        set { d.set(newValue, forKey: "keyPreview") }
+    }
     var keySound: Bool {
         get { bool("keySound", true) }
         set { d.set(newValue, forKey: "keySound") }

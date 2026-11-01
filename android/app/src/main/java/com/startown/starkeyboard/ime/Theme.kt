@@ -739,6 +739,10 @@ class KeyboardSettings(context: Context) {
         get() = p.getFloat("customSaturation2", 0.55f)
         set(v) = p.edit().putFloat("customSaturation2", v).apply()
     /** 空白鍵：theme 主題符號＋輸入法名字、image 自己的圖片／GIF、emoji 表符、text 只有字 */
+    /** 按下去時上面跳出放大的字 */
+    var keyPreview: Boolean
+        get() = p.getBoolean("keyPreview", true)
+        set(v) = p.edit().putBoolean("keyPreview", v).apply()
     var spaceStyle: String
         get() = p.getString("spaceStyle", "theme") ?: "theme"
         set(v) = p.edit().putString("spaceStyle", v).apply()

@@ -10,6 +10,7 @@ final class SettingsPanelView: UIView {
     var onDownloadFont: ((String) -> Void)?
     var onPasteSpaceImage: (() -> Void)?
     var onPasteSpaceEmoji: (() -> Void)?
+    var onCopyTypingLog: (() -> Void)?
     var onAddShortcut: (() -> Void)?
     var onResetLearning: (() -> Void)?
     var onBack: (() -> Void)?
@@ -137,6 +138,15 @@ final class SettingsPanelView: UIView {
             ("😊 貼上表符", { [weak self] in self?.onPasteSpaceEmoji?() }),
         ]))
         stack.addArrangedSubview(note("先「拷貝」一張圖片、GIF、表情符號或顏文字，再按上面的按鈕，空白鍵就只放那個小圖。想幫照片去背：打開「糯糯鍵盤」App →「空白鍵圖案」挑照片，會自動去背並複製好。"))
+
+        stack.addArrangedSubview(switchRow("按鍵放大泡泡（按下去上面跳出大大的字，看得到按到哪顆）", on: settings.keyPreview) { [weak self] on in
+            self?.settings.keyPreview = on
+            self?.onChange?()
+        })
+
+        stack.addArrangedSubview(header("注音被拆開了？"))
+        stack.addArrangedSubview(buttonRow([("📋 複製剛剛的打字紀錄", { [weak self] in self?.onCopyTypingLog?() })]))
+        stack.addArrangedSubview(note("打字時注音被拆開（例如「我覺得」變「我居約得」），先不要刪，直接打開 ⚙ 按這個，再貼給開發的人。紀錄是最近 80 次按鍵的注音、時間和選過的字。"))
 
         stack.addArrangedSubview(header("按鍵特效（按下去冒出小圖案）"))
         stack.addArrangedSubview(choiceRow(KeyEffect.allCases.map { $0.title },

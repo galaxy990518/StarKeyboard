@@ -24,6 +24,14 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     var onKey: ((KeySpec) -> Unit)? = null
     var onLongPress: ((KeySpec) -> Unit)? = null
     var onCursorMove: ((Int) -> Unit)? = null
+    /** 按下去時上面跳出放大的字（看得到自己按到哪一顆） */
+    var showsPreview = true
+    private var previewKey: Key? = null
+    private val previewPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val previewText = Paint(Paint.ANTI_ALIAS_FLAG).also { it.textAlign = Paint.Align.CENTER }
+
+    private fun previewFor(k: Key?): Key? =
+        if (showsPreview && k != null && k.spec.action.isCharacter && k.spec.label.length in 1..2) k else null
     /** 按住空白鍵上下滑：游標換到上一行（-1）或下一行（1） */
     var onCursorLine: ((Int) -> Unit)? = null
     /** 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去 */
@@ -240,8 +248,35 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             drawLabel(canvas, k, text)
             canvas.restore()
         }
+        previewKey?.let { drawPreview(canvas, it) }
         drawTrail(canvas)
         drawParticles(canvas)
+    }
+
+    /** 放大泡泡：在按鍵上方畫一個大大的字（最上排就往下一點，不要被切掉） */
+    private fun drawPreview(canvas: Canvas, k: Key) {
+        val t = style.theme
+        val f = k.frame
+        val w = maxOf(f.width() * 1.45f, 42 * dp)
+        val h = f.height() * 1.2f
+        val left = (f.centerX() - w / 2).coerceIn(2 * dp, width - w - 2 * dp)
+        val top = maxOf(0f, f.top - h + 4 * dp)
+        val r = RectF(left, top, left + w, top + h)
+        val radius = minOf(w, h) * 0.42f
+        previewPaint.style = Paint.Style.FILL
+        previewPaint.color = t.shadow.withAlpha(0.5f)
+        canvas.drawRoundRect(RectF(r).apply { offset(0f, 2 * dp) }, radius, radius, previewPaint)
+        previewPaint.color = t.key
+        canvas.drawRoundRect(r, radius, radius, previewPaint)
+        previewPaint.style = Paint.Style.STROKE
+        previewPaint.strokeWidth = 1.5f * dp
+        previewPaint.color = t.accent.withAlpha(0.6f)
+        canvas.drawRoundRect(r, radius, radius, previewPaint)
+        previewText.color = t.keyText
+        previewText.textSize = h * 0.6f
+        previewText.typeface = KeyFonts.get(context, style.fontId) ?: Typeface.DEFAULT_BOLD
+        val fm = previewText.fontMetrics
+        canvas.drawText(k.spec.label, r.centerX(), r.centerY() - (fm.ascent + fm.descent) / 2, previewText)
     }
 
     private fun darker(c: Int, f: Float) = Color.rgb((Color.red(c) * f).toInt(), (Color.green(c) * f).toInt(), (Color.blue(c) * f).toInt())
@@ -377,6 +412,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 // 先亮起這顆鍵，再送出上一拍還沒放開的字。選字不能擋住按鍵變色。
                 setPressed(key, true)
                 val track = Track(key, key.spec.action, e.getX(i), e.getY(i))
+                previewKey = previewFor(key)
                 if (glideEnabled && key.isLetter) track.points.add(Pt(e.getX(i), e.getY(i)))
                 tracks[e.getPointerId(i)] = track
                 for (t in tracks.values) {
@@ -446,6 +482,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                             setPressed(t.key, false)
                             setPressed(k, true)
                             t.key = k
+                            previewKey = previewFor(k)
+                            invalidate()
                             if (t.points.isNotEmpty() && ++t.visited >= 3) t.gliding = true
                         }
                     }
@@ -454,6 +492,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 val t = tracks.remove(e.getPointerId(e.actionIndex)) ?: return true
                 setPressed(t.key, false)
+                if (tracks.isEmpty() || previewKey === t.key) { previewKey = null; invalidate() }
                 if (t.action == KeyAction.Backspace) stopRepeat()
                 if (t.action == KeyAction.NextMode) longPressRunnable?.let { mainHandler.removeCallbacks(it) }
                 if (t.gliding) {
@@ -467,6 +506,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 val pending = tracks.values.filter { !it.fired && !it.cursorMode && !it.gliding && it.action.isCharacter }
                 for (t in tracks.values) setPressed(t.key, false)
                 tracks.clear()
+                previewKey = null
+                invalidate()
                 stopRepeat()
                 longPressRunnable?.let { mainHandler.removeCallbacks(it) }
                 for (t in pending) fire(t.key)

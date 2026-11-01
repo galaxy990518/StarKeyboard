@@ -119,6 +119,11 @@ class ZhuyinComposer {
     /** 查字典用的讀音：打完的音節＋正在打的音節（沒打聲調也算，先拿來預覽） */
     /** 字典裡所有音節的開頭（例如 ㄋ、ㄋㄧ、ㄋㄧㄠ）；有的話，組不出存在的音就自動換下一個字 */
     var validPrefixes: Set<String>? = null
+    /** 可以自己成一個字的音節（沒聲調）；「ㄐ」這種不能單獨念的，按空白也不會把它當成一個字 */
+    var validSyllables: Set<String>? = null
+    /** 剛被空白鍵（一聲）收起來的音節和時間（秒）：下一個注音其實接得上的話，當成空白是不小心碰到的 */
+    private var spaceClosedIndex = -1
+    private var spaceClosedTime: Double? = null
 
     val readings: List<String>
         get() {
@@ -132,9 +137,24 @@ class ZhuyinComposer {
     val hasPendingSyllable get() = !current.isEmpty
 
     /** 回傳 false 表示這個符號沒被組字用掉（不是注音）。聲調一定回傳 true。 */
-    fun input(c: Char): Boolean {
+    fun input(c: Char, time: Double? = null): Boolean {
         val kind = Bopomofo.kind(c) ?: return false
+        val closedIndex = spaceClosedIndex
+        val closedTime = spaceClosedTime
+        spaceClosedIndex = -1
+        spaceClosedTime = null
         if (kind == BopomofoKind.TONE) return putTone(c)
+        // 快速打字時拇指順便碰到空白鍵（ㄩ 就在空白鍵正上方）：ㄐ＋空白＋ㄩㄝ 還是「覺」，不是「居約」
+        if (current.isEmpty && kind != BopomofoKind.INITIAL && pendingTone == null && closedIndex >= 0 && closedIndex == syllables.size - 1) {
+            val last = syllables[closedIndex]
+            val merged = last.copy().also { it.put(c) }
+            val quick = time != null && closedTime != null && time - closedTime < ACCIDENTAL_SPACE_WINDOW
+            val impossible = validSyllables?.let { last.reading !in it } ?: false
+            val joins = validPrefixes?.contains(merged.reading) ?: true
+            if ((quick || impossible) && last.tone == null && !last.startsNewWith(kind) && joins) {
+                current = syllables.removeAt(closedIndex).also { it.open = false }
+            }
+        }
         // 不打聲調直接打下一個字：前一個字自動結束（ㄋㄏ → 你好）
         if (current.hasSound && (current.startsNewWith(kind) || !fits(c))) closeCurrent()
         current.put(c)
@@ -177,11 +197,15 @@ class ZhuyinComposer {
     }
 
     /** 空白鍵＝一聲。組字區保持開著。 */
-    fun confirmSyllable(): Boolean {
+    fun confirmSyllable(time: Double? = null): Boolean {
         if (!current.hasSound) return false
         if (current.tone == null && pendingTone != null) current.tone = pendingTone
         pendingTone = null
-        finish(open = false)
+        // 「ㄐ」這種不能單獨念的音按了空白：當成只打開頭的簡拼（ㄐ*），不是一聲的「ㄐ」
+        val alone = current.tone != null || (validSyllables?.contains(current.reading) ?: true)
+        finish(open = !alone)
+        spaceClosedIndex = syllables.size - 1
+        spaceClosedTime = time
         return true
     }
 
@@ -193,6 +217,7 @@ class ZhuyinComposer {
     }
 
     fun backspace(): Boolean {
+        spaceClosedIndex = -1
         if (current.hasSound && current.tone == null && pendingTone != null) {
             pendingTone = null
             return true
@@ -253,10 +278,13 @@ class ZhuyinComposer {
         syllables.clear()
         current = Syllable()
         pendingTone = null
+        spaceClosedIndex = -1
     }
 
     companion object {
         const val FIRST_TONE = 'ˉ'
+        /** 空白之後多快接著打注音，算是不小心碰到空白（秒） */
+        const val ACCIDENTAL_SPACE_WINDOW = 0.35
         fun display(keys: List<Char>) = keys.joinToString("") { if (it == FIRST_TONE) " " else it.toString() }
     }
 

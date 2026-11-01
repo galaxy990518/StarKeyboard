@@ -185,6 +185,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 if (source != null) {
                     engine = ZhuyinEngine(source, UserPhraseModel(File(filesDir, "learned.txt"))).also { it.fuzzy = fuzzyOptions() }
                     composer.validPrefixes = prefixes
+                    composer.validSyllables = source.syllables().toSet()
                 }
                 if (plain != null) {
                     pinyinEngine = PinyinEngine(ZhuyinEngine(plain, UserPhraseModel(File(filesDir, "learned-pinyin.txt")), toneless = true), plain.pinyinTable())
@@ -446,8 +447,28 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         updateSpelling()
     }
 
+    /** 最近的按鍵紀錄（注音被拆開時，使用者可以複製給開發的人看）：時間差、按了什麼、之後組字區長怎樣 */
+    private val zyLog = ArrayDeque<String>()
+    private var zyLogTime = 0L
+
+    private fun zyNote(what: String) {
+        val now = android.os.SystemClock.uptimeMillis()
+        val gap = if (zyLogTime == 0L) 0 else now - zyLogTime
+        zyLogTime = now
+        zyLog.addLast("+${gap}ms $what → [${composer.readings.joinToString(" ")}]")
+        while (zyLog.size > 80) zyLog.removeFirst()
+    }
+
+    private fun copyTypingLog() {
+        val text = "糯糯鍵盤 v${BuildInfo.current(this)} Android 打字紀錄\n" + zyLog.joinToString("\n")
+        (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+            .setPrimaryClip(android.content.ClipData.newPlainText("打字紀錄", text))
+        toast("已複製 ${zyLog.size} 筆紀錄，貼給開發的人")
+    }
+
     private fun typeZhuyin(c: Char) {
         suggestions = emptyList()
+        if (Bopomofo.kind(c) != null) mainHandler.post { zyNote(c.toString()) }
         if (Bopomofo.kind(c) == null) {
             refreshTopBar()
             return
@@ -462,7 +483,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             scheduleCandidates()
             return
         }
-        composer.input(c)
+        composer.input(c, android.os.SystemClock.uptimeMillis() / 1000.0)
         if (composer.syllables.size > 180) {
             val count = composer.syllables.size - 8
             val text = ZhuyinEngine.commit(synchronized(dictLock) { engine?.bestSegments(composer.readings.take(count)) }?.joinToString("") { it.text } ?: "")
@@ -554,6 +575,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     private fun backspace() {
+        if (composer.isComposing) mainHandler.post { zyNote("刪除") }
         if (pinyinBuffer.isNotEmpty()) {
             pinyinBuffer = pinyinBuffer.dropLast(1)
             updateCandidates()
@@ -598,6 +620,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     private fun space() {
+        if (composer.isComposing) mainHandler.post { zyNote("空白") }
         if (mode == InputMode.ZHUYIN && layer == KeyboardLayer.LETTERS && composer.isComposing && zyCursor != null) {
             // 游標在注音中間：空白鍵打一聲
             val i = zyCursor!!
@@ -610,7 +633,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         }
         if (mode == InputMode.ZHUYIN && layer == KeyboardLayer.LETTERS && composer.hasPendingSyllable) {
             // 空白鍵＝一聲。沒打完的音節留在組字區，不直接送出預選的字。
-            composer.confirmSyllable()
+            composer.confirmSyllable(android.os.SystemClock.uptimeMillis() / 1000.0)
             updateCandidates()
             return
         }
@@ -966,6 +989,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         }
         if (composer.isComposing) {
             val c = candidates.getOrNull(i) ?: return
+            mainHandler.post { zyNote("選「${c.text}」") }
             // 只有「直接送出注音」那一個候選會留下注音符號，其他一律拿掉
             val text = if (c.kind == Candidate.Kind.RAW) c.text else ZhuyinEngine.commit(c.text)
             val used = composer.readings.take(c.span)
@@ -1316,6 +1340,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                         .putExtra(MainActivity.EXTRA_PICK, MainActivity.PICK_SPACE))
                 },
                 onPasteSpaceEmoji = { pasteSpaceEmoji() },
+                onCopyTypingLog = { copyTypingLog() },
                 onImportFont = {
                     startActivity(Intent(this, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

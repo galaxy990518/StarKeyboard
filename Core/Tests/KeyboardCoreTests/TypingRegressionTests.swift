@@ -66,4 +66,26 @@ final class TypingRegressionTests: XCTestCase {
         XCTAssertEqual(reloaded.phrases(for: "ㄏㄠ*"), ["好"])
         XCTAssertTrue(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
     }
+
+    /// 朋友回報：快速打字時拇指碰到空白鍵，ㄐ 被單獨收起來（我覺得 → 我居約得）
+    func testAccidentalSpaceInsideSyllableIsUndone() {
+        func composer() -> ZhuyinComposer {
+            var c = ZhuyinComposer()
+            c.validPrefixes = ["ㄐ", "ㄐㄩ", "ㄐㄩㄝ", "ㄩ", "ㄩㄝ", "ㄩㄢ", "ㄢ"]
+            c.validSyllables = ["ㄐㄩ", "ㄐㄩㄝ", "ㄩ", "ㄩㄝ", "ㄩㄢ", "ㄢ"]
+            return c
+        }
+        // ㄐ 不能單獨念：空白之後再打 ㄩㄝ，不管隔多久都接回去
+        var a = composer()
+        a.input("ㄐ", at: 0); a.confirmSyllable(at: 0.1); a.input("ㄩ", at: 5); a.input("ㄝ", at: 5.1)
+        XCTAssertEqual(a.readings, ["ㄐㄩㄝ*"])
+        // ㄩ 可以單獨念：空白後很快就打 ㄢ，是不小心碰到的
+        var b = composer()
+        b.input("ㄩ", at: 0); b.confirmSyllable(at: 0.1); b.input("ㄢ", at: 0.2)
+        XCTAssertEqual(b.readings, ["ㄩㄢ*"])
+        // 隔一陣子才打：使用者真的要一聲的 ㄩ
+        var c = composer()
+        c.input("ㄩ", at: 0); c.confirmSyllable(at: 0.1); c.input("ㄢ", at: 1.5)
+        XCTAssertEqual(c.readings, ["ㄩ", "ㄢ*"])
+    }
 }
