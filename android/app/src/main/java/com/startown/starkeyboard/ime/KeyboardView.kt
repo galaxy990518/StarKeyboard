@@ -268,7 +268,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         val f = k.frame
         val w = maxOf(f.width() * 1.45f, 42 * dp)
         val h = f.height() * 1.2f
-        val left = (f.centerX() - w / 2).coerceIn(2 * dp, width - w - 2 * dp)
+        val left = (f.centerX() - w / 2).coerceIn(2 * dp, maxOf(2 * dp, width - w - 2 * dp))
         val top = maxOf(0f, f.top - h + 4 * dp)
         val r = RectF(left, top, left + w, top + h)
         val radius = minOf(w, h) * 0.42f

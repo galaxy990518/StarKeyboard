@@ -91,8 +91,9 @@ class Backdrop(context: Context) : ImageView(context) {
 
     private fun fit() {
         val (iw, ih, s) = scale() ?: return
-        val dx = (width / 2f - focusX * iw * s).coerceIn(width - iw * s, 0f)
-        val dy = (height / 2f - focusY * ih * s).coerceIn(height - ih * s, 0f)
+        // 照片剛好填滿時，算出來的下限可能因為小數誤差比 0 大一點點（0.00006），要先夾住，不然會閃退
+        val dx = (width / 2f - focusX * iw * s).coerceIn(minOf(width - iw * s, 0f), 0f)
+        val dy = (height / 2f - focusY * ih * s).coerceIn(minOf(height - ih * s, 0f), 0f)
         imageMatrix = Matrix().apply { setScale(s, s); postTranslate(dx, dy) }
     }
 }
