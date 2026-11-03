@@ -527,7 +527,8 @@ final class KeyboardGridView: UIView {
                 if !track.cursorMode && (abs(p.x - track.origin.x) > 16 || abs(p.y - track.origin.y) > 18) {
                     track.cursorMode = true
                     track.cursorX = p.x
-                    track.cursorY = p.y
+                    // 上下從按下去的地方算起：空白鍵在最下面，往下能滑的距離很短
+                    track.cursorY = track.origin.y
                 }
                 if track.cursorMode {
                     let steps = Int((p.x - track.cursorX) / 9)
@@ -535,11 +536,12 @@ final class KeyboardGridView: UIView {
                         onCursorMove?(steps)
                         track.cursorX += CGFloat(steps) * 9
                     }
-                    // 上下滑一段（約 22 點）換一行
-                    let lines = Int((p.y - track.cursorY) / 22)
-                    if lines != 0 {
-                        onCursorLine?(lines > 0 ? 1 : -1)
-                        track.cursorY += CGFloat(lines > 0 ? 1 : -1) * 22
+                    // 往上滑約 22 點換一行；往下只要 10 點（手指一下就滑出鍵盤了）
+                    let dy = p.y - track.cursorY
+                    let step: CGFloat = dy > 0 ? 10 : 22
+                    if abs(dy) >= step {
+                        onCursorLine?(dy > 0 ? 1 : -1)
+                        track.cursorY += dy > 0 ? step : -step
                     }
                 }
             } else if track.key.spec.action.isCharacter {

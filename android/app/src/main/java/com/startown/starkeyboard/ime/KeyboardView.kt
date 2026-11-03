@@ -522,7 +522,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                         if (!t.cursorMode && (abs(x - t.startX) > 16 * dp || abs(y - t.startY) > 18 * dp)) {
                             t.cursorMode = true
                             t.cursorX = x
-                            t.cursorY = y
+                            // 上下從按下去的地方算起：空白鍵在最下面，往下能滑的距離很短
+                            t.cursorY = t.startY
                         }
                         if (t.cursorMode) {
                             val steps = ((x - t.cursorX) / (9 * dp)).toInt()
@@ -530,12 +531,13 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                                 onCursorMove?.invoke(steps)
                                 t.cursorX += steps * 9 * dp
                             }
-                            // 上下滑一段（約 22dp）換一行
-                            val lines = ((y - t.cursorY) / (22 * dp)).toInt()
-                            if (lines != 0) {
-                                val d = if (lines > 0) 1 else -1
+                            // 往上滑約 22dp 換一行；往下只要 10dp（手指一下就滑出鍵盤了）
+                            val dy = y - t.cursorY
+                            val step = (if (dy > 0) 10 else 22) * dp
+                            if (abs(dy) >= step) {
+                                val d = if (dy > 0) 1 else -1
                                 onCursorLine?.invoke(d)
-                                t.cursorY += d * 22 * dp
+                                t.cursorY += d * step
                             }
                         }
                     } else if (t.action.isCharacter) {

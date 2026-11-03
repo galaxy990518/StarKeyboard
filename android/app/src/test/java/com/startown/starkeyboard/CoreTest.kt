@@ -171,7 +171,9 @@ class CoreTest {
 
     @Test fun fuzzy() {
         val e = engine(listOf(Triple("ㄋㄧ", "妮", -5.5)))
-        assertEquals("你好", sentence(e, listOf("ㄋㄧ", "ㄏㄠˇ")))
+        // 有符合輸入的字時尊重原音；容錯的「你」仍可另選
+        assertEquals("妮好", sentence(e, listOf("ㄋㄧ", "ㄏㄠˇ")))
+        assertTrue(e.candidates(listOf("ㄋㄧ")).any { it.text == "你" })
         e.fuzzy = e.fuzzy.copy(tones = false)
         assertEquals("妮好", sentence(e, listOf("ㄋㄧ", "ㄏㄠˇ")))
         val f = engine()
@@ -330,5 +332,19 @@ class CoreTest {
         assertEquals("那是", e.candidates(listOf("ㄋ*", "ㄕ*")).first().text)
         e.learn(listOf("ㄋㄧˇ", "ㄕˋ"), "你是")
         assertEquals("你是", e.candidates(listOf("ㄋ*", "ㄕ*")).first().text)
+    }
+    @Test fun typedSoundsBeatNeighborKeyGuesses() {
+        val e = ZhuyinEngine(MemoryPhraseSource(listOf(
+            Triple("ㄉㄨㄛ", "多", -3.0), Triple("ㄌㄜ˙", "了", -2.0), Triple("ㄉㄜˊ", "得", -3.0),
+            Triple("ㄉㄜˊ-ㄌㄜ˙", "得了", -4.0), Triple("ㄉㄨㄟˋ-ㄌㄜ˙", "對了", -4.0), Triple("ㄉㄨㄛ-ㄌㄩˋ", "多氯", -6.0),
+            Triple("ㄨㄛˇ", "我", -2.0), Triple("ㄐㄧㄤˋ", "降", -4.0), Triple("ㄧˇ", "以", -2.5),
+            Triple("ㄧˇ-ㄐㄧㄤˋ", "以降", -5.0), Triple("ㄨㄚˇ-ㄐㄧㄤˋ", "瓦匠", -6.0)
+        )), UserPhraseModel(null))
+        // 每個音都打對了：照打的音湊句子，不換成猜按錯鍵的詞；長句裡也一樣
+        assertEquals("多了", e.candidates(listOf("ㄉㄨㄛ*", "ㄌㄜ*")).first().text)
+        assertEquals("我降", e.candidates(listOf("ㄨㄛˇ", "ㄐㄧㄤˋ")).first().text)
+        assertEquals("我降了", sentence(e, listOf("ㄨㄛˇ", "ㄐㄧㄤˋ", "ㄌㄜ˙")))
+        val list = e.candidates(listOf("ㄨㄛˇ", "ㄐㄧㄤˋ")).map { it.text }
+        assertTrue(list.indexOf("我") < list.indexOf("以降"))
     }
 }

@@ -7,7 +7,7 @@ data class Candidate(val text: String, val span: Int, val kind: Kind) {
     enum class Kind { SENTENCE, PHRASE, LITERAL, RAW }
 }
 
-data class Scored(val text: String, val score: Double)
+data class Scored(val text: String, val score: Double, val corrections: Int = 0)
 
 /** 字典：讀音 → 字詞（SQLite 或測試用的記憶體版本） */
 interface PhraseSource {
@@ -191,11 +191,17 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         val key = readings.joinToString("-")
         fuzzyCache[key]?.let { return it }
         val best = LinkedHashMap<String, Double>()
-        fun merge(list: List<Scored>, penalty: Double) {
+        val errors = HashMap<String, Int>()
+        fun merge(list: List<Scored>, penalty: Double, corrected: Boolean = false) {
+            val e = if (corrected) 1 else 0
             for (p in list) {
                 val s = p.score + penalty
                 val old = best[p.text]
-                if (old == null || s > old) best[p.text] = s
+                val oldE = errors[p.text]
+                if (old == null || e < oldE!! || (e == oldE && s > old)) {
+                    best[p.text] = s
+                    errors[p.text] = e
+                }
             }
         }
         merge(phrases(readings), 0.0)
@@ -205,10 +211,12 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
             for ((alt, penalty) in alternatives(readings[j])) {
                 val variant = readings.toMutableList()
                 variant[j] = alt
-                merge(phrases(variant), penalty)
+                merge(phrases(variant), penalty, corrected = true)
             }
         }
-        val result = best.entries.map { Scored(it.key, it.value) }.sortedByDescending { it.score }
+        // 照打的音查到的排在猜錯字的前面
+        val result = best.entries.map { Scored(it.key, it.value, errors[it.key]!!) }
+            .sortedWith(compareBy<Scored> { it.corrections }.thenByDescending { it.score })
         fuzzyCache[key] = result
         return result
     }
@@ -265,25 +273,31 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         val n = readings.size
         if (n == 0) return emptyList()
         val best = DoubleArray(n + 1) { Double.NEGATIVE_INFINITY }
+        val errors = IntArray(n + 1) { Int.MAX_VALUE }
         val backStart = IntArray(n + 1)
         val backText = arrayOfNulls<String>(n + 1)
         val backScore = DoubleArray(n + 1)
         val tail = Array(n + 1) { "" }
         val context = if (contextual) source.contextModel() else ContextModel.EMPTY
         best[0] = 0.0
+        errors[0] = 0
         for (i in 1..n) {
             for (k in 1..minOf(MAX_PHRASE, i)) {
                 val start = i - k
                 if (best[start] == Double.NEGATIVE_INFINITY) continue
                 val pool = fuzzyPhrases(readings.subList(start, i)).filter { commit(it.text) == it.text && it.text.isNotEmpty() }
                 if (pool.isNotEmpty()) {
-                    val options = if (contextual) pool.take(6) else pool.take(1)
+                    // 整句先求猜錯字最少，再比分數：每個音都打對時不會被猜按錯鍵的詞換掉
+                    val floor = pool[0].corrections
+                    val options = if (contextual) pool.take(6).filter { it.corrections == floor } else pool.take(1)
                     val leaderBonus = if (contextual) context.bonus(tail[start], options[0].text) else 0.0
                     for (opt in options) {
                         val raw = if (contextual) context.bonus(tail[start], opt.text) else 0.0
                         val extra = minOf(0.55, maxOf(0.0, raw - leaderBonus))
                         val s = best[start] + opt.score + extra
-                        if (s > best[i]) {
+                        val count = errors[start] + opt.corrections
+                        if (count < errors[i] || (count == errors[i] && s > best[i])) {
+                            errors[i] = count
                             best[i] = s
                             backStart[i] = start
                             backText[i] = opt.text
@@ -293,7 +307,9 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
                     }
                 } else if (k == 1) {
                     val s = best[start] + UNKNOWN_PENALTY
-                    if (s > best[i]) {
+                    val count = errors[start] + 1
+                    if (count < errors[i] || (count == errors[i] && s > best[i])) {
+                        errors[i] = count
                         best[i] = s
                         backStart[i] = start
                         backText[i] = ""
@@ -390,7 +406,7 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         }
         val n = readings.size
         for (k in minOf(MAX_PHRASE, n - 1) downTo 2) {
-            val word = fuzzyPhrases(readings.subList(0, k)).firstOrNull { it.text.length == k } ?: continue
+            val word = fuzzyPhrases(readings.subList(0, k)).firstOrNull { it.corrections == 0 && it.text.length == k } ?: continue
             if (word.text.length != k || !joined.startsWith(word.text)) continue
             if (chars[k] != word.text.last() || k !in singleton) continue
             val banned = word.text.last().toString()
