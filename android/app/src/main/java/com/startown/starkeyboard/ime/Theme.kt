@@ -83,7 +83,7 @@ enum class KeyShape(val title: String, private val artId: String? = null) {
     // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.kt）
     CAT_FACE("貓咪", "catFace"), BEAR("熊熊", "bear"), PAW("肉球", "paw"), CLOUD_PUFF("棉花雲", "cloudPuff"), PIXEL("像素", "pixel"), PIXEL_HEART("像素心", "pixelHeart"),
     PUZZLE("拼圖", "puzzle"), BOOK("書本", "book"), BUTTERFLY("蝴蝶", "butterfly"),
-    STRAWBERRY("草莓", "strawberry"), FLOWER("櫻花", "flower"), MOON("月亮", "moon"), STAR("星星", "star"), HEART("愛心", "heart"), LATTE("拉花咖啡", "latte");
+    STRAWBERRY("草莓", "strawberry"), FLOWER("櫻花", "flower"), MOON("月亮", "moon"), STAR("星星", "star"), HEART("愛心", "heart"), LATTE("拉花咖啡", "latte"), CAT_LINE("貓咪探頭", "catLine");
 
     val art: KeyShapeArt? get() = artId?.let { KeyShapeArt.shapes[it] }
 
@@ -98,7 +98,11 @@ enum class KeyShape(val title: String, private val artId: String? = null) {
         else -> art != null
     }
 
-    private fun isWide(r: RectF) = isSoftShape && r.width() > r.height() * 1.65f
+    // 會自己拉長的造型（貓咪探頭）寬鍵也畫原本的樣子，不換成膠囊
+    private fun isWide(r: RectF) = isSoftShape && art?.stretch != true && r.width() > r.height() * 1.65f
+
+    /** 只畫線的部分（尾巴、鬍鬚） */
+    fun linesPath(r: RectF): Path? = if (isWide(r)) null else art?.linesPath(r)
     private fun wideBody(r: RectF) = RectF(r).apply { inset(0f, r.height() * 0.08f) }
     private fun badgeRect(r: RectF): RectF {
         val size = r.height() * 0.54f
@@ -405,7 +409,7 @@ enum class KeyMotion(val id: String, val title: String) {
 
 /** 按鍵質感：平面、胖胖（圓滾滾、按下去會壓扁）、立體（有厚度、按下去往下沉） */
 enum class KeyFinish(val title: String) {
-    FLAT("平面"), PUFFY("胖胖"), RAISED("立體");
+    FLAT("平面"), PUFFY("胖胖"), RAISED("立體"), OUTLINE("線稿");
 }
 
 /** 按下按鍵時冒出來的小圖案 */
@@ -857,3 +861,9 @@ class KeyboardSettings(context: Context) {
 
     val style get() = KeyboardStyle(theme, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish, shapeScale, keyMotion)
 }
+
+/** 線條的顏色：線稿質感的外框、貓咪的尾巴鬍鬚眼睛肉球 */
+val KeyboardStyle.lineColor: Int
+    get() = if (finish == KeyFinish.OUTLINE) {
+        if (theme.dark) Color.argb(240, 0xFA, 0xFB, 0xFF) else Color.argb(214, 0x29, 0x2B, 0x2C)
+    } else theme.keyText.withAlpha(0.8f)

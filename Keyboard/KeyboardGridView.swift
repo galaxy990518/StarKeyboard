@@ -24,6 +24,7 @@ final class KeyButton: UIView {
     private let bodyLayer = CAShapeLayer()
     private let glossLayer = CAShapeLayer()
     private let detailLayer = CAShapeLayer()
+    private let linesLayer = CAShapeLayer()
     private let cushionLayer = CAGradientLayer()
     private let cushionMask = CAShapeLayer()
     // 影子只畫在按鍵外面（按鍵調透明時才不會看到兩層疊在一起）
@@ -49,6 +50,11 @@ final class KeyButton: UIView {
         cushionLayer.locations = [0, 0.55, 1]
         content.layer.addSublayer(cushionLayer)
         content.layer.addSublayer(detailLayer)
+        linesLayer.fillColor = nil
+        linesLayer.lineCap = .round
+        linesLayer.lineJoin = .round
+        content.layer.addSublayer(linesLayer)
+        bodyLayer.lineJoin = .round
         label.textAlignment = .center
         label.adjustsFontSizeToFitWidth = true
         label.minimumScaleFactor = 0.5
@@ -91,7 +97,12 @@ final class KeyButton: UIView {
         cushionLayer.frame = big
         var toBig = CGAffineTransform(translationX: -big.minX, y: -big.minY)
         cushionMask.path = path.copy(using: &toBig)
-        cushionLayer.isHidden = !style.shape.isSoftShape && finish == .flat
+        cushionLayer.isHidden = finish == .outline || (!style.shape.isSoftShape && finish == .flat)
+        // 線稿：線的粗細跟著按鍵大小，細細的
+        let lineWidth = min(1.6, max(0.9, outer.height * 0.028))
+        bodyLayer.lineWidth = lineWidth
+        linesLayer.lineWidth = lineWidth * 0.9
+        linesLayer.path = style.shape.linesPath(in: outer)
         detailLayer.path = style.shape.detailPath(in: outer)
         detailLayer.opacity = Float(style.shape.detailOpacity(in: outer))
         shadowLayer.path = path.copy(using: &shift)
@@ -107,7 +118,7 @@ final class KeyButton: UIView {
             let gloss = CGRect(x: body.minX + body.width * 0.14, y: body.minY + body.height * 0.1,
                                width: body.width * 0.32, height: body.height * 0.2)
             glossLayer.path = UIBezierPath(ovalIn: gloss).cgPath
-        } else if style.shape == .jelly {
+        } else if style.shape == .jelly && finish != .outline {
             let gloss = CGRect(x: body.minX + body.width * 0.2, y: body.minY + 2.5,
                                width: body.width * 0.6, height: max(2.5, body.height * 0.16))
             glossLayer.path = UIBezierPath(roundedRect: gloss, cornerRadius: gloss.height / 2).cgPath
@@ -202,6 +213,12 @@ final class KeyButton: UIView {
             shadowLayer.fillColor = t.shadow.withAlphaComponent(min(1, a * 0.75)).cgColor
             cushionLayer.colors = [UIColor.white.withAlphaComponent(a * 0.5).cgColor,
                                    UIColor.clear.cgColor, UIColor.black.withAlphaComponent(a * (t.isDark ? 0.22 : 0.10)).cgColor]
+        case .outline:
+            // 線稿：只畫一條細線，裡面透明（背景照片完全露出來）；按下去時淡淡填一層
+            bodyLayer.fillColor = isPressed ? style.lineColor.withAlphaComponent(0.14).cgColor : UIColor.clear.cgColor
+            bodyLayer.strokeColor = style.lineColor.cgColor
+            shadowLayer.fillColor = UIColor.clear.cgColor
+            cushionLayer.colors = [UIColor.clear.cgColor, UIColor.clear.cgColor, UIColor.clear.cgColor]
         case .raised:
             // 側面用按鍵本身的顏色調暗，按鍵調得很透明也一定看得出厚度；按下去時側面消失（沉下去了）
             bodyLayer.fillColor = fill.withAlphaComponent(a).cgColor
@@ -211,7 +228,12 @@ final class KeyButton: UIView {
             cushionLayer.colors = [UIColor.white.withAlphaComponent(v * (t.isDark ? 0.3 : 0.55)).cgColor,
                                    UIColor.clear.cgColor, UIColor.black.withAlphaComponent(v * (t.isDark ? 0.25 : 0.12)).cgColor]
         }
-        detailLayer.fillColor = style.shape.detailColor(theme: t).withAlphaComponent(style.keyAlpha).cgColor
+        if style.shape.art?.lineDetail == true {
+            detailLayer.fillColor = style.lineColor.cgColor
+        } else {
+            detailLayer.fillColor = style.shape.detailColor(theme: t).withAlphaComponent(style.keyAlpha).cgColor
+        }
+        linesLayer.strokeColor = style.lineColor.cgColor
         glossLayer.fillColor = UIColor.white.withAlphaComponent(style.finish == .puffy ? (t.isDark ? 0.3 : 0.75) : (t.isDark ? 0.18 : 0.55)).cgColor
         CATransaction.commit()
         label.textColor = text
@@ -260,7 +282,7 @@ final class KeyButton: UIView {
                 switch self.style.finish {
                 case .puffy: self.content.transform = CGAffineTransform(scaleX: 1.06, y: 0.86)
                 case .raised: self.content.transform = CGAffineTransform(translationX: 0, y: self.depth * 0.85)
-                case .flat: self.content.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+                case .flat, .outline: self.content.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
                 }
             }
         } else {

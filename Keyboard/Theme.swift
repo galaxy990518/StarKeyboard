@@ -194,7 +194,7 @@ struct KeyboardTheme {
 enum KeyShape: String, CaseIterable {
     case rounded, jelly, catEar, cloud, bunny, puppy, pudding, jellyfish, flame, droplet, duck
     // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.swift）
-    case catFace, bear, paw, cloudPuff, pixel, pixelHeart, puzzle, book, butterfly, strawberry, flower, moon, star, heart, latte
+    case catFace, bear, paw, cloudPuff, pixel, pixelHeart, puzzle, book, butterfly, strawberry, flower, moon, star, heart, latte, catLine
 
     var art: KeyShapeArt? { KeyShapeArt.shapes[rawValue] }
 
@@ -229,7 +229,11 @@ enum KeyShape: String, CaseIterable {
         }
     }
 
-    private func isWide(_ r: CGRect) -> Bool { isSoftShape && r.width > r.height * 1.65 }
+    // 會自己拉長的造型（貓咪探頭）寬鍵也畫原本的樣子，不換成膠囊
+    private func isWide(_ r: CGRect) -> Bool { isSoftShape && art?.stretch != true && r.width > r.height * 1.65 }
+
+    /// 只畫線的部分（尾巴、鬍鬚）
+    func linesPath(in r: CGRect) -> CGPath? { isWide(r) ? nil : art?.linesPath(in: r) }
 
     private func wideBody(in r: CGRect) -> CGRect { r.insetBy(dx: 0, dy: r.height * 0.08) }
 
@@ -554,18 +558,27 @@ struct KeyboardStyle {
     var shapeScale: CGFloat = 1.15
     /// 按下去的動作：jelly 果凍彈彈、hop 跳跳、wiggle 搖搖、pop 放大、none 無（只有字的按鍵會動）
     var motion = KeyMotion.jelly.rawValue
+
+    /// 線條的顏色：線稿質感的外框、貓咪的尾巴鬍鬚眼睛肉球
+    var lineColor: UIColor {
+        if finish == .outline {
+            return theme.isDark ? UIColor(hex: 0xFAFBFF).withAlphaComponent(0.94) : UIColor(hex: 0x292B2C).withAlphaComponent(0.84)
+        }
+        return theme.keyText.withAlphaComponent(0.8)
+    }
 }
 
 /// 按鍵質感：平面、胖胖（圓滾滾、按下去會壓扁）、立體（有厚度、按下去往下沉）
 /// 立體的存檔名沿用舊的 "glass"，以前選玻璃的人會直接變成立體
 enum KeyFinish: String, CaseIterable {
-    case flat, puffy, raised = "glass"
+    case flat, puffy, raised = "glass", outline
 
     var title: String {
         switch self {
         case .flat: return "平面"
         case .puffy: return "胖胖"
         case .raised: return "立體"
+        case .outline: return "線稿"
         }
     }
 }
