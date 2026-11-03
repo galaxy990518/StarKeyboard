@@ -49,7 +49,7 @@
     'android-update': [
       { cap: '有新版時，打開「糯糯鍵盤」App 按 <b>下載新版</b>。', screen: { title: '糯糯鍵盤', rows: [
         { k: 'big', t: '🎉 有新版' }, { k: 'btn', t: '下載新版', hl: true }] } },
-      { cap: '點下載好的 <b>StarKeyboard.apk</b>，按 <b>更新</b>。設定和剪貼簿都會留著（v0.7.7 以後）。', screen: { title: '糯糯鍵盤', rows: [
+      { cap: '點下載好的 <b>StarKeyboard.apk</b>，按 <b>更新</b>。<b>不要先解除安裝</b>，直接蓋過去，設定、照片和剪貼簿都會留著（v0.7.7 以後）。', screen: { title: '糯糯鍵盤', rows: [
         { k: 'big', t: '要更新這個應用程式嗎？' }, { k: 'btn', t: '更新', hl: true }] } },
     ],
     'iphone-update': [

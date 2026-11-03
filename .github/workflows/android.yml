@@ -113,7 +113,7 @@ jobs:
             echo "這次更新："
             git log --no-merges --pretty="- %s" $RANGE -- android tools | head -20
             echo
-            echo "在 Android 手機下載 StarKeyboard.apk，點開安裝。目前要先移除舊版再安裝（正式簽名金鑰設定好之後就能直接更新）。"
+            echo "在 Android 手機下載 StarKeyboard.apk，點開後按「更新」，直接蓋過舊版就好，不要先移除舊版（移除會把設定、照片、剪貼簿一起刪掉）。從 v0.7.6 以前的舊版更新的這一次才需要先在鍵盤裡匯出剪貼簿、移除再裝。"
           } > release_notes.md
           cat release_notes.md
 
