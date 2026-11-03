@@ -168,6 +168,17 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         return best.entries.map { Scored(it.key, it.value) }.sortedByDescending { it.score }.take(80)
     }
 
+    /** 選過的詞放進這個讀音的候選：照這個讀音選過的就算；用簡拼（只打 h）選過的，
+     *  要每個字都真的念這個音（ㄋㄏ 選過「妳好」→ 打 ㄋㄧˇㄏㄠˇ 有；h 選過「會」→ 打 hao 沒有） */
+    private fun fits(phrase: String, readings: List<String>, key: String): Boolean {
+        if (userModel.hasExact(key, phrase)) return true
+        if (phrase.length != readings.size) return false
+        return readings.indices.all { i ->
+            val one = phrase[i].toString()
+            lookup(readings[i]).any { it.text == one } || userModel.hasExact(readings[i], one)
+        }
+    }
+
     fun phrases(readings: List<String>): List<Scored> {
         val key = readings.joinToString("-")
         cache[key]?.let { return it }
@@ -176,7 +187,7 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
             if (p.text !in best) best[p.text] = p.score
         }
         for (p in userModel.phrases(key)) {
-            if (p !in best) best[p] = USER_PHRASE_BASE
+            if (p !in best && fits(p, readings, key)) best[p] = USER_PHRASE_BASE
         }
         val result = best.entries.map { Scored(it.key, it.value + userModel.boost(key, it.key)) }
             .sortedWith(compareByDescending<Scored> { userModel.pickCount(key, it.text) }
@@ -507,6 +518,9 @@ class UserPhraseModel(private val file: File?) {
 
     fun pickCount(reading: String, phrase: String) = matchingCounts(reading)[phrase] ?: 0
 
+    /** 剛好照這個讀音選過（不是用比對找到的） */
+    fun hasExact(reading: String, phrase: String) = counts[reading]?.containsKey(phrase) == true
+
     fun recency(reading: String, phrase: String) = matchingRecency(reading)[phrase] ?: 0
 
     fun phrases(reading: String): List<String> =
@@ -536,19 +550,14 @@ class UserPhraseModel(private val file: File?) {
             val parts = saved.split('-')
             if (parts.size != query.size) continue
             if (query.zip(parts).all { (want, have) ->
-                    // 反過來比（存的是沒打完的音）只限至少打了兩個注音的；只打聲母（簡拼 h）選過的字，
-                    // 不能讓它在打完整讀音（hao）時排到前面（「好」變成「會」）
                     want == have || ZhuyinEngine.matchPenalty(listOf(want), listOf(have)) != null ||
-                        (typedSymbols(have) >= 2 && ZhuyinEngine.matchPenalty(listOf(have), listOf(want)) != null)
+                        ZhuyinEngine.matchPenalty(listOf(have), listOf(want)) != null
                 }) {
                 merge(phrases, recency[saved] ?: emptyMap())
             }
         }
         return result
     }
-
-    /** 一個音節實際打了幾個注音（不算 * ~ 和聲調） */
-    private fun typedSymbols(part: String) = part.count { it != '*' && it != '~' && Bopomofo.TONES.indexOf(it) < 0 }
 
     private fun abbreviation(reading: String): String? {
         val parts = reading.split('-')
