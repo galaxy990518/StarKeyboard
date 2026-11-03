@@ -125,6 +125,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     /** 新增快捷片語：先打片語內容，再打縮寫 */
     private var pendingPhrase = ""
     private var translating = false
+    /** 快速翻譯：直接把輸入框裡的字換成翻譯（first 原文、second 現在輸入框裡的字） */
+    private var quick: Pair<String, String>? = null
     private var lastAutocorrect: Pair<String, String>? = null
     private var styleKey = ""
 
@@ -348,9 +350,33 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 }
             }
         }
-        topBar.onEditor = { confirm -> if (confirm) confirmEditor() else endEditor() }
-        topBar.onEditorExtra = { editorExtraTapped() }
+        topBar.onEditor = onEditor@{ confirm ->
+            if (quick != null) {
+                // 快速翻譯：「還原」放回原文；✕ 留著翻譯
+                if (confirm) restoreQuickTranslate() else { quick = null; refreshTopBar() }
+                return@onEditor
+            }
+            if (confirm) confirmEditor() else endEditor()
+        }
+        topBar.onEditorExtra = onExtra@{
+            val q = quick
+            if (q != null) {
+                val targets = Translator.targets
+                val i = maxOf(0, targets.indexOfFirst { it.code == settings.translateTarget })
+                settings.translateTarget = targets[(i + 1) % targets.size].code
+                runQuickTranslate(q.first)
+                return@onExtra
+            }
+            editorExtraTapped()
+        }
         topBar.onEditorSource = onEditorSource@{
+            quick?.let { q ->
+                val codes = listOf("auto") + Translator.targets.map { it.code }
+                val i = maxOf(0, codes.indexOf(settings.translateSource))
+                settings.translateSource = codes[(i + 1) % codes.size]
+                runQuickTranslate(q.first)
+                return@onEditorSource
+            }
             // 新增表符、符號：把剪貼簿的文字貼進編輯框
             if (editorPurpose == EditorPurpose.EMOTICON || editorPurpose == EditorPurpose.SYMBOL) {
                 pasteIntoEditor()
@@ -408,6 +434,10 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     // ===== 按鍵 =====
 
     private fun handle(spec: KeySpec) {
+        if (quick != null) {
+            quick = null
+            refreshTopBar()
+        }
         val pending = lastAutocorrect
         lastAutocorrect = null
         val action = spec.action
@@ -1113,7 +1143,13 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         }
         if (namingFolder) folderNameBox.update(ed ?: "", renamingCategory != null, style)
         if (editingClip) folderNameBox.updateClip(ed ?: "", editorCursor, if (isComposing) compositionText else "", style)
+        val q = quick
         when {
+            q != null -> {
+                val name = Translator.targets.firstOrNull { it.code == settings.translateTarget }?.name ?: "英文"
+                val from = Translator.targets.firstOrNull { it.code == settings.translateSource }?.name ?: "自動"
+                topBar.showEditor(if (translating) "翻譯中…" else "已翻成$name・原文：", q.first, "→$name", "還原", "從：$from")
+            }
             tr != null -> topBar.showCandidates(tr.title, tr.items + "✏️ 修改", Trailing.CLOSE)
             isComposing -> {
                 val prefix = if (ed != null && !editingClip) editorLabel(editorPurpose) + editorDisplay(ed) + " ｜ " else ""
@@ -1264,7 +1300,11 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 startActivity(Intent(this, com.startown.starkeyboard.VoiceInputActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
             ToolbarItem.SETTINGS -> togglePanel(PanelKind.SETTINGS)
-            ToolbarItem.TRANSLATE -> beginEditor(EditorPurpose.TRANSLATE)
+            ToolbarItem.TRANSLATE -> {
+                // 輸入框有字就直接翻（像三星鍵盤），沒有字才開翻譯框
+                val text = fieldText()
+                if (!text.isNullOrBlank() && !isComposing) startQuickTranslate(text) else beginEditor(EditorPurpose.TRANSLATE)
+            }
             ToolbarItem.FANCY -> beginEditor(EditorPurpose.FANCY)
             ToolbarItem.HANDWRITING -> {
                 closePanel()
@@ -1618,6 +1658,57 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             refreshTopBar()
             refreshReturnTitle()
         }
+    }
+
+    // ===== 快速翻譯 =====
+
+    /** 輸入框裡全部的字 */
+    private fun fieldText(): String? {
+        if (editorText != null) return null
+        val ic = currentInputConnection ?: return null
+        return ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)?.text?.toString()
+    }
+
+    /** 把輸入框的字整段換掉 */
+    private fun replaceField(text: String) {
+        val ic = currentInputConnection ?: return
+        val length = ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)?.text?.length ?: return
+        ic.beginBatchEdit()
+        ic.finishComposingText()
+        ic.setSelection(0, length)
+        ic.commitText(text, 1)
+        ic.endBatchEdit()
+    }
+
+    private fun startQuickTranslate(text: String) {
+        closePanel()
+        quick = text to text
+        runQuickTranslate(text)
+    }
+
+    private fun runQuickTranslate(original: String) {
+        if (translating) return
+        translating = true
+        refreshTopBar()
+        Translator.translate(original, settings.translateSource, settings.translateTarget, settings.allowOnlineTranslation, status = { toast(it) }) { result ->
+            translating = false
+            if (quick?.first != original) { refreshTopBar(); return@translate }
+            result.onSuccess {
+                replaceField(it)
+                quick = original to it
+            }.onFailure {
+                toast(it.message ?: "翻譯失敗")
+                quick = null
+            }
+            refreshTopBar()
+        }
+    }
+
+    private fun restoreQuickTranslate() {
+        val q = quick ?: return
+        replaceField(q.first)
+        quick = null
+        refreshTopBar()
     }
 
     private fun endEditor() {

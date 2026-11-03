@@ -118,6 +118,8 @@ final class KeyboardViewController: UIInputViewController {
     private var glide: GlideDecoder?
     private var lastGlide: String?
     private var translating = false
+    /// 快速翻譯：直接把輸入框裡的字換成翻譯（original 原文、current 現在輸入框裡的字）
+    private var quick: (original: String, current: String)?
     private var lastReturnTitle = ""
     private var backgroundImage: UIImage?
     private var clipboardTimer: Timer?
@@ -408,11 +410,34 @@ final class KeyboardViewController: UIInputViewController {
             }
         }
         topBar.onEditor = { [weak self] confirm in
-            if confirm { self?.confirmEditor() } else { self?.endEditor() }
+            guard let self = self else { return }
+            if self.quick != nil {
+                // 快速翻譯：「還原」放回原文；✕ 留著翻譯
+                if confirm { self.restoreQuickTranslate() } else { self.quick = nil; self.refreshTopBar() }
+                return
+            }
+            if confirm { self.confirmEditor() } else { self.endEditor() }
         }
-        topBar.onEditorExtra = { [weak self] in self?.editorExtraTapped() }
+        topBar.onEditorExtra = { [weak self] in
+            guard let self = self else { return }
+            if let q = self.quick {
+                let targets = Translator.targets
+                let i = targets.firstIndex { $0.code == self.settings.translateTarget } ?? 0
+                self.settings.translateTarget = targets[(i + 1) % targets.count].code
+                self.runQuickTranslate(q.original)
+                return
+            }
+            self.editorExtraTapped()
+        }
         topBar.onEditorSource = { [weak self] in
             guard let self = self else { return }
+            if let q = self.quick {
+                let codes = ["auto"] + Translator.targets.map { $0.code }
+                let i = codes.firstIndex(of: self.settings.translateSource) ?? 0
+                self.settings.translateSource = codes[(i + 1) % codes.count]
+                self.runQuickTranslate(q.original)
+                return
+            }
             // 新增表符、符號：把剪貼簿的文字貼進編輯框
             if self.editorPurpose == .emoticon || self.editorPurpose == .symbol {
                 self.pasteIntoEditor()
@@ -429,6 +454,10 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - 按鍵
 
     private func handle(_ spec: KeySpec) {
+        if quick != nil {
+            quick = nil
+            refreshTopBar()
+        }
         let pendingAutocorrect = lastAutocorrect
         lastAutocorrect = nil
         if spec.action == .backspace, let ac = pendingAutocorrect, revertAutocorrect(ac) { return }
@@ -1146,7 +1175,12 @@ final class KeyboardViewController: UIInputViewController {
                                      composing: isComposing ? compositionText : "", style: style)
         }
         topBar.scriptTitle = mode == .pinyin && editorResult == nil ? (settings.pinyinSimplified ? "簡" : "繁") : nil
-        if let r = editorResult {
+        if let q = quick {
+            let name = Translator.targets.first { $0.code == settings.translateTarget }?.name ?? "英文"
+            let from = Translator.targets.first { $0.code == settings.translateSource }?.name ?? "自動"
+            topBar.show(.editor(prompt: translating ? "翻譯中…" : "已翻成\(name)・原文：", text: q.original, extra: "→\(name)",
+                                confirm: "還原", source: "從：\(from)"))
+        } else if let r = editorResult {
             topBar.show(.candidates(composition: r.title, items: r.items + ["✏️ 修改"], trailing: .close))
         } else if isComposing {
             // 用編輯框時，前面也顯示已經打好的字
@@ -1227,7 +1261,12 @@ final class KeyboardViewController: UIInputViewController {
             // 鍵盤裡不能跳系統的提示框（會閃退），改成畫在鍵盤上的說明卡
             showNotice(title: "語音輸入", message: "直接說話輸入：點鍵盤右下方的系統 🎙。若沒有麥克風，請到 iPhone 設定 → 一般 → 鍵盤 → 啟用聽寫；必要時長按 🌐 切到 Apple 鍵盤。\n\n也可打開桌面的「糯糯鍵盤」App → 語音轉文字，辨識後檢查並複製回來貼上。iPhone 不允許第三方鍵盤直接錄音。")
         case .settings: togglePanel(.settings)
-        case .translate: beginEditor(.translate)
+        case .translate:
+            if let text = fieldText(), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isComposing {
+                startQuickTranslate(text)
+            } else {
+                beginEditor(.translate)
+            }
         case .fancy: beginEditor(.fancy)
         case .handwriting:
             closePanel()
@@ -1550,6 +1589,62 @@ final class KeyboardViewController: UIInputViewController {
                 self.refreshReturnTitle()
             }
         }
+    }
+
+    // MARK: - 快速翻譯
+
+    /// 輸入框裡全部的字（系統只給游標前後一段，很長的文章可能不完整）
+    private func fieldText() -> String? {
+        guard editorText == nil else { return nil }
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let after = textDocumentProxy.documentContextAfterInput ?? ""
+        let all = before + after
+        return all.isEmpty ? nil : all
+    }
+
+    /// 把輸入框的字整段換掉：游標移到最後，刪掉全部，再打上新的
+    private func replaceField(with text: String) {
+        let after = textDocumentProxy.documentContextAfterInput ?? ""
+        if !after.isEmpty { textDocumentProxy.adjustTextPosition(byCharacterOffset: after.count) }
+        var guardCount = 0
+        while let before = textDocumentProxy.documentContextBeforeInput, !before.isEmpty, guardCount < 5000 {
+            for _ in 0..<before.count { textDocumentProxy.deleteBackward() }
+            guardCount += before.count
+        }
+        textDocumentProxy.insertText(text)
+    }
+
+    private func startQuickTranslate(_ text: String) {
+        closePanel()
+        quick = (text, text)
+        runQuickTranslate(text)
+    }
+
+    private func runQuickTranslate(_ original: String) {
+        guard !translating else { return }
+        translating = true
+        refreshTopBar()
+        Translator.translate(original, from: settings.translateSource, to: settings.translateTarget, allowOnline: settings.allowOnlineTranslation) { [weak self] result in
+            guard let self = self else { return }
+            self.translating = false
+            guard self.quick?.original == original else { self.refreshTopBar(); return }
+            switch result {
+            case .success(let translated):
+                self.replaceField(with: translated)
+                self.quick = (original, translated)
+            case .failure(.message(let message)):
+                self.toast(message)
+                self.quick = nil
+            }
+            self.refreshTopBar()
+        }
+    }
+
+    private func restoreQuickTranslate() {
+        guard let q = quick else { return }
+        replaceField(with: q.original)
+        quick = nil
+        refreshTopBar()
     }
 
     private func endEditor() {
