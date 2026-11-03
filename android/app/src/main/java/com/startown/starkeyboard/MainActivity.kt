@@ -224,7 +224,8 @@ class MainActivity : Activity() {
             pickedSpace(uri)
             return
         }
-        val bitmap = load(uri, if (requestCode == PICK_STICKER) 512 else 1000) ?: run {
+        // 背景照片留大一點（放大對準臉也不會糊）；貼圖小小的就好
+        val bitmap = load(uri, if (requestCode == PICK_STICKER) 512 else 2048) ?: run {
             toast("讀不到這張照片")
             return
         }
@@ -234,7 +235,7 @@ class MainActivity : Activity() {
                 // 對準臉；找不到臉就偏上面一點（人像的頭通常在上面）
                 val face = faceCenter(bitmap)
                 s.addPhoto(face?.first ?: 0.5f, face?.second ?: 0.3f) { f ->
-                    f.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+                    f.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 92, it) }
                 }
                 // 接著叫出鍵盤，直接在鍵盤上拖拉、縮放照片
                 s.adjustPhotoPending = true

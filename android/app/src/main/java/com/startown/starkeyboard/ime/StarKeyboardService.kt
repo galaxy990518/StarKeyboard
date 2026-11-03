@@ -1733,7 +1733,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             val file = settings.backgroundFile
             val stamp = file.path + ":" + file.lastModified()
             if (stamp != backgroundStamp || bgImage.drawable == null) {
-                bgImage.setImageBitmap(decodeSmall(file.path, 1400))
+                // 照片可以放大來對準臉，所以留到大約兩倍螢幕寬才不會糊（太大才縮，免得吃光記憶體）
+                val screen = maxOf(resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels)
+                bgImage.setImageBitmap(decodeSmall(file.path, (screen * 2).coerceIn(2000, 3200)))
                 backgroundStamp = stamp
             }
             if (photoAdjust == null) {

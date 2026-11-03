@@ -1770,7 +1770,7 @@ final class KeyboardViewController: UIInputViewController {
         guard url?.path != loadedPhoto || (url != nil && backgroundImage == nil) else { return }
         loadedPhoto = url?.path
         // 照片存的時候已經縮到 1000；舊版存的大照片也在這裡縮小再用
-        backgroundImage = url.flatMap { UIImage.downsampled(url: $0, maxSide: 1200) }
+        backgroundImage = url.flatMap { UIImage.downsampled(url: $0, maxSide: 1600) }
     }
 
     private func pasteBackground() {
@@ -1778,7 +1778,8 @@ final class KeyboardViewController: UIInputViewController {
             toast("要先開啟「允許完整取用」")
             return
         }
-        guard let small = UIPasteboard.general.downsampledImage(maxSide: 1000) else {
+        // 背景照片留到 1600（放大對準臉比較不糊；再大鍵盤的記憶體會不夠）
+        guard let small = UIPasteboard.general.downsampledImage(maxSide: 1600) else {
             toast("剪貼簿裡沒有圖片，先到相簿「拷貝」一張")
             return
         }
