@@ -685,7 +685,8 @@ final class KeyboardViewController: UIInputViewController {
     private func returnKey() {
         if isComposing {
             updateCandidatesNow()
-            commitAll()
+            // 拼音打到一半按換行：送出打的英文字母（例如 apps），不是中文候選字
+            commitAll(rawPinyin: true)
             return
         }
         if editorResult != nil {
@@ -1077,12 +1078,13 @@ final class KeyboardViewController: UIInputViewController {
         refreshTopBar()
     }
 
-    private func commitAll() {
+    /// rawPinyin：拼音照打的字母送出（拼音打到一半按換行鍵，像三星鍵盤）
+    private func commitAll(rawPinyin: Bool = false) {
         guard isComposing else { return }
         var text = ""
         if !pinyinBuffer.isEmpty {
             // 拼音：送出整句（第一個候選）；完全查不到就照打的字母送出
-            text = candidates.first?.text ?? pinyinBuffer.replacingOccurrences(of: "'", with: "")
+            text = (rawPinyin ? nil : candidates.first?.text) ?? pinyinBuffer.replacingOccurrences(of: "'", with: "")
             pinyinBuffer = ""
             candidateOriginals = []
         } else if !kanaBuffer.isEmpty {

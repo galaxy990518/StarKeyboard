@@ -678,7 +678,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun returnKey() {
         if (isComposing) {
-            commitAll()
+            // 拼音打到一半按換行：送出打的英文字母（例如 apps），不是中文候選字
+            commitAll(rawPinyin = true)
             return
         }
         if (editorResult != null) {
@@ -1043,12 +1044,13 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         showAssociations(s)
     }
 
-    private fun commitAll() {
+    /** rawPinyin：拼音照打的字母送出（拼音打到一半按換行鍵，像三星鍵盤） */
+    private fun commitAll(rawPinyin: Boolean = false) {
         if (!isComposing) return
         val text: String
         if (pinyinBuffer.isNotEmpty()) {
             // 拼音：送出整句（第一個候選）；完全查不到就照打的字母送出
-            text = candidates.firstOrNull()?.text ?: pinyinBuffer.replace("'", "")
+            text = (if (rawPinyin) null else candidates.firstOrNull()?.text) ?: pinyinBuffer.replace("'", "")
             pinyinBuffer = ""
             candidateOriginals = emptyList()
         } else if (kanaBuffer.isNotEmpty()) {

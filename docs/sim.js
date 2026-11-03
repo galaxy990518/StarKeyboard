@@ -958,6 +958,8 @@
       output(' '); S.suggestions = []; return;
     }
     if (kind === 'return') {
+      // 拼音打到一半按換行：送出打的英文字母（和 App 一樣）
+      if (S.mode === 'pinyin' && S.py) { output(S.py.replace(/'/g, '')); S.py = ''; S.expanded = false; afterCommit(); return; }
       if (isComposing()) { commitFirst(); return; }
       finishHangul();
       if (S.editor) { confirmEditor(); return; }
