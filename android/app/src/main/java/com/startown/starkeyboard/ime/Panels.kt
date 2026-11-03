@@ -236,6 +236,8 @@ class ClipboardPanel(
     private val onEdit: (ClipItem) -> Unit,
     private val onEditCategory: (String?) -> Unit,
     private val onSearch: () -> Unit = {},
+    private var autoRecord: Boolean = false,
+    private val onToggleAuto: (Boolean) -> Unit = {},
     onBack: () -> Unit,
     onBackspace: () -> Unit,
 ) : LinearLayout(context) {
@@ -264,6 +266,16 @@ class ClipboardPanel(
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, dpi(34f)))
         val tools = LinearLayout(context)
         tools.addView(Tap(context, "匯入／匯出", 14f, t.specialText, true) { onTransfer() }, LayoutParams(0, dpi(34f), 1f))
+        // 自動記錄開關放在這裡：打開後連續複製的每一則都會自己存進來，不用一則一則按「加入」
+        lateinit var auto: TextView
+        fun autoLabel() = if (autoRecord) "自動記錄 ● 開" else "自動記錄 ○ 關"
+        auto = Tap(context, autoLabel(), 14f, t.specialText, true) {
+            autoRecord = !autoRecord
+            auto.text = autoLabel()
+            onToggleAuto(autoRecord)
+        }
+        auto.contentDescription = "自動記錄剪貼簿"
+        tools.addView(auto, LayoutParams(0, dpi(34f), 1f))
         manage = Tap(context, "資料夾管理", 14f, t.specialText, true) {}
         manage.setOnClickListener {
             val menu = PopupMenu(context, manage)
@@ -310,7 +322,7 @@ class ClipboardPanel(
         }
         if (rows.isEmpty()) {
             list.addView(TextView(context).apply {
-                text = if (selected >= 2) "分類還沒有內容，點每筆右側的 📁 來歸類" else if (selected == 1) "還沒有釘選的內容\n點項目右邊的 📌 就能釘選" else "按上方「加入目前複製的」儲存，或到 ⚙ 隱私與安全開啟自動記錄\n請勿保存密碼或驗證碼"
+                text = if (selected >= 2) "分類還沒有內容，點每筆右側的 📁 來歸類" else if (selected == 1) "還沒有釘選的內容\n點項目右邊的 📌 就能釘選" else "按上方「加入目前複製的」儲存，或打開「自動記錄」\n連續複製的每一則都會自己存進來\n請勿保存密碼或驗證碼"
                 textSize = 14f
                 gravity = Gravity.CENTER
                 setTextColor(t.keyText.withAlpha(0.7f))

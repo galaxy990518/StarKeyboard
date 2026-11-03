@@ -26,6 +26,10 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
     private let titleLabel = UILabel()
     private let categoryButton = UIButton(type: .system)
     private let transferButton = UIButton(type: .system)
+    private let autoButton = UIButton(type: .system)
+    /// 自動記錄開關；打開後連續複製的每一則都會自己存進來
+    var autoRecord = false { didSet { updateAutoButton() } }
+    var onToggleAuto: ((Bool) -> Void)?
     private let addButton = UIButton(type: .system)
     private let clearButton = UIButton(type: .system)
     private let searchButton = UIButton(type: .system)
@@ -66,6 +70,15 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         transferButton.titleLabel?.font = .rounded(14, .semibold)
         transferButton.addAction(UIAction { [weak self] _ in self?.onTransfer?() }, for: .touchUpInside)
         header.addSubview(transferButton)
+        autoButton.titleLabel?.font = .rounded(14, .semibold)
+        autoButton.accessibilityLabel = "自動記錄剪貼簿"
+        autoButton.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            self.autoRecord.toggle()
+            self.onToggleAuto?(self.autoRecord)
+        }, for: .touchUpInside)
+        updateAutoButton()
+        header.addSubview(autoButton)
         categoryButton.setTitle("資料夾管理", for: .normal)
         categoryButton.titleLabel?.font = .rounded(14, .semibold)
         categoryButton.showsMenuAsPrimaryAction = true
@@ -103,6 +116,10 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    private func updateAutoButton() {
+        autoButton.setTitle(autoRecord ? "自動記錄 ● 開" : "自動記錄 ○ 關", for: .normal)
+    }
+
     func selectCategory(_ name: String) {
         selected = store.categories.firstIndex(of: name).map { $0 + 2 } ?? 0
         reload(); setNeedsLayout(); layoutIfNeeded(); bar.revealSelectedTab()
@@ -117,6 +134,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         else if selected >= 2 { rows = store.ordered.filter { $0.category == store.categories[selected - 2] } }
         else { rows = store.ordered }
         categoryButton.isHidden = store.categories.isEmpty
+        setNeedsLayout()
         updateCategoryMenu()
         table.reloadData()
         if !hasFullAccess {
@@ -126,7 +144,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         } else if selected >= 2 {
             emptyLabel.text = "這個分類還沒有內容\n點每筆右側的資料夾圖示來歸類"
         } else {
-            emptyLabel.text = "點上方「加入目前複製的」儲存文字\n或到 ⚙ 隱私與安全開啟自動記錄"
+            emptyLabel.text = "點上方「加入目前複製的」儲存文字\n或打開「自動記錄」，複製的文字會自己存進來"
         }
         emptyLabel.isHidden = !rows.isEmpty
     }
@@ -140,8 +158,12 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         searchButton.frame = CGRect(x: 12, y: 0, width: max(70, w - 96 - 150 - 16), height: 34)
         clearButton.frame = CGRect(x: w - 96, y: 0, width: 88, height: 34)
         addButton.frame = CGRect(x: w - 96 - 150, y: 0, width: 150, height: 34)
-        transferButton.frame = CGRect(x: 12, y: 34, width: w / 2 - 12, height: 34)
-        categoryButton.frame = CGRect(x: w / 2, y: 34, width: w / 2 - 12, height: 34)
+        // 第二排：匯入／匯出、自動記錄、資料夾管理（沒有分類時只排前兩個）
+        let columns: CGFloat = categoryButton.isHidden ? 2 : 3
+        let cw = (w - 24) / columns
+        transferButton.frame = CGRect(x: 12, y: 34, width: cw, height: 34)
+        autoButton.frame = CGRect(x: 12 + cw, y: 34, width: cw, height: 34)
+        categoryButton.frame = CGRect(x: 12 + cw * 2, y: 34, width: cw, height: 34)
         table.frame = CGRect(x: 0, y: headerH, width: w, height: bounds.height - headerH - barH)
         emptyLabel.frame = table.frame.insetBy(dx: 20, dy: 10)
         bar.frame = CGRect(x: 0, y: bounds.height - barH, width: w, height: barH)
@@ -152,6 +174,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         titleLabel.textColor = t.keyText
         categoryButton.tintColor = t.isDark ? t.accent : t.specialText
         transferButton.tintColor = t.isDark ? t.accent : t.specialText
+        autoButton.tintColor = t.isDark ? t.accent : t.specialText
         addButton.tintColor = t.isDark ? t.accent : t.specialText
         searchButton.tintColor = t.keyText
         clearButton.tintColor = t.keyText.withAlphaComponent(0.7)

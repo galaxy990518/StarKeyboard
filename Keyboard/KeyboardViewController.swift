@@ -1283,6 +1283,19 @@ final class KeyboardViewController: UIInputViewController {
                 self.clipboardTransfer.show()
             }
             p.onError = { [weak self] message in self?.toast(message) }
+            p.autoRecord = settings.clipboardHistoryEnabled
+            p.onToggleAuto = { [weak self, weak p] on in
+                guard let self = self else { return }
+                guard self.hasFullAccess || !on else {
+                    p?.autoRecord = false
+                    self.toast("要先開啟「允許完整取用」")
+                    return
+                }
+                self.settings.clipboardHistoryEnabled = on
+                // 打開時把現在剪貼簿的那則當成已看過，只記之後複製的
+                if on { self.settings.lastPasteboardChange = UIPasteboard.general.changeCount }
+                self.toast(on ? "自動記錄已開：之後複製的文字會自己存進來" : "自動記錄已關")
+            }
             p.onEditCategory = { [weak self] name in
                 guard let self = self else { return }
                 self.renamingCategory = name

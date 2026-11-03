@@ -1323,6 +1323,11 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                     onTransfer = {
                         startActivity(Intent(this, com.startown.starkeyboard.ClipboardTransferActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     },
+                    autoRecord = settings.clipboardHistoryEnabled,
+                    onToggleAuto = { on ->
+                        settings.clipboardHistoryEnabled = on
+                        toast(if (on) "自動記錄已開：之後複製的文字都會自己存進來" else "自動記錄已關")
+                    },
                     onBack = { closePanel() },
                     onBackspace = { deleteOutput() })
             }
