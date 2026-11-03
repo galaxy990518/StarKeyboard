@@ -168,7 +168,8 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         return best.entries.map { Scored(it.key, it.value) }.sortedByDescending { it.score }.take(80)
     }
 
-    /** 選過的詞放進這個讀音的候選：照這個讀音選過的就算；用簡拼（只打 h）選過的，
+    /** 只有拼音用（注音維持原本的規則）。
+     *  選過的詞放進這個讀音的候選：照這個讀音選過的就算；用簡拼（只打 h）選過的，
      *  要每個字都真的念這個音（ㄋㄏ 選過「妳好」→ 打 ㄋㄧˇㄏㄠˇ 有；h 選過「會」→ 打 hao 沒有） */
     private fun fits(phrase: String, readings: List<String>, key: String): Boolean {
         if (userModel.hasExact(key, phrase)) return true
@@ -187,7 +188,7 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
             if (p.text !in best) best[p.text] = p.score
         }
         for (p in userModel.phrases(key)) {
-            if (p !in best && fits(p, readings, key)) best[p] = USER_PHRASE_BASE
+            if (p !in best && (!toneless || fits(p, readings, key))) best[p] = USER_PHRASE_BASE
         }
         val result = best.entries.map { Scored(it.key, it.value + userModel.boost(key, it.key)) }
             .sortedWith(compareByDescending<Scored> { userModel.pickCount(key, it.text) }

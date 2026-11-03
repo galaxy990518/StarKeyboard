@@ -12,7 +12,7 @@ import org.junit.Test
 
 /** 和 iPhone 版 PinyinTests 一樣的檢查（字典用沒聲調的注音當 key） */
 class PinyinTest {
-    private fun pinyin(): PinyinEngine {
+    private fun pinyin(toneless: Boolean = false): PinyinEngine {
         val rows = listOf(
             Triple("ㄋㄧ", "你", -3.0), Triple("ㄏㄠ", "好", -3.0), Triple("ㄋㄧ-ㄏㄠ", "你好", -4.0),
             Triple("ㄏㄞ", "還", -3.2), Triple("ㄏㄜ", "和", -3.0), Triple("ㄒㄧ", "西", -3.5), Triple("ㄢ", "安", -3.6),
@@ -26,14 +26,14 @@ class PinyinTest {
             "xian" to "ㄒㄧㄢ", "zhong" to "ㄓㄨㄥ", "guo" to "ㄍㄨㄛ", "lv" to "ㄌㄩ", "se" to "ㄙㄜ",
             "tai" to "ㄊㄞ", "wan" to "ㄨㄢ", "hui" to "ㄏㄨㄟ", "lai" to "ㄌㄞ", "la" to "ㄌㄚ",
         )
-        return PinyinEngine(ZhuyinEngine(MemoryPhraseSource(rows), UserPhraseModel(null)), table)
+        return PinyinEngine(ZhuyinEngine(MemoryPhraseSource(rows), UserPhraseModel(null), toneless), table)
     }
 
     private fun pieces(p: PinyinEngine, s: String) = p.segment(s).pieces.map { it.pinyin }
 
     /** 用簡拼（h、hl）選過的字，打完整拼音時不能搶到第一個（hao 是「好」不是「會」） */
     @Test fun abbreviationPicksDoNotBeatFullPinyin() {
-        val p = pinyin()
+        val p = pinyin(toneless = true)   // 和 App 一樣（拼音字典沒有聲調）
         p.engine.learn(listOf("ㄏ*"), "會")
         p.engine.learn(listOf("ㄏ*", "ㄌ*"), "好啦")
         assertEquals("好", p.candidates("hao").first().text)

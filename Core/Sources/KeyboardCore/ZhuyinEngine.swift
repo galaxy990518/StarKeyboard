@@ -199,6 +199,7 @@ final class ZhuyinEngine {
     // MARK: 查詢
 
     /// 一段注音（例如 ["ㄋㄧˇ", "ㄏㄠˇ"]）對應的所有詞，分數高的在前面
+    /// 只有拼音用（注音維持原本的規則）。
     /// 選過的詞放進這個讀音的候選：照這個讀音選過的就算；用簡拼（只打 h）選過的，
     /// 要每個字都真的念這個音（ㄋㄏ 選過「妳好」→ 打 ㄋㄧˇㄏㄠˇ 有；h 選過「會」→ 打 hao 沒有）
     private func fits(_ phrase: String, _ readings: ArraySlice<String>, key: String) -> Bool {
@@ -222,7 +223,7 @@ final class ZhuyinEngine {
             best[phrase] = score
             order.append(phrase)
         }
-        for phrase in userModel.phrases(for: key) where best[phrase] == nil && fits(phrase, readings, key: key) {
+        for phrase in userModel.phrases(for: key) where best[phrase] == nil && (column != "plain" || fits(phrase, readings, key: key)) {
             best[phrase] = Self.userPhraseBase
             order.append(phrase)
         }
