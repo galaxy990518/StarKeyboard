@@ -15,7 +15,8 @@ class PinyinEngine(val engine: ZhuyinEngine, private val table: Map<String, Stri
             "zh" to "ㄓ", "ch" to "ㄔ", "sh" to "ㄕ",
             "b" to "ㄅ", "p" to "ㄆ", "m" to "ㄇ", "f" to "ㄈ", "d" to "ㄉ", "t" to "ㄊ", "n" to "ㄋ", "l" to "ㄌ",
             "g" to "ㄍ", "k" to "ㄎ", "h" to "ㄏ", "j" to "ㄐ", "q" to "ㄑ", "x" to "ㄒ", "r" to "ㄖ",
-            "z" to "ㄗ", "c" to "ㄘ", "s" to "ㄙ", "y" to "ㄧ", "w" to "ㄨ",
+            // 只打 z／c／s 時很多人其實是 zh／ch／sh（sm＝什麼、zd＝知道）：兩種都查
+            "z" to "ㄗ|ㄓ", "c" to "ㄘ|ㄔ", "s" to "ㄙ|ㄕ", "y" to "ㄧ", "w" to "ㄨ",
         )
     }
 
@@ -76,12 +77,14 @@ class PinyinEngine(val engine: ZhuyinEngine, private val table: Map<String, Stri
             if (start == s.length) return emptyList()
             if (memo.containsKey(start)) return memo[start]
             var result: List<String>? = null
+            var cost = Int.MAX_VALUE
             for (len in minOf(MAX_SYLLABLE, s.length - start) downTo 1) {
                 val py = s.substring(start, start + len)
                 if (py !in table) continue
                 val rest = go(start + len) ?: continue
-                result = listOf(py) + rest
-                break
+                // 中間的音節用 a、o、e 開頭（ken＋eng）多半是斷錯了，有別的斷法（ke＋neng）就用別的；一樣的話取長的
+                val c = rest.count { it[0] in "aoe" } + (if (start > 0 && py[0] in "aoe") 1 else 0)
+                if (c < cost) { cost = c; result = listOf(py) + rest }
             }
             if (result == null && abbreviate) {
                 for (len in 2 downTo 1) {

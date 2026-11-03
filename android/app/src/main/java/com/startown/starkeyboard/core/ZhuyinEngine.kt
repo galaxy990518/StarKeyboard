@@ -134,6 +134,16 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
          * 讀音合不合 pattern：有 * 的音節只要開頭一樣（聲調不限），其他要完全一樣。
          * 合的話回傳要扣的分數，不合回傳 null
          */
+        /** 「ㄙ|ㄕ*-ㄇ*」→「ㄙ*-ㄇ*」「ㄕ*-ㄇ*」 */
+        fun expandAlternatives(key: String): List<String> {
+            var out = listOf("")
+            for ((i, part) in key.split('-').withIndex()) {
+                val options = if ('|' in part) part.removeSuffix("*").split('|').map { "$it*" } else listOf(part)
+                out = out.flatMap { pre -> options.map { if (i == 0) it else "$pre-$it" } }
+            }
+            return out
+        }
+
         fun matchPenalty(pattern: List<String>, reading: List<String>, ignoreTones: Boolean = false): Double? {
             if (pattern.size != reading.size) return null
             var penalty = 0.0
@@ -148,7 +158,8 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
                 val head = want.dropLast(1)
                 val plain = have.filter { Bopomofo.TONES.indexOf(it) < 0 }
                 if (!plain.startsWith(head)) return null
-                if (plain != head) penalty += PREFIX_PENALTY
+                // 拼音（ignoreTones）只打聲母時，剛好只有聲母的音（shi＝ㄕ）不該比其他音（suo）優先：不扣分
+                if (plain != head && !ignoreTones) penalty += PREFIX_PENALTY
             }
             return penalty
         }
@@ -157,6 +168,15 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
     /** 查字典：讀音裡有沒打完的音節（*）就用開頭注音查，再一個一個比 */
     private fun lookup(key: String): List<Scored> {
         if ('*' !in key) return source.lookup(key).take(80)
+        if ('|' in key) {
+            // 拼音簡拼 s 可能是 ㄙ 或 ㄕ（寫成「ㄙ|ㄕ*」）：每種組合都查
+            val merged = HashMap<String, Double>()
+            for (variant in expandAlternatives(key)) for (p in lookup(variant)) {
+                val old = merged[p.text]
+                if (old == null || p.score > old) merged[p.text] = p.score
+            }
+            return merged.entries.map { Scored(it.key, it.value) }.sortedByDescending { it.score }.take(80)
+        }
         val pattern = key.split('-')
         val best = HashMap<String, Double>()
         for ((reading, text, score) in source.byAbbreviation(pattern.joinToString("") { it.take(1) }, key)) {
@@ -431,7 +451,7 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
 
     fun isInitialsQuery(readings: List<String>): Boolean =
         readings.isNotEmpty() && readings.all { reading ->
-            reading.count { it != '*' && it != '~' && Bopomofo.TONES.indexOf(it) < 0 } <= 1
+            reading.substringBefore('|').count { it != '*' && it != '~' && Bopomofo.TONES.indexOf(it) < 0 } <= 1
         }
 
     /** 所有音節的開頭（給組字用，判斷注音能不能接在一起） */

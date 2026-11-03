@@ -20,11 +20,15 @@ class PinyinTest {
             Triple("ㄌㄩ-ㄙㄜ", "綠色", -4.5), Triple("ㄊㄞ-ㄨㄢ", "臺灣", -4.0),
             Triple("ㄏㄨㄟ", "會", -2.5), Triple("ㄌㄞ", "來", -3.0), Triple("ㄌㄚ", "啦", -3.5),
             Triple("ㄏㄨㄟ-ㄌㄞ", "回來", -4.0), Triple("ㄏㄠ-ㄌㄚ", "好啦", -4.5),
+            Triple("ㄎㄜ-ㄋㄥ", "可能", -3.0), Triple("ㄎㄣ", "肯", -4.0), Triple("ㄥ", "鞥", -6.0),
+            Triple("ㄕㄣ-ㄇㄜ", "什麼", -2.9), Triple("ㄕ-ㄇㄚ", "是嗎", -3.5), Triple("ㄙㄨㄛ-ㄧ", "所以", -3.0), Triple("ㄕ-ㄧ", "十一", -3.6),
         )
         val table = mapOf(
             "ni" to "ㄋㄧ", "hao" to "ㄏㄠ", "hai" to "ㄏㄞ", "he" to "ㄏㄜ", "xi" to "ㄒㄧ", "an" to "ㄢ",
             "xian" to "ㄒㄧㄢ", "zhong" to "ㄓㄨㄥ", "guo" to "ㄍㄨㄛ", "lv" to "ㄌㄩ", "se" to "ㄙㄜ",
             "tai" to "ㄊㄞ", "wan" to "ㄨㄢ", "hui" to "ㄏㄨㄟ", "lai" to "ㄌㄞ", "la" to "ㄌㄚ",
+            "ke" to "ㄎㄜ", "neng" to "ㄋㄥ", "ken" to "ㄎㄣ", "eng" to "ㄥ", "shen" to "ㄕㄣ", "me" to "ㄇㄜ",
+            "shi" to "ㄕ", "ma" to "ㄇㄚ", "suo" to "ㄙㄨㄛ", "yi" to "ㄧ",
         )
         return PinyinEngine(ZhuyinEngine(MemoryPhraseSource(rows), UserPhraseModel(null), toneless), table)
     }
@@ -39,6 +43,15 @@ class PinyinTest {
         assertEquals("好", p.candidates("hao").first().text)
         assertEquals("回來", p.candidates("huilai").first().text)
         assertEquals("好啦", p.candidates("hl").first().text)
+    }
+
+    /** keneng 斷成 ke＋neng（不是 ken＋eng）；只打 s 也找得到 sh 開頭的字，而且不會只因為 shi 剛好只有聲母就排前面 */
+    @Test fun segmentationAndShorthandInitials() {
+        val p = pinyin(toneless = true)
+        assertEquals(listOf("ke", "neng"), pieces(p, "keneng"))
+        assertEquals("可能", p.candidates("keneng").first().text)
+        assertEquals("什麼", p.candidates("sm").first().text)
+        assertEquals("所以", p.candidates("sy").first().text)
     }
 
     @Test fun segmentation() {

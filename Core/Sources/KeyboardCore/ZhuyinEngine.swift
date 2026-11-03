@@ -152,7 +152,8 @@ final class ZhuyinEngine {
             let head = want.dropLast()
             let plain = String(have.filter { !Bopomofo.tones.contains($0) })
             guard plain.hasPrefix(head) else { return nil }
-            if plain.count != head.count { penalty += prefixPenalty }
+            // 拼音（ignoreTones）只打聲母時，剛好只有聲母的音（shi＝ㄕ）不該比其他音（suo）優先：不扣分
+            if plain.count != head.count && !ignoreTones { penalty += prefixPenalty }
         }
         return penalty
     }
@@ -164,6 +165,17 @@ final class ZhuyinEngine {
         defer {
             if lookupCache.count >= 512 { lookupCache.removeAll() }
             lookupCache[key] = out
+        }
+        if key.contains("|") {
+            // 拼音簡拼 s 可能是 ㄙ 或 ㄕ（寫成「ㄙ|ㄕ*」）：每種組合都查
+            var merged: [String: Double] = [:]
+            for variant in Self.expandAlternatives(key) {
+                for (phrase, score) in lookup(variant) where score > (merged[phrase] ?? -Double.greatestFiniteMagnitude) {
+                    merged[phrase] = score
+                }
+            }
+            out = merged.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.prefix(80).map { ($0.key, $0.value) }
+            return out
         }
         guard key.contains("*") else {
             let ids = column == "plain" ? index.byPlain[key] : index.byReading[key]
@@ -441,8 +453,20 @@ final class ZhuyinEngine {
     /// 只打了聲母（每個音節最多一個注音）。這時罕見詞要讓給常見詞。
     static func isInitialsQuery(_ readings: [String]) -> Bool {
         !readings.isEmpty && readings.allSatisfy { reading in
-            reading.filter { $0 != "*" && $0 != "~" && !Bopomofo.tones.contains($0) }.count <= 1
+            (reading.split(separator: "|").first ?? "").filter { $0 != "*" && $0 != "~" && !Bopomofo.tones.contains($0) }.count <= 1
         }
+    }
+
+    /// 「ㄙ|ㄕ*-ㄇ*」→「ㄙ*-ㄇ*」「ㄕ*-ㄇ*」
+    static func expandAlternatives(_ key: String) -> [String] {
+        var out = [""]
+        for (i, part) in key.split(separator: "-").enumerated() {
+            let options: [String] = part.contains("|")
+                ? part.replacingOccurrences(of: "*", with: "").split(separator: "|").map { $0 + "*" }
+                : [String(part)]
+            out = out.flatMap { pre in options.map { i == 0 ? $0 : pre + "-" + $0 } }
+        }
+        return out
     }
 
     /// 只打聲母時，調整後分數低於這條線、又沒學過的詞，排在常見詞後面。

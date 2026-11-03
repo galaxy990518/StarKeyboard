@@ -22,7 +22,8 @@ final class PinyinEngine {
         "zh": "ㄓ", "ch": "ㄔ", "sh": "ㄕ",
         "b": "ㄅ", "p": "ㄆ", "m": "ㄇ", "f": "ㄈ", "d": "ㄉ", "t": "ㄊ", "n": "ㄋ", "l": "ㄌ",
         "g": "ㄍ", "k": "ㄎ", "h": "ㄏ", "j": "ㄐ", "q": "ㄑ", "x": "ㄒ", "r": "ㄖ",
-        "z": "ㄗ", "c": "ㄘ", "s": "ㄙ", "y": "ㄧ", "w": "ㄨ",
+        // 只打 z／c／s 時很多人其實是 zh／ch／sh（sm＝什麼、zd＝知道）：兩種都查
+        "z": "ㄗ|ㄓ", "c": "ㄘ|ㄔ", "s": "ㄙ|ㄕ", "y": "ㄧ", "w": "ㄨ",
     ]
 
     /// 拼音或簡拼 → 查字典用的注音（簡拼後面加 *，表示「這個聲母開頭的字」）
@@ -101,11 +102,14 @@ final class PinyinEngine {
             if start == s.count { return [] }
             if let cached = memo[start] { return cached }
             var result: [String]? = nil
+            var cost = Int.max
             for len in stride(from: min(Self.maxSyllable, s.count - start), through: 1, by: -1) {
                 let py = String(s[start..<(start + len)])
                 guard table[py] != nil, let rest = go(start + len) else { continue }
-                result = [py] + rest
-                break
+                // 中間的音節用 a、o、e 開頭（ken＋eng）多半是斷錯了，有別的斷法（ke＋neng）就用別的；一樣的話取長的
+                let vowelStart = { (p: String) in p.first.map { "aoe".contains($0) } ?? false }
+                let c = rest.filter(vowelStart).count + (start > 0 && vowelStart(py) ? 1 : 0)
+                if c < cost { cost = c; result = [py] + rest }
             }
             if result == nil && abbreviate {
                 for len in stride(from: 2, through: 1, by: -1) where start + len <= s.count {

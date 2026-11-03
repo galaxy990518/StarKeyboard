@@ -129,11 +129,15 @@ final class PinyinTests: XCTestCase {
             ("ㄌㄩˋ-ㄙㄜˋ", "綠色", -4.5), ("ㄊㄞˊ-ㄨㄢ", "臺灣", -4.0),
             ("ㄏㄨㄟˋ", "會", -2.5), ("ㄌㄞˊ", "來", -3.0), ("ㄌㄚ˙", "啦", -3.5),
             ("ㄏㄨㄟˊ-ㄌㄞˊ", "回來", -4.0), ("ㄏㄠˇ-ㄌㄚ˙", "好啦", -4.5),
+            ("ㄎㄜˇ-ㄋㄥˊ", "可能", -3.0), ("ㄎㄣˇ", "肯", -4.0), ("ㄥ", "鞥", -6.0),
+            ("ㄕㄣˊ-ㄇㄜ˙", "什麼", -2.9), ("ㄕˋ-ㄇㄚ˙", "是嗎", -3.5), ("ㄙㄨㄛˇ-ㄧˇ", "所以", -3.0), ("ㄕˊ-ㄧ", "十一", -3.6),
         ]
         for r in rows { ZhuyinEngine.insert(into: db, reading: r.0, phrase: r.1, score: r.2) }
         let table = ["ni": "ㄋㄧ", "hao": "ㄏㄠ", "hai": "ㄏㄞ", "he": "ㄏㄜ", "xi": "ㄒㄧ", "an": "ㄢ",
                      "xian": "ㄒㄧㄢ", "zhong": "ㄓㄨㄥ", "guo": "ㄍㄨㄛ", "lv": "ㄌㄩ", "se": "ㄙㄜ",
-                     "tai": "ㄊㄞ", "wan": "ㄨㄢ", "hui": "ㄏㄨㄟ", "lai": "ㄌㄞ", "la": "ㄌㄚ"]
+                     "tai": "ㄊㄞ", "wan": "ㄨㄢ", "hui": "ㄏㄨㄟ", "lai": "ㄌㄞ", "la": "ㄌㄚ",
+                     "ke": "ㄎㄜ", "neng": "ㄋㄥ", "ken": "ㄎㄣ", "eng": "ㄥ", "shen": "ㄕㄣ", "me": "ㄇㄜ",
+                     "shi": "ㄕ", "ma": "ㄇㄚ", "suo": "ㄙㄨㄛ", "yi": "ㄧ"]
         let engine = ZhuyinEngine(db: db, userModel: UserPhraseModel(fileURL: nil), column: "plain")
         return PinyinEngine(engine: engine, table: table)
     }
@@ -173,6 +177,15 @@ final class PinyinTests: XCTestCase {
         XCTAssertEqual(p.candidates(for: "hao").first?.text, "好")
         XCTAssertEqual(p.candidates(for: "huilai").first?.text, "回來")
         XCTAssertEqual(p.candidates(for: "hl").first?.text, "好啦")   // 簡拼還是記得選過的
+    }
+
+    /// keneng 斷成 ke＋neng（不是 ken＋eng）；只打 s 也找得到 sh 開頭的字，而且不會只因為 shi 剛好只有聲母就排前面
+    func testSegmentationAndShorthandInitials() {
+        let p = makePinyin()
+        XCTAssertEqual(pieces(p, "keneng"), ["ke", "neng"])
+        XCTAssertEqual(p.candidates(for: "keneng").first?.text, "可能")
+        XCTAssertEqual(p.candidates(for: "sm").first?.text, "什麼")
+        XCTAssertEqual(p.candidates(for: "sy").first?.text, "所以")
     }
 
     func testCandidates() {
