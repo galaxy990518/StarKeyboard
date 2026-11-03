@@ -542,10 +542,12 @@ final class ZhuyinEngine {
         shorter = sorted(shorter, readings: readings, initials: initials)
         if n == 1 { exact = promoteContext(exact, readings: readings, context: context) }
 
+        // 每個打出來的音都查得到字：照打的音湊句子，猜按錯鍵的詞排在後面（ㄨㄛˇㄐㄧㄤˋ 是「我降」不是「以降」）
+        let allTyped = readings.allSatisfy { !phrases([$0.hasSuffix("~") ? String($0.dropLast()) : $0][...]).isEmpty }
         var sentence = ""
         if let cover = exact.first(where: { $0.corrections == 0 && $0.text.count == n }) {
             sentence = cover.text
-        } else if n > 1, let fixed = exact.first(where: { $0.corrections == 1 && $0.text.count == n }) {
+        } else if n > 1, !allTyped, let fixed = exact.first(where: { $0.corrections == 1 && $0.text.count == n }) {
             // 打出來的音拼不成詞，但改掉一個按到旁邊的鍵就是一個詞（ㄋㄜˇㄞˋ → 可愛）：比單字硬湊的句子可靠
             sentence = fixed.text
         } else if n > 1 {
@@ -557,10 +559,12 @@ final class ZhuyinEngine {
             out.append(Candidate(text: sentence, span: n, kind: .sentence))
             listed.insert(sentence)
         }
-        for item in exact where listed.insert(item.text).inserted {
-            out.append(Candidate(text: item.text, span: item.span, kind: .phrase))
-        }
-        for item in shorter where listed.insert(item.text).inserted {
+        // 音都打得對時，照打的音查到的詞和單字都排在猜錯字的詞前面，不會被一堆用不到的詞擠到後面
+        let ordered = allTyped
+            ? exact.filter { $0.corrections == 0 } + shorter.filter { $0.corrections == 0 } +
+              exact.filter { $0.corrections > 0 } + shorter.filter { $0.corrections > 0 }
+            : exact + shorter
+        for item in ordered where listed.insert(item.text).inserted {
             out.append(Candidate(text: item.text, span: item.span, kind: .phrase))
         }
         for extra in longerSuggestions(readings: readings, context: context, initials: initials, leading: out.first?.text, seen: &listed) {

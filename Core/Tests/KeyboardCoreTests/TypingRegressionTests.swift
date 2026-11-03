@@ -108,4 +108,23 @@ final class TypingRegressionTests: XCTestCase {
         for k in "ㄒ˙ㄩㄝ" { c.input(k) }
         XCTAssertEqual(c.readings.map { $0.replacingOccurrences(of: "~", with: "") }, ["ㄒㄩㄝ*"])
     }
+    func testTypedSoundsBeatNeighborKeyGuesses() {
+        let db = SQLiteDB.inMemory()!
+        ZhuyinEngine.createSchema(in: db)
+        for (reading, phrase, score) in [
+            ("ㄉㄨㄛ", "多", -3.0), ("ㄌㄜ˙", "了", -2.0), ("ㄉㄜˊ", "得", -3.0), ("ㄉㄜˊ-ㄌㄜ˙", "得了", -4.0),
+            ("ㄉㄨㄟˋ-ㄌㄜ˙", "對了", -4.0), ("ㄉㄨㄛ-ㄌㄩˋ", "多氯", -6.0),
+            ("ㄨㄛˇ", "我", -2.0), ("ㄐㄧㄤˋ", "降", -4.0), ("ㄧˇ", "以", -2.5), ("ㄧˇ-ㄐㄧㄤˋ", "以降", -5.0),
+            ("ㄨㄚˇ-ㄐㄧㄤˋ", "瓦匠", -6.0)
+        ] { ZhuyinEngine.insert(into: db, reading: reading, phrase: phrase, score: score) }
+        let e = ZhuyinEngine(db: db, userModel: UserPhraseModel(fileURL: nil))
+        // 每個音都打對了：照打的音湊句子，不換成猜按錯鍵的詞
+        XCTAssertEqual(e.candidates(for: ["ㄉㄨㄛ*", "ㄌㄜ*"]).first?.text, "多了")
+        XCTAssertEqual(e.candidates(for: ["ㄨㄛˇ", "ㄐㄧㄤˋ"]).first?.text, "我降")
+        // 單字「多」「我」排在猜錯字的詞前面
+        let list = e.candidates(for: ["ㄉㄨㄛ*", "ㄌㄜ*"]).map { $0.text }
+        XCTAssertLessThan(list.firstIndex(of: "多")!, list.firstIndex(of: "得了") ?? Int.max)
+        let list2 = e.candidates(for: ["ㄨㄛˇ", "ㄐㄧㄤˋ"]).map { $0.text }
+        XCTAssertLessThan(list2.firstIndex(of: "我")!, list2.firstIndex(of: "以降") ?? Int.max)
+    }
 }

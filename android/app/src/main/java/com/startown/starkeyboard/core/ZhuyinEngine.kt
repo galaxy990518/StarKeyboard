@@ -317,14 +317,15 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         if (readings.isEmpty()) return emptyList()
         val n = readings.size
         val initials = isInitialsQuery(readings)
-        class Item(val text: String, val span: Int, val score: Double)
+        class Item(val text: String, val span: Int, val score: Double, val typed: Boolean)
         val exact = ArrayList<Item>()
         val shorter = ArrayList<Item>()
         val seen = HashSet<String>()
         for (k in 1..minOf(MAX_PHRASE, n)) {
+            val typedHere = phrases(readings.subList(0, k)).map { it.text }.toHashSet()
             for (p in fuzzyPhrases(readings.subList(0, k))) {
                 if (p.text.isEmpty() || commit(p.text) != p.text || !seen.add(p.text)) continue
-                val item = Item(p.text, k, p.score)
+                val item = Item(p.text, k, p.score, p.text in typedHere)
                 if (k == n) exact.add(item) else shorter.add(item)
             }
         }
@@ -350,18 +351,24 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         // 照打的音查到的詞排在「猜按錯鍵」的詞前面
         val typed = phrases(readings).map { it.text }.toHashSet()
         exact.sortBy { if (it.text in typed) 0 else 1 }
+        val allTyped = readings.all { phrases(listOf(it.removeSuffix("~"))).isNotEmpty() }
         val out = ArrayList<Candidate>()
         val listed = HashSet<String>()
         if (n > 1) {
-            val cover = exact.firstOrNull { it.text.length == n && it.text in typed } ?: exact.firstOrNull { it.text.length == n }
+            // 每個打出來的音都查得到字：照打的音湊句子，不用猜按錯鍵的詞（ㄨㄛˇㄐㄧㄤˋ 是「我降」不是「以降」）
+            val cover = exact.firstOrNull { it.text.length == n && it.text in typed }
+                ?: if (allTyped) null else exact.firstOrNull { it.text.length == n }
             val sentence = cover?.text ?: composedSentence(readings)
             if (sentence.isNotEmpty() && commit(sentence) == sentence) {
                 out.add(Candidate(sentence, n, Candidate.Kind.SENTENCE))
                 listed.add(sentence)
             }
         }
-        for (item in exact) if (listed.add(item.text)) out.add(Candidate(item.text, item.span, Candidate.Kind.PHRASE))
-        for (item in shorter) if (listed.add(item.text)) out.add(Candidate(item.text, item.span, Candidate.Kind.PHRASE))
+        // 音都打得對時，照打的音查到的詞和單字都排在猜錯字的詞前面
+        val ordered = if (allTyped)
+            exact.filter { it.typed } + shorter.filter { it.typed } + exact.filter { !it.typed } + shorter.filter { !it.typed }
+        else exact + shorter
+        for (item in ordered) if (listed.add(item.text)) out.add(Candidate(item.text, item.span, Candidate.Kind.PHRASE))
         if (out.none { it.span == 1 && it.kind == Candidate.Kind.PHRASE }) {
             val literal = commit(display(readings[0]))
             if (literal.isNotEmpty()) out.add(Candidate(literal, 1, Candidate.Kind.LITERAL))
