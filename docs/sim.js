@@ -41,6 +41,34 @@
     SHAPES.push([a.id, a.title, a.center, 1, '新']);
     if (a.color) DETAIL[a.id] = a.color;
   });
+  // 線稿質感：外框用 --body-stroke 畫線、--key 變透明；尾巴鬍鬚和貓咪的眼睛肉球用 --line-ink
+  var BODY_STYLE = 'fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke';
+  function artPaths(host, a, d, detail, lines) {
+    var ns = 'http://www.w3.org/2000/svg';
+    var p = document.createElementNS(ns, 'path'); p.setAttribute('d', d); p.setAttribute('style', BODY_STYLE); host.appendChild(p);
+    if (detail && a.alpha > 0) {
+      var q = document.createElementNS(ns, 'path'); q.setAttribute('d', detail);
+      q.setAttribute('fill', a.lineDetail ? 'var(--line-ink)' : 'var(--detail)'); q.setAttribute('opacity', a.alpha); host.appendChild(q);
+    }
+    if (lines) {
+      var l = document.createElementNS(ns, 'path'); l.setAttribute('d', lines);
+      l.setAttribute('style', 'fill:none;stroke:var(--line-ink);stroke-width:1.05;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke');
+      host.appendChild(l);
+    }
+  }
+  // 寬鍵把中間拉長（貓咪探頭）：x 小於 50 貼左邊、大於 50 貼右邊
+  function stretchD(ops, vw, aspect) {
+    var d = '', i = 0, px = function (x) { return x < 50 ? x / aspect : vw - (100 - x) / aspect; };
+    while (i < ops.length) {
+      var c = ops[i];
+      if (c === 0) { d += 'M' + px(ops[i + 1]) + ' ' + ops[i + 2]; i += 3; }
+      else if (c === 1) { d += 'L' + px(ops[i + 1]) + ' ' + ops[i + 2]; i += 3; }
+      else if (c === 2) { d += 'C' + px(ops[i + 1]) + ' ' + ops[i + 2] + ' ' + px(ops[i + 3]) + ' ' + ops[i + 4] + ' ' + px(ops[i + 5]) + ' ' + ops[i + 6]; i += 7; }
+      else if (c === 3) { d += 'Q' + px(ops[i + 1]) + ' ' + ops[i + 2] + ' ' + px(ops[i + 3]) + ' ' + ops[i + 4]; i += 5; }
+      else { d += 'Z'; i += 1; }
+    }
+    return d;
+  }
   (function addArtSymbols() {
     var first = document.querySelector('symbol[id^="preview-shape-"]');
     if (!first) return;
@@ -48,10 +76,7 @@
     ART.forEach(function (a) {
       var sym = document.createElementNS(ns, 'symbol');
       sym.setAttribute('id', 'preview-shape-' + a.id); sym.setAttribute('viewBox', '0 0 100 100');
-      var p = document.createElementNS(ns, 'path'); p.setAttribute('d', a.d); p.setAttribute('fill', 'var(--key)'); sym.appendChild(p);
-      if (a.detail && a.alpha > 0) {
-        var q = document.createElementNS(ns, 'path'); q.setAttribute('d', a.detail); q.setAttribute('fill', 'var(--detail)'); q.setAttribute('opacity', a.alpha); sym.appendChild(q);
-      }
+      artPaths(sym, a, a.d, a.detail, a.lines);
       parent.appendChild(sym);
     });
   }());
@@ -73,7 +98,7 @@
     return { name: '自訂', top: hsb(h, s * .15, 1), bottom: hsb(h2, s2 * .25, .97), key: '#ffffff', text: hsb(h, s * .6 + .2, .45), special: hsb(h2, s2 * .35, .95), specialText: hsb(h2, s2 * .7, .38), accent: hsb(h2, s2 * .6, .9), accentText: '#ffffff', shadow: hsb(h, s * .4, .82) };
   }
   THEMES.custom = customTheme();
-  var FINISHES = [['flat', '平面'], ['puffy', '胖胖'], ['raised', '立體']];
+  var FINISHES = [['flat', '平面'], ['puffy', '胖胖'], ['raised', '立體'], ['outline', '線稿', '新']];
   var EFFECTS = [['none', '無', []], ['stars', '星星', ['★', '☆', '✦']], ['hearts', '愛心', ['♥︎', '♡', '❤︎']], ['sparkles', '閃亮', ['✧', '✦', '⋆']], ['flowers', '花花', ['✿', '❀', '❁']], ['bubbles', '泡泡', ['○', '◦', '°']]];
   var JSD = 'https://cdn.jsdelivr.net/gh/';
   var FONTS = [
@@ -461,24 +486,39 @@
   function K(label, act, o) { o = o || {}; o.label = label; o.act = act; return o; }
   function chars(s, o) { return Array.from(s).map(function (c) { return K(c, 'c:' + c, o ? Object.assign({}, o) : {}); }); }
   function nextMode() { return S.modes[(S.modes.indexOf(S.mode) + 1) % S.modes.length]; }
-  function returnTitle() { return isComposing() || S.hangul ? '確認' : (S.editor ? '完成' : '傳送'); }
+  function returnTitle() { return '↵'; }
   function bottomRow(cols) {
     var k = cols / 10;
     var row = [S.layer === 'letters' ? K('123', 'layer:numbers', { w: 1.3 * k, kind: 'special', fs: 15 }) : K(MODE_INFO[S.mode][2], 'layer:letters', { w: 1.3 * k, kind: 'special', fs: 13 })];
-    row.push(K(MODE_INFO[nextMode()][1], 'mode', { w: 1.1 * k, kind: 'special', fs: 17 }));
+    row.push(S.layer === 'letters' ? K(MODE_INFO[nextMode()][1], 'mode', { w: 1.1 * k, kind: 'special', fs: 17 }) : K('數字', 'layer:numpad', { w: 1.1 * k, kind: 'special', fs: 14 }));
     row.push(K('☺', 'panel:emoji', { w: 1.1 * k, kind: 'special', fs: 19 }));
     row.push(K(MODE_INFO[S.mode][0], 'space', { w: 0, fs: 14, wide: 1 }));
-    row.push(K(returnTitle(), 'return', { w: 2 * k, kind: 'accent', fs: 15, wide: 1 }));
+    row.push(K(returnTitle(), 'return', { w: 2 * k, kind: 'accent', fs: 20, wide: 1 }));
     return row;
+  }
+  // 拼音（三星排法）：!#1 開符號、空白鍵兩邊是逗號句號、123 開大顆數字鍵盤
+  function pinyinBottom() {
+    return [K('!#1', 'layer:numbers', { w: 1.3, kind: 'special', fs: 14 }), K(MODE_INFO[nextMode()][1], 'mode', { w: 1.1, kind: 'special', fs: 17 }),
+      K('，', 'c:，', { w: 0.9, fs: 19 }), K(MODE_INFO[S.mode][0], 'space', { w: 0, fs: 14, wide: 1 }), K('。', 'c:。', { w: 0.9, fs: 19 }),
+      K('123', 'layer:numpad', { w: 1.1, kind: 'special', fs: 15 }), K(returnTitle(), 'return', { w: 1.6, kind: 'accent', fs: 20, wide: 1 })];
+  }
+  // 大顆的數字鍵盤（每種輸入法都有）
+  function numpad() {
+    var side = function (c) { return K(c, 'c:' + c, { kind: 'special', fs: 20 }); };
+    return { cols: 5, rows: [[side('-')].concat(chars('123', { fs: 24 })).concat([back(1)]), [side('@')].concat(chars('456', { fs: 24 })).concat([side('.')]),
+      [side(':')].concat(chars('789', { fs: 24 })).concat([side(',')]),
+      [K('!#1', 'layer:numbers', { kind: 'special', fs: 14 }), K(MODE_INFO[S.mode][2], 'layer:letters', { kind: 'special', fs: 13 })].concat(chars('0', { fs: 24 }))
+        .concat([K('␣', 'space', { kind: 'special', fs: 18 }), K(returnTitle(), 'return', { kind: 'accent', fs: 20 })])] };
   }
   function shiftKey() { return K(S.shift === 'locked' ? '⇪' : S.shift === 'on' ? '⬆' : '⇧', 'shift', { w: 1.4, kind: 'special', fs: 19 }); }
   function back(w) { return K('⌫', 'back', { w: w || 1.4, kind: 'special', fs: 19 }); }
   function layout() {
     var full = S.fullWidth, chinese = S.mode !== 'english' && S.mode !== 'korean';
+    if (S.layer === 'numpad') return numpad();
     if (S.layer === 'numbers') {
-      if (!chinese) return { cols: 10, rows: [chars('1234567890'), chars('-/:;()$&@"'), [K('#+=', 'layer:symbols', { w: 1.4, kind: 'special', fs: 15 })].concat(chars(".,?!'", { w: 1.4 })).concat([back()]), bottomRow(10)] };
+      if (!chinese) return { cols: 10, rows: [chars('1234567890'), chars('-/:;()$&@"'), chars('+×÷=%_<>#*'), [K('#+=', 'layer:symbols', { w: 1.4, kind: 'special', fs: 15 })].concat(chars(".,?!'", { w: 1.4 })).concat([back()]), bottomRow(10)] };
       var digits = full ? '１２３４５６７８９０' : '1234567890';
-      return { cols: 10, rows: [chars(digits, { fs: 20 }), chars('-/：；（）$@「」', { fs: 19 }), [K('#+=', 'layer:symbols', { w: 1.4, kind: 'special', fs: 15 })].concat(chars('。，、？！.', { w: 1.2, fs: 19 })).concat([back()]), bottomRow(10)] };
+      return { cols: 10, rows: [chars(digits, { fs: 20 }), chars('-/：；（）$@「」', { fs: 19 }), chars('+×÷=%&*#_~', { fs: 19 }), [K('#+=', 'layer:symbols', { w: 1.4, kind: 'special', fs: 15 })].concat(chars('。，、？！.', { w: 1.2, fs: 19 })).concat([back()]), bottomRow(10)] };
     }
     if (S.layer === 'symbols') {
       if (!chinese) return { cols: 10, rows: [chars('[]{}#%^*+='), chars('_\\|~<>€£¥`'), [K('123', 'layer:numbers', { w: 1.4, kind: 'special', fs: 15 })].concat(chars(".,?!'", { w: 1.4 })).concat([back()]), bottomRow(10)] };
@@ -498,6 +538,7 @@
     var up = S.mode === 'english' && S.shift !== 'off';
     function L(s) { return chars(up ? s.toUpperCase() : s, { fs: 22 }); }
     var first = S.mode === 'english' ? shiftKey() : S.mode === 'japanese' ? K('ー', 'c:-', { w: 1.4, kind: 'special', fs: 19 }) : K("'", "c:'", { w: 1.4, kind: 'special', fs: 20 });
+    if (S.mode === 'pinyin') return { cols: 10, rows: [chars('1234567890', { fs: 19 }), L('qwertyuiop'), L('asdfghjkl'), [first].concat(L('zxcvbnm')).concat([back()]), pinyinBottom()] };
     return { cols: 10, rows: [L('qwertyuiop'), L('asdfghjkl'), [first].concat(L('zxcvbnm')).concat([back()]), bottomRow(10)] };
   }
 
@@ -528,6 +569,7 @@
     var soft = info[3];
     // 線條造型保持自己的比例（按鍵太瘦就上下留白），不會被拉長
     var art = !k.wide && ART.filter(function (a) { return a.id === S.shape; })[0];
+    var stretchArt = k.wide && ART.filter(function (a) { return a.id === S.shape && a.stretch; })[0];
     var host = face;
     if (art) {
       face.classList.add('artface');
@@ -535,7 +577,18 @@
       host.style.setProperty('--a', art.aspect || 1);
       face.appendChild(host);
     }
-    if (k.wide) {
+    if (stretchArt) {
+      var wsvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      wsvg.setAttribute('class', 'shape'); wsvg.setAttribute('aria-hidden', 'true');
+      face.appendChild(wsvg);
+      // 量到按鍵大小以後才知道要拉多長
+      requestAnimationFrame(function () {
+        var r = face.getBoundingClientRect(), vw = r.height ? 100 * r.width / r.height : 300, sa = stretchArt.stretch, asp = stretchArt.aspect || 1;
+        wsvg.setAttribute('viewBox', '0 0 ' + vw + ' 100');
+        artPaths(wsvg, stretchArt, stretchD(sa.ops, vw, asp), sa.dops.length ? stretchD(sa.dops, vw, asp) : '', sa.lops.length ? stretchD(sa.lops, vw, asp) : '');
+      });
+      face.style.setProperty('--label-y', '55%');
+    } else if (k.wide) {
       face.appendChild(shapeSvg(S.shape === 'bubble' || S.shape === 'mochi' ? 'bubble' : 'wide', 'shape'));
       if (soft) { var badge = shapeSvg(S.shape, 'badge'); face.appendChild(badge); }
       face.style.setProperty('--label-y', '50%');
@@ -546,7 +599,7 @@
     host.appendChild(el('i', 'gloss'));
     var lbl = el('span', 'lbl', k.label);
     if (k.fs) lbl.style.setProperty('--kfs', k.fs + 'px');
-    if (k.wide && soft) lbl.style.paddingLeft = '18%';
+    if (k.wide && soft && !stretchArt) lbl.style.paddingLeft = '18%';
     host.appendChild(lbl);
     b.appendChild(face);
     b.style.flex = k.w === 0 ? '1 1 0' : (k.w || 1) + ' 0 0';
@@ -1052,9 +1105,14 @@
     $('sim-theme-name').textContent = t.name;
     pressed('#sim-colors button', id); setDetail(); render();
   }
-  function setDetail() { var d = DETAIL[S.shape], t = THEMES[S.theme]; phone.style.setProperty('--detail', d ? d[t.dark ? 1 : 0] : t.accent); }
+  function setDetail() {
+    var d = DETAIL[S.shape], t = THEMES[S.theme];
+    phone.style.setProperty('--detail', d ? d[t.dark ? 1 : 0] : t.accent);
+    // 線稿：淺色主題深灰線、深色主題白線；其他質感用字的顏色
+    phone.style.setProperty('--line-ink', S.finish === 'outline' ? (t.dark ? 'rgba(250,251,255,.94)' : 'rgba(41,43,44,.84)') : 'color-mix(in srgb, ' + t.text + ' 80%, transparent)');
+  }
   function setShape(id) { S.shape = id; $('sim-shape-name').textContent = shapeInfo()[1]; pressed('#sim-shapes button', id); setDetail(); render(); }
-  function setFinish(id) { S.finish = id; pressed('#sim-finishes button', id); render(); }
+  function setFinish(id) { S.finish = id; pressed('#sim-finishes button', id); setDetail(); render(); }
   function setEffect(id) { S.effect = id; pressed('#sim-effects button', id); render(); }
   var loadedFonts = {};
   function setFont(id) {

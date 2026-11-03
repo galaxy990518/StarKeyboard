@@ -207,6 +207,10 @@
 .sim-targets button::before { content: ''; display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--dot, #ccc); border: 2px solid #fff; vertical-align: -2px; margin-right: 6px; }
 
 /* 立體：按鍵有厚度（側面是按鍵顏色調暗），按下去往下沉 */
+/* 質感：線稿（只畫一條細線，裡面透明） */
+.sim-phone[data-finish="outline"] .sim-key svg.shape { --key: transparent; --body-stroke: var(--line-ink); --body-sw: 1.2; filter: none; }
+.sim-phone[data-finish="outline"] .sim-key.down svg.shape { --key: color-mix(in srgb, var(--line-ink) 14%, transparent); }
+.sim-phone[data-finish="outline"] .sim-key svg.shape use.shade, .sim-phone[data-finish="outline"] .sim-key .gloss, .sim-phone[data-finish="outline"] .sim-key .shade { display: none !important; }
 .sim-phone[data-finish="raised"] .sim-key svg.shape { filter: drop-shadow(0 4px 0 color-mix(in srgb, var(--key) 70%, #000)); }
 .sim-phone[data-finish="raised"] .sim-key svg.shape use.shade { --key: url(#sim-shade-raised); display: inline; }
 .sim-phone[data-finish="raised"] .sim-key .shade { display: block; }

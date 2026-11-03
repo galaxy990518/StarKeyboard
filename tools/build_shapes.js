@@ -353,7 +353,8 @@ fs.writeFileSync(path.join(root, 'android/app/src/main/java/com/startown/starkey
 // ---- 網站試玩 ----
 const css = n => '#' + n.toString(16).padStart(6, '0');
 const web = shapes.map(s => ({
-  id: s.id, title: s.title, center: r2(s.body[1] + s.body[3] / 2), d: s.svg, detail: s.dsvg, lines: s.lsvg,
+  id: s.id, title: s.title, center: r2(s.body[1] + s.body[3] / 2), d: s.svg, detail: s.dsvg, lines: s.lsvg, lineDetail: s.lineDetail,
+  stretch: s.stretch ? { ops: s.ops, dops: s.dops, lops: s.lops } : null,
   color: s.color ? s.color.map(css) : null, alpha: s.alpha, aspect: s.aspect,
 }));
 fs.writeFileSync(path.join(root, 'docs/sim-shapes.js'), `/* ${note} */\nwindow.SIM_ART_SHAPES = ${JSON.stringify(web)};\n`);
