@@ -536,14 +536,19 @@ class UserPhraseModel(private val file: File?) {
             val parts = saved.split('-')
             if (parts.size != query.size) continue
             if (query.zip(parts).all { (want, have) ->
+                    // 反過來比（存的是沒打完的音）只限至少打了兩個注音的；只打聲母（簡拼 h）選過的字，
+                    // 不能讓它在打完整讀音（hao）時排到前面（「好」變成「會」）
                     want == have || ZhuyinEngine.matchPenalty(listOf(want), listOf(have)) != null ||
-                        ZhuyinEngine.matchPenalty(listOf(have), listOf(want)) != null
+                        (typedSymbols(have) >= 2 && ZhuyinEngine.matchPenalty(listOf(have), listOf(want)) != null)
                 }) {
                 merge(phrases, recency[saved] ?: emptyMap())
             }
         }
         return result
     }
+
+    /** 一個音節實際打了幾個注音（不算 * ~ 和聲調） */
+    private fun typedSymbols(part: String) = part.count { it != '*' && it != '~' && Bopomofo.TONES.indexOf(it) < 0 }
 
     private fun abbreviation(reading: String): String? {
         val parts = reading.split('-')

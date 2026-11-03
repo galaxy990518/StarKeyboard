@@ -127,11 +127,13 @@ final class PinyinTests: XCTestCase {
             ("ㄏㄞˊ", "還", -3.2), ("ㄏㄜˊ", "和", -3.0), ("ㄒㄧ", "西", -3.5), ("ㄢ", "安", -3.6),
             ("ㄒㄧ-ㄢ", "西安", -5.0), ("ㄒㄧㄢ", "先", -3.4), ("ㄓㄨㄥ-ㄍㄨㄛˊ", "中國", -3.5),
             ("ㄌㄩˋ-ㄙㄜˋ", "綠色", -4.5), ("ㄊㄞˊ-ㄨㄢ", "臺灣", -4.0),
+            ("ㄏㄨㄟˋ", "會", -2.5), ("ㄌㄞˊ", "來", -3.0), ("ㄌㄚ˙", "啦", -3.5),
+            ("ㄏㄨㄟˊ-ㄌㄞˊ", "回來", -4.0), ("ㄏㄠˇ-ㄌㄚ˙", "好啦", -4.5),
         ]
         for r in rows { ZhuyinEngine.insert(into: db, reading: r.0, phrase: r.1, score: r.2) }
         let table = ["ni": "ㄋㄧ", "hao": "ㄏㄠ", "hai": "ㄏㄞ", "he": "ㄏㄜ", "xi": "ㄒㄧ", "an": "ㄢ",
                      "xian": "ㄒㄧㄢ", "zhong": "ㄓㄨㄥ", "guo": "ㄍㄨㄛ", "lv": "ㄌㄩ", "se": "ㄙㄜ",
-                     "tai": "ㄊㄞ", "wan": "ㄨㄢ"]
+                     "tai": "ㄊㄞ", "wan": "ㄨㄢ", "hui": "ㄏㄨㄟ", "lai": "ㄌㄞ", "la": "ㄌㄚ"]
         let engine = ZhuyinEngine(db: db, userModel: UserPhraseModel(fileURL: nil), column: "plain")
         return PinyinEngine(engine: engine, table: table)
     }
@@ -161,6 +163,16 @@ final class PinyinTests: XCTestCase {
         XCTAssertEqual(half.pieces.map { $0.pinyin }, ["ni"])
         XCTAssertEqual(half.partial, "h")
         XCTAssertEqual(p.display("nih"), "ni h")
+    }
+
+    /// 用簡拼（h、hl）選過的字，打完整拼音時不能搶到第一個（hao 是「好」不是「會」）
+    func testAbbreviationPicksDoNotBeatFullPinyin() {
+        let p = makePinyin()
+        p.engine.learn(readings: ["ㄏ*"], text: "會")
+        p.engine.learn(readings: ["ㄏ*", "ㄌ*"], text: "好啦")
+        XCTAssertEqual(p.candidates(for: "hao").first?.text, "好")
+        XCTAssertEqual(p.candidates(for: "huilai").first?.text, "回來")
+        XCTAssertEqual(p.candidates(for: "hl").first?.text, "好啦")   // 簡拼還是記得選過的
     }
 
     func testCandidates() {

@@ -18,16 +18,28 @@ class PinyinTest {
             Triple("ㄏㄞ", "還", -3.2), Triple("ㄏㄜ", "和", -3.0), Triple("ㄒㄧ", "西", -3.5), Triple("ㄢ", "安", -3.6),
             Triple("ㄒㄧ-ㄢ", "西安", -5.0), Triple("ㄒㄧㄢ", "先", -3.4), Triple("ㄓㄨㄥ-ㄍㄨㄛ", "中國", -3.5),
             Triple("ㄌㄩ-ㄙㄜ", "綠色", -4.5), Triple("ㄊㄞ-ㄨㄢ", "臺灣", -4.0),
+            Triple("ㄏㄨㄟ", "會", -2.5), Triple("ㄌㄞ", "來", -3.0), Triple("ㄌㄚ", "啦", -3.5),
+            Triple("ㄏㄨㄟ-ㄌㄞ", "回來", -4.0), Triple("ㄏㄠ-ㄌㄚ", "好啦", -4.5),
         )
         val table = mapOf(
             "ni" to "ㄋㄧ", "hao" to "ㄏㄠ", "hai" to "ㄏㄞ", "he" to "ㄏㄜ", "xi" to "ㄒㄧ", "an" to "ㄢ",
             "xian" to "ㄒㄧㄢ", "zhong" to "ㄓㄨㄥ", "guo" to "ㄍㄨㄛ", "lv" to "ㄌㄩ", "se" to "ㄙㄜ",
-            "tai" to "ㄊㄞ", "wan" to "ㄨㄢ",
+            "tai" to "ㄊㄞ", "wan" to "ㄨㄢ", "hui" to "ㄏㄨㄟ", "lai" to "ㄌㄞ", "la" to "ㄌㄚ",
         )
         return PinyinEngine(ZhuyinEngine(MemoryPhraseSource(rows), UserPhraseModel(null)), table)
     }
 
     private fun pieces(p: PinyinEngine, s: String) = p.segment(s).pieces.map { it.pinyin }
+
+    /** 用簡拼（h、hl）選過的字，打完整拼音時不能搶到第一個（hao 是「好」不是「會」） */
+    @Test fun abbreviationPicksDoNotBeatFullPinyin() {
+        val p = pinyin()
+        p.engine.learn(listOf("ㄏ*"), "會")
+        p.engine.learn(listOf("ㄏ*", "ㄌ*"), "好啦")
+        assertEquals("好", p.candidates("hao").first().text)
+        assertEquals("回來", p.candidates("huilai").first().text)
+        assertEquals("好啦", p.candidates("hl").first().text)
+    }
 
     @Test fun segmentation() {
         val p = pinyin()

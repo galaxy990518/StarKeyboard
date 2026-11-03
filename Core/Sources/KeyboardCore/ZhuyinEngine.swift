@@ -997,15 +997,22 @@ final class UserPhraseModel {
             let parts = readingParts[saved]!
             guard parts.count == query.count else { continue }
             let matches = zip(query, parts).allSatisfy { want, have in
+                // 反過來比（存的是沒打完的音）只限至少打了兩個注音的；只打聲母（簡拼 h）選過的字，
+                // 不能讓它在打完整讀音（hao）時排到前面（「好」變成「會」）
                 want == have ||
                 ZhuyinEngine.matchPenalty([want], [have]) != nil ||
-                ZhuyinEngine.matchPenalty([have], [want]) != nil
+                (Self.typedSymbols(have) >= 2 && ZhuyinEngine.matchPenalty([have], [want]) != nil)
             }
             if matches { merge(counts[saved] ?? [:], recency[saved] ?? [:]) }
         }
         if prefCache.count >= 512 { prefCache.removeAll() }
         prefCache[reading] = result
         return result
+    }
+
+    /// 一個音節實際打了幾個注音（不算 * ~ 和聲調）
+    private static func typedSymbols(_ part: Substring) -> Int {
+        part.filter { $0 != "*" && $0 != "~" && !Bopomofo.tones.contains($0) }.count
     }
 
     /// 每個音節只留第一個注音，讓「選過的完整讀音」在簡拼時也排前面。
