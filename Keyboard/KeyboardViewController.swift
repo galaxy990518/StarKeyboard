@@ -1598,7 +1598,7 @@ final class KeyboardViewController: UIInputViewController {
                 toast("要先開啟「允許完整取用」")
                 return
             }
-            guard let img = UIPasteboard.general.image, let data = img.resized(maxSide: 512).pngData() else {
+            guard let img = UIPasteboard.general.downsampledImage(maxSide: 512), let data = img.pngData() else {
                 toast("剪貼簿裡沒有圖片，先到相簿「拷貝」一張")
                 return
             }
@@ -1769,7 +1769,8 @@ final class KeyboardViewController: UIInputViewController {
         let url = settings.hasBackground ? settings.currentPhotoURL : nil
         guard url?.path != loadedPhoto || (url != nil && backgroundImage == nil) else { return }
         loadedPhoto = url?.path
-        backgroundImage = url.flatMap { UIImage(contentsOfFile: $0.path) }
+        // 照片存的時候已經縮到 1000；舊版存的大照片也在這裡縮小再用
+        backgroundImage = url.flatMap { UIImage.downsampled(url: $0, maxSide: 1200) }
     }
 
     private func pasteBackground() {
@@ -1777,11 +1778,10 @@ final class KeyboardViewController: UIInputViewController {
             toast("要先開啟「允許完整取用」")
             return
         }
-        guard let img = UIPasteboard.general.image else {
+        guard let small = UIPasteboard.general.downsampledImage(maxSide: 1000) else {
             toast("剪貼簿裡沒有圖片，先到相簿「拷貝」一張")
             return
         }
-        let small = img.resized(maxSide: 1000)
         guard let data = small.jpegData(compressionQuality: 0.85) else { return }
         do {
             // 對準臉；找不到臉就偏上面一點（人像的頭通常在上面）
@@ -1834,7 +1834,7 @@ final class KeyboardViewController: UIInputViewController {
             if let gif = pb.data(forPasteboardType: "com.compuserve.gif") {
                 guard gif.count <= SpaceArt.maxBytes else { toast("這個 GIF 太大了（超過 3MB），換小一點的"); return }
                 try SpaceArt.save(gifData: gif)
-            } else if let img = pb.image {
+            } else if let img = pb.downsampledImage(maxSide: 200) {
                 try SpaceArt.save(image: img)
             } else {
                 toast("剪貼簿裡沒有圖片，先「拷貝」一張圖片或 GIF")
@@ -2029,7 +2029,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func updateHeight() {
-        let fiveRows = mode == .zhuyin && layer == .letters
+        let fiveRows = (mode == .zhuyin || mode == .pinyin) && layer == .letters
         let content: CGFloat
         if isLandscape {
             content = fiveRows ? 196 : 164

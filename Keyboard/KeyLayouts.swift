@@ -26,7 +26,7 @@ enum InputMode: String, CaseIterable {
     }
 }
 
-enum KeyboardLayer { case letters, numbers, symbols }
+enum KeyboardLayer { case letters, numbers, symbols, numpad }
 enum ShiftState { case off, on, locked }
 enum PanelKind: String { case emoji, kaomoji, symbols, clipboard, settings }
 
@@ -99,6 +99,7 @@ enum KeyLayouts {
             }
         case .numbers: return chinese ? chineseNumbers(c) : englishNumbers(c)
         case .symbols: return chinese ? chineseSymbols(c) : englishSymbols(c)
+        case .numpad: return numpad(c)
         }
     }
 
@@ -125,7 +126,9 @@ enum KeyLayouts {
     private static func bottomRow(_ c: Context, columns: CGFloat) -> [KeySpec] {
         let k = columns / 10
         let layerKey: KeySpec
-        if c.layer == .letters {
+        if c.layer == .letters && c.mode == .pinyin {
+            layerKey = KeySpec(face: .text("!#1"), action: .layer(.numbers), width: 1.3 * k, kind: .special, fontSize: 16)
+        } else if c.layer == .letters {
             layerKey = KeySpec(face: .text("123"), action: .layer(.numbers), width: 1.3 * k, kind: .special, fontSize: 16)
         } else {
             let title: String
@@ -143,7 +146,21 @@ enum KeyLayouts {
         if c.needsGlobe {
             row.append(KeySpec(face: .symbol("globe"), action: .globe, width: 1.1 * k, kind: .special))
         }
-        row.append(KeySpec(face: .text(c.nextModeTitle), action: .nextMode, width: 1.1 * k, kind: .special, fontSize: 17))
+        if c.layer == .letters {
+            row.append(KeySpec(face: .text(c.nextModeTitle), action: .nextMode, width: 1.1 * k, kind: .special, fontSize: 17))
+        } else {
+            // 123 和符號頁：這格換成大顆的數字鍵盤
+            row.append(KeySpec(face: .text("數字"), action: .layer(.numpad), width: 1.1 * k, kind: .special, fontSize: 15))
+        }
+        if c.layer == .letters && c.mode == .pinyin {
+            // 拼音照三星的排法：空白鍵兩邊是逗號、句號，右邊是數字鍵盤
+            row.append(KeySpec(face: .text("，"), action: .text("，"), width: 0.9 * k, fontSize: 20))
+            row.append(KeySpec(face: .text(c.spaceTitle), action: .space, width: 0, fontSize: 15))
+            row.append(KeySpec(face: .text("。"), action: .text("。"), width: 0.9 * k, fontSize: 20))
+            row.append(KeySpec(face: .text("123"), action: .layer(.numpad), width: 1.1 * k, kind: .special, fontSize: 16))
+            row.append(KeySpec(face: .text(c.returnTitle), action: .returnKey, width: 1.6 * k, kind: .accent, fontSize: 16))
+            return row
+        }
         if !c.needsGlobe {
             row.append(KeySpec(face: .symbol("face.smiling"), action: .panel(.emoji), width: 1.1 * k, kind: .special))
         }
@@ -212,7 +229,7 @@ enum KeyLayouts {
                               columns: 10)
     }
 
-    /// 漢語拼音：左下角是分音節的「'」（例如 xi'an）
+    /// 漢語拼音（照三星鍵盤）：最上面一排數字，左下角是分音節的「'」（例如 xi'an）
     private static func pinyin(_ c: Context) -> KeyboardLayout {
         func letters(_ s: String) -> [KeySpec] {
             s.map { KeySpec(face: .text(String($0)), action: .pinyin($0), fontSize: 24) }
@@ -220,8 +237,32 @@ enum KeyLayouts {
         var row3 = [KeySpec(face: .text("'"), action: .pinyin("'"), width: 1.4, kind: .special, fontSize: 22)]
         row3 += letters("zxcvbnm")
         row3.append(backspace())
-        return KeyboardLayout(rows: [letters("qwertyuiop"), letters("asdfghjkl"), row3, bottomRow(c, columns: 10)],
+        return KeyboardLayout(rows: [keys("1234567890", size: 20), letters("qwertyuiop"), letters("asdfghjkl"), row3, bottomRow(c, columns: 10)],
                               columns: 10)
+    }
+
+    /// 大顆的數字鍵盤（打電話號碼、金額用）：中間 1–9、0，兩邊常用符號
+    private static func numpad(_ c: Context) -> KeyboardLayout {
+        let back: String
+        switch c.mode {
+        case .zhuyin: back = "ㄅㄆㄇ"
+        case .english: back = "ABC"
+        case .handwriting: back = "手寫"
+        case .korean: back = "한글"
+        case .japanese: back = "かな"
+        case .pinyin: back = "拼音"
+        }
+        func side(_ s: String) -> KeySpec { KeySpec(face: .text(s), action: .text(s), kind: .special, fontSize: 22) }
+        return KeyboardLayout(rows: [
+            [side("-")] + keys("123", size: 26) + [backspace(1)],
+            [side("@")] + keys("456", size: 26) + [side(".")],
+            [side(":")] + keys("789", size: 26) + [side(",")],
+            [KeySpec(face: .text("!#1"), action: .layer(.numbers), kind: .special, fontSize: 16),
+             KeySpec(face: .text(back), action: .layer(.letters), kind: .special, fontSize: 14)]
+                + keys("0", size: 26)
+                + [KeySpec(face: .symbol("space"), action: .space, kind: .special),
+                   KeySpec(face: .text(c.returnTitle), action: .returnKey, kind: .accent, fontSize: 15)],
+        ], columns: 5)
     }
 
     private static func englishNumbers(_ c: Context) -> KeyboardLayout {

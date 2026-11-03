@@ -6,7 +6,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
-import android.graphics.BitmapFactory
 import android.graphics.drawable.GradientDrawable
 import android.inputmethodservice.InputMethodService
 import android.media.AudioManager
@@ -1733,7 +1732,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             val file = settings.backgroundFile
             val stamp = file.path + ":" + file.lastModified()
             if (stamp != backgroundStamp || bgImage.drawable == null) {
-                bgImage.setImageBitmap(BitmapFactory.decodeFile(file.path))
+                bgImage.setImageBitmap(decodeSmall(file.path, 1400))
                 backgroundStamp = stamp
             }
             if (photoAdjust == null) {
@@ -1800,7 +1799,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     private fun contentHeight(): Int {
-        val fiveRows = mode == InputMode.ZHUYIN && layer == KeyboardLayer.LETTERS
+        val fiveRows = (mode == InputMode.ZHUYIN || mode == InputMode.PINYIN) && layer == KeyboardLayer.LETTERS
         val base = if (isLandscape) (if (fiveRows) 196f else 164f) else (if (fiveRows) 252f else 216f)
         val scale = if (isLandscape) minOf(settings.heightScale, 1.1f) else settings.heightScale
         return (base * scale * dp).toInt()

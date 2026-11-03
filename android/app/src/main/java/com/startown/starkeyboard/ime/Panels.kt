@@ -3,7 +3,6 @@ package com.startown.starkeyboard.ime
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
@@ -119,7 +118,7 @@ class EmojiPanel(
     }
 
     private fun bitmap(name: String): Bitmap? = bitmaps.getOrPut(name) {
-        store.stickerFile(name)?.takeIf { it.exists() }?.let { BitmapFactory.decodeFile(it.path) }
+        store.stickerFile(name)?.takeIf { it.exists() }?.let { decodeSmall(it.path, 180) }
     }
 
     private fun tapped(i: Int) {

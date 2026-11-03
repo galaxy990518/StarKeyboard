@@ -3,7 +3,7 @@ package com.startown.starkeyboard.ime
 import com.startown.starkeyboard.core.Bopomofo
 import com.startown.starkeyboard.core.SymbolPages
 
-enum class KeyboardLayer { LETTERS, NUMBERS, SYMBOLS }
+enum class KeyboardLayer { LETTERS, NUMBERS, SYMBOLS, NUMPAD }
 enum class ShiftState { OFF, ON, LOCKED }
 enum class PanelKind { EMOJI, KAOMOJI, SYMBOLS, CLIPBOARD, SETTINGS }
 
@@ -63,6 +63,7 @@ object KeyLayouts {
             }
             KeyboardLayer.NUMBERS -> if (chinese) chineseNumbers(c) else englishNumbers(c)
             KeyboardLayer.SYMBOLS -> if (chinese) chineseSymbols(c) else englishSymbols(c)
+            KeyboardLayer.NUMPAD -> numpad(c)
         }
     }
 
@@ -86,7 +87,20 @@ object KeyLayouts {
 
     private fun bottomRow(c: Context, columns: Float): List<KeySpec> {
         val k = columns / 10f
-        val layerKey = if (c.layer == KeyboardLayer.LETTERS) {
+        val letters = c.layer == KeyboardLayer.LETTERS
+        if (letters && c.mode == InputMode.PINYIN) {
+            // 拼音照三星的排法：!#1 開符號、空白鍵兩邊是逗號句號、123 開數字鍵盤
+            return listOf(
+                KeySpec("!#1", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.3f * k, KeyKind.SPECIAL, 16f),
+                KeySpec(c.nextModeTitle, KeyAction.NextMode, 1.1f * k, KeyKind.SPECIAL, 17f),
+                KeySpec("，", KeyAction.Text("，"), 0.9f * k, KeyKind.NORMAL, 20f),
+                KeySpec(c.spaceTitle, KeyAction.Space, 0f, KeyKind.NORMAL, 15f),
+                KeySpec("。", KeyAction.Text("。"), 0.9f * k, KeyKind.NORMAL, 20f),
+                KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMPAD), 1.1f * k, KeyKind.SPECIAL, 16f),
+                KeySpec(c.returnTitle, KeyAction.Return, 1.6f * k, KeyKind.ACCENT, 16f),
+            )
+        }
+        val layerKey = if (letters) {
             KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.3f * k, KeyKind.SPECIAL, 16f)
         } else {
             val title = when (c.mode) {
@@ -101,7 +115,9 @@ object KeyLayouts {
         }
         return listOf(
             layerKey,
-            KeySpec(c.nextModeTitle, KeyAction.NextMode, 1.1f * k, KeyKind.SPECIAL, 17f),
+            // 123 和符號頁：這格換成大顆的數字鍵盤
+            if (letters) KeySpec(c.nextModeTitle, KeyAction.NextMode, 1.1f * k, KeyKind.SPECIAL, 17f)
+            else KeySpec("數字", KeyAction.Layer(KeyboardLayer.NUMPAD), 1.1f * k, KeyKind.SPECIAL, 15f),
             KeySpec("☺︎", KeyAction.Panel(PanelKind.EMOJI), 1.1f * k, KeyKind.SPECIAL, 21f),
             KeySpec(c.spaceTitle, KeyAction.Space, 0f, KeyKind.NORMAL, 15f),
             KeySpec(c.returnTitle, KeyAction.Return, 2f * k, KeyKind.ACCENT, 16f),
@@ -137,11 +153,36 @@ object KeyLayouts {
         return KeyboardLayout(listOf(letters("qwertyuiop"), letters("asdfghjkl"), row3, bottomRow(c, 10f)), 10f)
     }
 
-    /** 漢語拼音：左下角是分音節的「'」（例如 xi'an） */
+    /** 漢語拼音（照三星鍵盤）：最上面一排數字，左下角是分音節的「'」（例如 xi'an） */
     private fun pinyin(c: Context): KeyboardLayout {
         fun letters(s: String) = s.map { KeySpec(it.toString(), KeyAction.Pinyin(it), fontSize = 24f) }
         val row3 = listOf(KeySpec("'", KeyAction.Pinyin('\''), 1.4f, KeyKind.SPECIAL, 22f)) + letters("zxcvbnm") + backspace()
-        return KeyboardLayout(listOf(letters("qwertyuiop"), letters("asdfghjkl"), row3, bottomRow(c, 10f)), 10f)
+        return KeyboardLayout(listOf(keys("1234567890", 20f), letters("qwertyuiop"), letters("asdfghjkl"), row3, bottomRow(c, 10f)), 10f)
+    }
+
+    /** 大顆的數字鍵盤（打電話號碼、金額用）：中間 1–9、0，兩邊常用符號 */
+    private fun numpad(c: Context): KeyboardLayout {
+        val back = when (c.mode) {
+            InputMode.ZHUYIN -> "ㄅㄆㄇ"
+            InputMode.ENGLISH -> "ABC"
+            InputMode.HANDWRITING -> "手寫"
+            InputMode.KOREAN -> "한글"
+            InputMode.JAPANESE -> "かな"
+            InputMode.PINYIN -> "拼音"
+        }
+        fun side(s: String) = KeySpec(s, KeyAction.Text(s), 1f, KeyKind.SPECIAL, 22f)
+        return KeyboardLayout(listOf(
+            listOf(side("-")) + keys("123", 26f) + backspace(1f),
+            listOf(side("@")) + keys("456", 26f) + side("."),
+            listOf(side(":")) + keys("789", 26f) + side(","),
+            listOf(
+                KeySpec("!#1", KeyAction.Layer(KeyboardLayer.NUMBERS), 1f, KeyKind.SPECIAL, 16f),
+                KeySpec(back, KeyAction.Layer(KeyboardLayer.LETTERS), 1f, KeyKind.SPECIAL, 14f),
+            ) + keys("0", 26f) + listOf(
+                KeySpec("␣", KeyAction.Space, 1f, KeyKind.SPECIAL, 20f),
+                KeySpec(c.returnTitle, KeyAction.Return, 1f, KeyKind.ACCENT, 15f),
+            ),
+        ), 5f)
     }
 
     private fun englishNumbers(c: Context): KeyboardLayout {

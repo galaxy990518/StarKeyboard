@@ -1199,4 +1199,35 @@ extension UIImage {
             draw(in: CGRect(origin: .zero, size: newSize))
         }
     }
+
+    /// 直接讀成小圖，不先把整張解開。手機照片整張解開要 40～50MB，鍵盤只有 60MB 左右可以用，會直接閃退。
+    static func downsampled(_ source: CGImageSource?, maxSide: CGFloat) -> UIImage? {
+        guard let src = source else { return nil }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxSide,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
+        return UIImage(cgImage: cg)
+    }
+
+    static func downsampled(url: URL, maxSide: CGFloat) -> UIImage? {
+        downsampled(CGImageSourceCreateWithURL(url as CFURL, nil), maxSide: maxSide)
+    }
+}
+
+extension UIPasteboard {
+    /// 剪貼簿裡的圖片，讀成小圖（不用 .image，那會把整張大照片解開）
+    func downsampledImage(maxSide: CGFloat) -> UIImage? {
+        let imageTypes = ["public.heic", "public.jpeg", "public.png", "com.compuserve.gif", "public.tiff", "public.image"]
+        for type in types where imageTypes.contains(type) || type.hasPrefix("public.") && type.contains("image") {
+            if let data = data(forPasteboardType: type),
+               let img = UIImage.downsampled(CGImageSourceCreateWithData(data as CFData, nil), maxSide: maxSide) {
+                return img
+            }
+        }
+        return hasImages ? image?.resized(maxSide: maxSide) : nil
+    }
 }

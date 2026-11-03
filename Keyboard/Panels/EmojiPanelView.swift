@@ -154,7 +154,9 @@ final class EmojiPanelView: UIView {
 
     private func image(for ref: StickerRef) -> UIImage? {
         if let img = imageCache[ref.id] { return img }
-        guard let url = store.stickerURL(ref), let img = UIImage(contentsOfFile: url.path) else { return nil }
+        // 貼圖只顯示成小格子：讀成小圖，太多張時先清掉（整張 512 的貼圖一張就 1MB）
+        guard let url = store.stickerURL(ref), let img = UIImage.downsampled(url: url, maxSide: 180) else { return nil }
+        if imageCache.count >= 80 { imageCache.removeAll() }
         imageCache[ref.id] = img
         return img
     }
