@@ -1221,9 +1221,8 @@ final class KeyboardViewController: UIInputViewController {
         case .kaomoji: togglePanel(.kaomoji)
         case .symbols: togglePanel(.symbols)
         case .voice:
-            let alert = UIAlertController(title: "語音輸入", message: "直接說話輸入：點鍵盤右下方的系統 🎙。若沒有麥克風，請到 iPhone 設定 → 一般 → 鍵盤 → 啟用聽寫；必要時長按 🌐 切到 Apple 鍵盤。\n\n也可打開桌面的「糯糯鍵盤」App → 語音轉文字，辨識後檢查並複製回來貼上。iPhone 不允許第三方鍵盤直接錄音。", preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "知道了", style: .cancel))
-            if presentedViewController == nil { present(alert, animated: true) }
+            // 鍵盤裡不能跳系統的提示框（會閃退），改成畫在鍵盤上的說明卡
+            showNotice(title: "語音輸入", message: "直接說話輸入：點鍵盤右下方的系統 🎙。若沒有麥克風，請到 iPhone 設定 → 一般 → 鍵盤 → 啟用聽寫；必要時長按 🌐 切到 Apple 鍵盤。\n\n也可打開桌面的「糯糯鍵盤」App → 語音轉文字，辨識後檢查並複製回來貼上。iPhone 不允許第三方鍵盤直接錄音。")
         case .settings: togglePanel(.settings)
         case .translate: beginEditor(.translate)
         case .fancy: beginEditor(.fancy)
@@ -2107,6 +2106,62 @@ final class KeyboardViewController: UIInputViewController {
             haptic.impactOccurred()
             haptic.prepare()   // 先暖機，下一次按才不會慢半拍
         }
+    }
+
+    /// 蓋在鍵盤上的說明卡（鍵盤裡不能用 UIAlertController），按「知道了」或點外面關掉
+    private func showNotice(title: String, message: String) {
+        closeNotice()
+        let t = style.theme
+        let dim = UIControl(frame: view.bounds)
+        dim.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        dim.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+        dim.addAction(UIAction { [weak self] _ in self?.closeNotice() }, for: .touchUpInside)
+        let card = UIView()
+        card.backgroundColor = t.isDark ? UIColor(white: 0.16, alpha: 1) : .white
+        card.layer.cornerRadius = 18
+        card.translatesAutoresizingMaskIntoConstraints = false
+        dim.addSubview(card)
+        let fg: UIColor = t.isDark ? .white : UIColor(white: 0.15, alpha: 1)
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = .rounded(17, .bold)
+        titleLabel.textColor = fg
+        let body = UILabel()
+        body.text = message
+        body.numberOfLines = 0
+        body.font = .rounded(14, .medium)
+        body.textColor = fg
+        body.adjustsFontSizeToFitWidth = true
+        body.minimumScaleFactor = 0.6
+        let ok = UIButton(type: .system)
+        ok.setTitle("知道了", for: .normal)
+        ok.titleLabel?.font = .rounded(16, .bold)
+        ok.tintColor = t.accent
+        ok.addAction(UIAction { [weak self] _ in self?.closeNotice() }, for: .touchUpInside)
+        let stack = UIStackView(arrangedSubviews: [titleLabel, body, ok])
+        stack.axis = .vertical
+        stack.spacing = 6
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(stack)
+        NSLayoutConstraint.activate([
+            card.leadingAnchor.constraint(equalTo: dim.leadingAnchor, constant: 12),
+            card.trailingAnchor.constraint(equalTo: dim.trailingAnchor, constant: -12),
+            card.topAnchor.constraint(equalTo: dim.topAnchor, constant: 8),
+            card.bottomAnchor.constraint(lessThanOrEqualTo: dim.bottomAnchor, constant: -8),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
+            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 12),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -6),
+        ])
+        view.addSubview(dim)
+        noticeView = dim
+    }
+
+    private var noticeView: UIView?
+
+    private func closeNotice() {
+        noticeView?.removeFromSuperview()
+        noticeView = nil
     }
 
     private func toast(_ text: String) {
