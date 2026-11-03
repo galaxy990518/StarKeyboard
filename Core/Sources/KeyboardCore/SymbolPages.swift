@@ -12,6 +12,9 @@ enum SymbolPages {
     /// 切成「半形」時：括號、冒號、分號、問號、驚嘆號改用半形（寫程式、英文混打用）
     static let zhuyinNumberRow2Half = "-/:;()$@「」"
     static let zhuyinNumberRow3Half = "。，、?!."
+    /// 123 頁的第三排（像三星鍵盤三排標點）
+    static let zhuyinNumberExtra = "+×÷=%&*#_~"
+    static let englishNumberExtra = "+×÷=%_<>#*"
     static let englishSymbolRow1 = "[]{}#%^*+="
     static let englishSymbolRow2 = "_\\|~<>€£¥`"
 

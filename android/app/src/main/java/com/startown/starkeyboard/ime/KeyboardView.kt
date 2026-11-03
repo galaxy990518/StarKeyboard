@@ -34,6 +34,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         if (showsPreview && k != null && k.spec.action.isCharacter && k.spec.label.length in 1..2) k else null
     /** 按住空白鍵上下滑：游標換到上一行（-1）或下一行（1） */
     var onCursorLine: ((Int) -> Unit)? = null
+    /** 手指按下去的那一刻（震動、按鍵聲） */
+    var onPress: (() -> Unit)? = null
     /** 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去 */
     var glideEnabled = false
     var onGlide: ((List<Pt>, Map<Char, Pt>, Float) -> Unit)? = null
@@ -116,6 +118,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.RIGHT }
 
     fun setLayout(newLayout: KeyboardLayout) {
+        popup = null
         layout = newLayout
         rebuildKeys()
     }
@@ -472,6 +475,82 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         invalidate()
     }
 
+    // ===== 按住跳出的標點清單 =====
+
+    private class Popup(val pointer: Int, val items: List<String>, val box: RectF, val cells: List<RectF>) {
+        var selected = -1
+    }
+    private var popup: Popup? = null
+    private val popupPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val popupText = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+
+    private fun showPopup(pointer: Int, key: Key, track: Track) {
+        val items = key.spec.popup
+        val perRow = minOf(items.size, 7)
+        val rowCount = (items.size + perRow - 1) / perRow
+        val cw = ((width - 12 * dp) / perRow).coerceIn(32 * dp, maxOf(32 * dp, 44 * dp))
+        val ch = (key.frame.height() * 0.9f).coerceIn(36 * dp, 46 * dp)
+        val w = cw * perRow + 8 * dp
+        val h = ch * rowCount + 8 * dp
+        val x = (key.frame.centerX() - w / 2).coerceIn(2 * dp, maxOf(2 * dp, width - w - 2 * dp))
+        val y = maxOf(0f, key.frame.top - h - 4 * dp)
+        val box = RectF(x, y, x + w, y + h)
+        val cells = items.indices.map { i ->
+            val cx = x + 4 * dp + (i % perRow) * cw
+            val cy = y + 4 * dp + (i / perRow) * ch
+            RectF(cx, cy, cx + cw, cy + ch)
+        }
+        popup = Popup(pointer, items, box, cells)
+        onPress?.invoke()
+        selectPopup(track.startX, track.startY)
+        invalidate()
+    }
+
+    /** 手指在哪一格就選哪一格；離清單太遠就不選（放開等於取消） */
+    private fun selectPopup(px: Float, py: Float) {
+        val p = popup ?: return
+        var best = -1
+        val near = RectF(p.box).apply { inset(-24 * dp, -60 * dp) }
+        if (near.contains(px, py)) {
+            var bestD = Float.MAX_VALUE
+            p.cells.forEachIndexed { i, c ->
+                val d = Math.hypot((c.centerX() - px).toDouble(), (c.centerY() - py).toDouble()).toFloat()
+                if (d < bestD) { bestD = d; best = i }
+            }
+        }
+        if (best == p.selected) return
+        p.selected = best
+        if (best >= 0) onPress?.invoke()
+        invalidate()
+    }
+
+    private fun closePopup(commit: Boolean) {
+        val p = popup ?: return
+        popup = null
+        invalidate()
+        if (commit && p.selected in p.items.indices) {
+            val s = p.items[p.selected]
+            onKey?.invoke(KeySpec(s, KeyAction.Text(s)))
+        }
+    }
+
+    override fun onDrawForeground(canvas: Canvas) {
+        super.onDrawForeground(canvas)
+        val p = popup ?: return
+        popupPaint.color = android.graphics.Color.argb(248, 43, 43, 43)
+        canvas.drawRoundRect(p.box, 12 * dp, 12 * dp, popupPaint)
+        popupText.textSize = 20 * dp
+        val fm = popupText.fontMetrics
+        p.cells.forEachIndexed { i, c ->
+            if (i == p.selected) {
+                popupPaint.color = style.theme.accent
+                canvas.drawRoundRect(c, 8 * dp, 8 * dp, popupPaint)
+            }
+            popupText.color = if (i == p.selected) style.theme.accentText else android.graphics.Color.WHITE
+            canvas.drawText(p.items[i], c.centerX(), c.centerY() - (fm.ascent + fm.descent) / 2, popupText)
+        }
+    }
+
     private fun fire(k: Key) {
         onKey?.invoke(k.spec)
     }
@@ -484,6 +563,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 val key = keyAt(e.getX(i), e.getY(i)) ?: return true
                 // 先亮起這顆鍵，再送出上一拍還沒放開的字。選字不能擋住按鍵變色。
                 setPressed(key, true)
+                onPress?.invoke()
                 val track = Track(key, key.spec.action, e.getX(i), e.getY(i))
                 previewKey = previewFor(key)
                 if (glideEnabled && key.isLetter) track.points.add(Pt(e.getX(i), e.getY(i)))
@@ -516,16 +596,18 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                         longPressRunnable = r
                         mainHandler.postDelayed(r, 500)
                     }
-                    else -> if (key.spec.hint.isNotEmpty()) {
+                    else -> if (key.spec.hint.isNotEmpty() || key.spec.popup.isNotEmpty()) {
                         // 長按有小字的鍵：打出右上角那個字（數字、字母、句號）
                         val hint = key.spec.hint
+                        val pid = e.getPointerId(i)   // MotionEvent 之後會被回收，先記下手指編號
                         mainHandler.postDelayed({
                             if (!track.fired && !track.cursorMode && !track.gliding && track.key === key && tracks.containsValue(track)) {
                                 track.fired = true
                                 setPressed(key, false)
                                 previewKey = null
                                 invalidate()
-                                onKey?.invoke(KeySpec(hint, KeyAction.Text(hint)))
+                                if (key.spec.popup.isNotEmpty()) showPopup(pid, key, track)
+                                else onKey?.invoke(KeySpec(hint, KeyAction.Text(hint)))
                             }
                         }, 450)
                     }
@@ -533,6 +615,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             }
             MotionEvent.ACTION_MOVE -> {
                 for (i in 0 until e.pointerCount) {
+                    if (popup?.pointer == e.getPointerId(i)) { selectPopup(e.getX(i), e.getY(i)); continue }
                     val t = tracks[e.getPointerId(i)] ?: continue
                     if (t.fired) continue
                     val x = e.getX(i)
@@ -577,6 +660,11 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                if (popup?.pointer == e.getPointerId(e.actionIndex)) {
+                    tracks.remove(e.getPointerId(e.actionIndex))?.let { setPressed(it.key, false) }
+                    closePopup(true)
+                    return true
+                }
                 val t = tracks.remove(e.getPointerId(e.actionIndex)) ?: return true
                 setPressed(t.key, false)
                 if (tracks.isEmpty() || previewKey === t.key) { previewKey = null; invalidate() }
@@ -590,6 +678,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 } else if (!t.fired && !t.cursorMode && t.action != KeyAction.Backspace && t.action != KeyAction.Shift) fire(t.key)
             }
             MotionEvent.ACTION_CANCEL -> {
+                closePopup(false)
                 val pending = tracks.values.filter { !it.fired && !it.cursorMode && !it.gliding && it.action.isCharacter }
                 for (t in tracks.values) setPressed(t.key, false)
                 tracks.clear()

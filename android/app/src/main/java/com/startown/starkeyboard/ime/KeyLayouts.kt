@@ -36,7 +36,12 @@ data class KeySpec(
     val kind: KeyKind = KeyKind.NORMAL,
     val fontSize: Float = 23f,
     val hint: String = "",          // 右上角的小字：長按這顆鍵會打出它（Gboard 式注音的數字、字母）
-)
+    val popup: List<String> = emptyList(),   // 按住會跳出一排字，手指滑過去放開就打出那個
+) {
+    companion object {
+        val PUNCTUATION_POPUP = listOf("，", "。", "？", "！", "、", "：", "；", "…", "「", "」", "～", "@", "#", "%")
+    }
+}
 
 data class KeyboardLayout(val rows: List<List<KeySpec>>, val columns: Float)
 
@@ -95,9 +100,9 @@ object KeyLayouts {
             return listOf(
                 KeySpec("!#1", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.3f * k, KeyKind.SPECIAL, 16f),
                 KeySpec(c.nextModeTitle, KeyAction.NextMode, 1.1f * k, KeyKind.SPECIAL, 17f),
-                KeySpec("，", KeyAction.Text("，"), 0.9f * k, KeyKind.NORMAL, 20f),
+                KeySpec("，", KeyAction.Text("，"), 0.9f * k, KeyKind.NORMAL, 20f, popup = KeySpec.PUNCTUATION_POPUP),
                 KeySpec(c.spaceTitle, KeyAction.Space, 0f, KeyKind.NORMAL, 15f),
-                KeySpec("。", KeyAction.Text("。"), 0.9f * k, KeyKind.NORMAL, 20f),
+                KeySpec("。", KeyAction.Text("。"), 0.9f * k, KeyKind.NORMAL, 20f, popup = KeySpec.PUNCTUATION_POPUP),
                 KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMPAD), 1.1f * k, KeyKind.SPECIAL, 16f),
                 KeySpec("↵", KeyAction.Return, 1.6f * k, KeyKind.ACCENT, 22f),
             )
@@ -148,7 +153,7 @@ object KeyLayouts {
         val bottom = listOf(
             KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.2f, KeyKind.SPECIAL, 16f),
             KeySpec(c.nextModeTitle, KeyAction.NextMode, 1f, KeyKind.SPECIAL, 17f),
-            KeySpec("，", KeyAction.Text("，"), 1f, KeyKind.NORMAL, 20f, hint = "。"),
+            KeySpec("，", KeyAction.Text("，"), 1f, KeyKind.NORMAL, 20f, hint = "。", popup = KeySpec.PUNCTUATION_POPUP),
             KeySpec(c.spaceTitle, KeyAction.Space, 0f, KeyKind.NORMAL, 15f),
             KeySpec("ㄦ", KeyAction.Zhuyin('ㄦ'), 1f, KeyKind.NORMAL, 21f),
             backspace(1.2f),
@@ -213,7 +218,7 @@ object KeyLayouts {
 
     private fun englishNumbers(c: Context): KeyboardLayout {
         val row3 = listOf(KeySpec("#+=", KeyAction.Layer(KeyboardLayer.SYMBOLS), 1.4f, KeyKind.SPECIAL, 16f)) + keys(".,?!'", width = 1.4f) + backspace()
-        return KeyboardLayout(listOf(keys("1234567890"), keys("-/:;()\$&@\""), row3, bottomRow(c, 10f)), 10f)
+        return KeyboardLayout(listOf(keys("1234567890"), keys("-/:;()\$&@\""), keys(SymbolPages.ENGLISH_NUMBER_EXTRA), row3, bottomRow(c, 10f)), 10f)
     }
 
     private fun englishSymbols(c: Context): KeyboardLayout {
@@ -227,7 +232,8 @@ object KeyLayouts {
         val toggle = KeySpec(if (full) "全形" else "半形", KeyAction.ToggleWidth, 1.1f, KeyKind.SPECIAL, 14f)
         val row3 = listOf(KeySpec("#+=", KeyAction.Layer(KeyboardLayer.SYMBOLS), 1.25f, KeyKind.SPECIAL, 16f)) +
             keys(if (full) SymbolPages.ZHUYIN_NUMBER_ROW3 else SymbolPages.ZHUYIN_NUMBER_ROW3_HALF, 20f, 1.05f) + toggle + backspace(1.35f)
-        return KeyboardLayout(listOf(keys("1234567890"), keys(if (full) SymbolPages.ZHUYIN_NUMBER_ROW2 else SymbolPages.ZHUYIN_NUMBER_ROW2_HALF, 20f), row3, bottomRow(c, 10f)), 10f)
+        return KeyboardLayout(listOf(keys("1234567890"), keys(if (full) SymbolPages.ZHUYIN_NUMBER_ROW2 else SymbolPages.ZHUYIN_NUMBER_ROW2_HALF, 20f),
+            keys(SymbolPages.ZHUYIN_NUMBER_EXTRA, 20f), row3, bottomRow(c, 10f)), 10f)
     }
 
     /** 注音的 #+= 頁。Markdown 用的符號永遠半形；中文標點維持全形。 */

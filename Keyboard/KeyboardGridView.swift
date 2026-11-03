@@ -309,6 +309,8 @@ final class KeyboardGridView: UIView {
     var onCursorMove: ((Int) -> Void)?
     /// 按住空白鍵上下滑：游標換到上一行（-1）或下一行（1）
     var onCursorLine: ((Int) -> Void)?
+    /// 手指按下去的那一刻（震動、按鍵聲）
+    var onPress: (() -> Void)?
     /// 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去
     var glideEnabled = false
     var onGlide: (([CGPoint], [Character: CGPoint], CGFloat) -> Void)?
@@ -383,6 +385,7 @@ final class KeyboardGridView: UIView {
 
     // 按鍵物件會重用，所以換版面時手指還按著也不會出錯
     func setLayout(_ newLayout: KeyboardLayout) {
+        closePopup(commit: false)
         layout = newLayout
         let specs = newLayout.rows.flatMap { $0 }
         while keys.count > specs.count {
@@ -473,7 +476,86 @@ final class KeyboardGridView: UIView {
             track.fired = true
             self.tracks[touch] = track
             key.isPressed = false
-            self.onKey?(KeySpec(face: .text(hint), action: .text(hint)))
+            if !key.spec.popup.isEmpty {
+                self.showPopup(touch, key)
+            } else {
+                self.onKey?(KeySpec(face: .text(hint), action: .text(hint)))
+            }
+        }
+    }
+
+    // MARK: 按住跳出的標點清單
+
+    private final class Popup {
+        let touch: UITouch
+        let view: UIView
+        let items: [String]
+        var cells: [UILabel] = []
+        var selected = -1
+        init(touch: UITouch, view: UIView, items: [String]) { self.touch = touch; self.view = view; self.items = items }
+    }
+    private var popup: Popup?
+
+    private func showPopup(_ touch: UITouch, _ key: KeyButton) {
+        closePopup(commit: false)
+        let items = key.spec.popup
+        let perRow = min(items.count, 7)
+        let rowCount = (items.count + perRow - 1) / perRow
+        let cw = max(32, min(44, (bounds.width - 12) / CGFloat(perRow)))
+        let ch = max(36, min(46, key.bounds.height * 0.9))
+        let w = cw * CGFloat(perRow) + 8, h = ch * CGFloat(rowCount) + 8
+        let x = min(max(2, key.frame.midX - w / 2), bounds.width - w - 2)
+        let y = max(0, key.frame.minY - h - 4)
+        let v = UIView(frame: CGRect(x: x, y: y, width: w, height: h))
+        v.backgroundColor = UIColor(white: 0.17, alpha: 0.97)
+        v.layer.cornerRadius = 12
+        v.isUserInteractionEnabled = false
+        let p = Popup(touch: touch, view: v, items: items)
+        for (i, s) in items.enumerated() {
+            let l = UILabel(frame: CGRect(x: 4 + CGFloat(i % perRow) * cw, y: 4 + CGFloat(i / perRow) * ch, width: cw, height: ch))
+            l.text = s
+            l.textAlignment = .center
+            l.textColor = .white
+            l.font = .systemFont(ofSize: 20, weight: .medium)
+            l.layer.cornerRadius = 8
+            l.clipsToBounds = true
+            v.addSubview(l)
+            p.cells.append(l)
+        }
+        addSubview(v)
+        popup = p
+        onPress?()
+        selectPopup(at: touch.location(in: self))
+    }
+
+    /// 手指在哪一格就選哪一格；離清單太遠就不選（放開等於取消）
+    private func selectPopup(at point: CGPoint) {
+        guard let p = popup else { return }
+        let local = p.view.convert(point, from: self)
+        var best = -1
+        if p.view.bounds.insetBy(dx: -24, dy: -60).contains(local) {
+            var bestD = CGFloat.greatestFiniteMagnitude
+            for (i, c) in p.cells.enumerated() {
+                let d = hypot(c.center.x - local.x, c.center.y - local.y)
+                if d < bestD { bestD = d; best = i }
+            }
+        }
+        guard best != p.selected else { return }
+        p.selected = best
+        for (i, c) in p.cells.enumerated() {
+            c.backgroundColor = i == best ? style.theme.accent : .clear
+            c.textColor = i == best ? style.theme.accentText : .white
+        }
+        if best >= 0 { onPress?() }
+    }
+
+    private func closePopup(commit: Bool) {
+        guard let p = popup else { return }
+        popup = nil
+        p.view.removeFromSuperview()
+        if commit, p.items.indices.contains(p.selected) {
+            let s = p.items[p.selected]
+            onKey?(KeySpec(face: .text(s), action: .text(s)))
         }
     }
 
@@ -517,12 +599,13 @@ final class KeyboardGridView: UIView {
             fire(track.key)
         }
         for (touch, key) in fresh {
+            onPress?()
             let p = touch.location(in: self)
             var track = Track(key: key, action: key.spec.action, origin: p)
             if glideEnabled && isLetter(key) { track.points.append(p) }
             spawnEffect(from: key)
             tracks[touch] = track
-            if !key.spec.hint.isEmpty { startHint(touch, key) }
+            if !key.spec.hint.isEmpty || !key.spec.popup.isEmpty { startHint(touch, key) }
             switch key.spec.action {
             case .backspace:
                 track.fired = true
@@ -543,6 +626,10 @@ final class KeyboardGridView: UIView {
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches {
+            if let p = popup, p.touch === touch {
+                selectPopup(at: touch.location(in: self))
+                continue
+            }
             guard var track = tracks[touch], !track.fired else { continue }
             let p = touch.location(in: self)
             if track.key.spec.action == .space {
@@ -585,6 +672,11 @@ final class KeyboardGridView: UIView {
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches.sorted(by: touchOrder) {
+            if let p = popup, p.touch === touch {
+                if let t = tracks.removeValue(forKey: touch) { t.key.isPressed = false }
+                closePopup(commit: true)
+                continue
+            }
             guard let track = tracks.removeValue(forKey: touch) else { continue }
             track.key.isPressed = false
             switch track.action {
@@ -606,6 +698,7 @@ final class KeyboardGridView: UIView {
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         // 系統把觸控取消時仍送出已經按下的字，避免快速打字時整段注音消失。
+        if let p = popup, touches.contains(p.touch) { closePopup(commit: false) }
         for touch in touches.sorted(by: touchOrder) {
             guard let track = tracks.removeValue(forKey: touch) else { continue }
             track.key.isPressed = false

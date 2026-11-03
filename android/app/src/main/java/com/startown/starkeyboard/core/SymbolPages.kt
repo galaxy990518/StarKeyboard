@@ -10,6 +10,9 @@ object SymbolPages {
     /** 切成「半形」時：括號、冒號、分號、問號、驚嘆號改用半形 */
     const val ZHUYIN_NUMBER_ROW2_HALF = "-/:;()$@「」"
     const val ZHUYIN_NUMBER_ROW3_HALF = "。，、?!."
+    /** 123 頁的第三排（像三星鍵盤三排標點） */
+    const val ZHUYIN_NUMBER_EXTRA = "+×÷=%&*#_~"
+    const val ENGLISH_NUMBER_EXTRA = "+×÷=%_<>#*"
     const val ENGLISH_SYMBOL_ROW1 = "[]{}#%^*+="
     const val ENGLISH_SYMBOL_ROW2 = "_\\|~<>€£¥`"
 

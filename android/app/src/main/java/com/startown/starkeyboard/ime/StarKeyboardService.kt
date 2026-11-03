@@ -309,6 +309,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun wire() {
         keyboard.onKey = { handle(it) }
+        // 手指一按下去就震動、出聲（不用等放開）
+        keyboard.onPress = { feedback() }
         keyboard.onLongPress = { showImePicker() }
         keyboard.onCursorMove = { steps -> moveCursor(steps) }   // 注音中間、編輯框的游標都在 moveCursor 裡處理
         keyboard.onCursorLine = { dir ->
@@ -406,7 +408,6 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     // ===== 按鍵 =====
 
     private fun handle(spec: KeySpec) {
-        feedback()
         val pending = lastAutocorrect
         lastAutocorrect = null
         val action = spec.action
@@ -1800,7 +1801,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     private fun contentHeight(): Int {
-        val fiveRows = (mode == InputMode.ZHUYIN || mode == InputMode.PINYIN) && layer == KeyboardLayer.LETTERS
+        val fiveRows = (mode == InputMode.ZHUYIN || mode == InputMode.PINYIN) && layer == KeyboardLayer.LETTERS || layer == KeyboardLayer.NUMBERS
         val base = if (isLandscape) (if (fiveRows) 196f else 164f) else (if (fiveRows) 252f else 216f)
         val scale = if (isLandscape) minOf(settings.heightScale, 1.1f) else settings.heightScale
         return (base * scale * dp).toInt()
@@ -1879,7 +1880,27 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun feedback() {
         if (settings.keySound) playKeySound()
-        if (settings.haptics) root?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING)
+        if (settings.haptics) buzz()
+    }
+
+    private val vibrator: android.os.Vibrator? by lazy {
+        if (android.os.Build.VERSION.SDK_INT >= 31) getSystemService(android.os.VibratorManager::class.java)?.defaultVibrator
+        else @Suppress("DEPRECATION") getSystemService(android.os.Vibrator::class.java)
+    }
+
+    /** 直接叫手機震一下：三星等手機把系統「觸控回饋」關掉時，舊的做法完全不會震 */
+    private fun buzz() {
+        val v = vibrator
+        if (v == null || !v.hasVibrator()) {
+            root?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING)
+            return
+        }
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 29) v.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_CLICK))
+            else v.vibrate(android.os.VibrationEffect.createOneShot(15, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+        } catch (e: Exception) {
+            root?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING)
+        }
     }
 
     private var toastToken = 0

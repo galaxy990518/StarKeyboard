@@ -68,6 +68,10 @@ struct KeySpec {
     var fontSize: CGFloat = 23
     /// 右上角的小字：長按這顆鍵會打出它（Gboard 式注音的數字、字母）
     var hint: String = ""
+    /// 按住會跳出一排字，手指滑過去放開就打出那個（逗號、句號的標點清單）
+    var popup: [String] = []
+
+    static let punctuationPopup = ["，", "。", "？", "！", "、", "：", "；", "…", "「", "」", "～", "@", "#", "%"]
 }
 
 struct KeyboardLayout {
@@ -157,9 +161,9 @@ enum KeyLayouts {
         }
         if c.layer == .letters && c.mode == .pinyin {
             // 拼音照三星的排法：空白鍵兩邊是逗號、句號，右邊是數字鍵盤
-            row.append(KeySpec(face: .text("，"), action: .text("，"), width: 0.9 * k, fontSize: 20))
+            row.append(KeySpec(face: .text("，"), action: .text("，"), width: 0.9 * k, fontSize: 20, popup: KeySpec.punctuationPopup))
             row.append(KeySpec(face: .text(c.spaceTitle), action: .space, width: 0, fontSize: 15))
-            row.append(KeySpec(face: .text("。"), action: .text("。"), width: 0.9 * k, fontSize: 20))
+            row.append(KeySpec(face: .text("。"), action: .text("。"), width: 0.9 * k, fontSize: 20, popup: KeySpec.punctuationPopup))
             row.append(KeySpec(face: .text("123"), action: .layer(.numpad), width: 1.1 * k, kind: .special, fontSize: 16))
             row.append(KeySpec(face: .symbol("return"), action: .returnKey, width: 1.6 * k, kind: .accent, fontSize: 16))
             return row
@@ -200,7 +204,7 @@ enum KeyLayouts {
             bottom.append(KeySpec(face: .symbol("globe"), action: .globe, width: 1, kind: .special))
         }
         bottom.append(KeySpec(face: .text(c.nextModeTitle), action: .nextMode, width: 1, kind: .special, fontSize: 17))
-        bottom.append(KeySpec(face: .text("，"), action: .text("，"), width: 1, fontSize: 20, hint: "。"))
+        bottom.append(KeySpec(face: .text("，"), action: .text("，"), width: 1, fontSize: 20, hint: "。", popup: KeySpec.punctuationPopup))
         bottom.append(KeySpec(face: .text(c.spaceTitle), action: .space, width: 0, fontSize: 15))
         bottom.append(KeySpec(face: .text("ㄦ"), action: .zhuyin("ㄦ"), width: 1, fontSize: 21))
         bottom.append(backspace(1.2))
@@ -300,7 +304,7 @@ enum KeyLayouts {
         var row3 = [KeySpec(face: .text("#+="), action: .layer(.symbols), width: 1.4, kind: .special, fontSize: 16)]
         row3 += keys(".,?!'", width: 1.4)
         row3.append(backspace())
-        return KeyboardLayout(rows: [keys("1234567890"), keys("-/:;()$&@\""), row3, bottomRow(c, columns: 10)],
+        return KeyboardLayout(rows: [keys("1234567890"), keys("-/:;()$&@\""), keys(SymbolPages.englishNumberExtra), row3, bottomRow(c, columns: 10)],
                               columns: 10)
     }
 
@@ -318,7 +322,8 @@ enum KeyLayouts {
         row3 += keys(c.fullWidthSymbols ? SymbolPages.zhuyinNumberRow3 : SymbolPages.zhuyinNumberRow3Half, size: 20, width: 1.05)
         row3.append(KeySpec(face: .text(c.fullWidthSymbols ? "全形" : "半形"), action: .toggleWidth, width: 1.1, kind: .special, fontSize: 14))
         row3.append(backspace(1.35))
-        return KeyboardLayout(rows: [keys("1234567890"), keys(c.fullWidthSymbols ? SymbolPages.zhuyinNumberRow2 : SymbolPages.zhuyinNumberRow2Half, size: 20), row3, bottomRow(c, columns: 10)],
+        return KeyboardLayout(rows: [keys("1234567890"), keys(c.fullWidthSymbols ? SymbolPages.zhuyinNumberRow2 : SymbolPages.zhuyinNumberRow2Half, size: 20),
+                                     keys(SymbolPages.zhuyinNumberExtra, size: 20), row3, bottomRow(c, columns: 10)],
                               columns: 10)
     }
 

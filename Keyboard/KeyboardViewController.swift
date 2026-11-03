@@ -341,6 +341,8 @@ final class KeyboardViewController: UIInputViewController {
 
     private func wireCallbacks() {
         grid.onKey = { [weak self] spec in self?.handle(spec) }
+        // 手指一按下去就震動、出聲（不用等放開）
+        grid.onPress = { [weak self] in self?.feedback() }
         grid.onGlobe = { [weak self] view, event in
             guard let event = event else { return }
             self?.handleInputModeList(from: view, with: event)
@@ -427,7 +429,6 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - 按鍵
 
     private func handle(_ spec: KeySpec) {
-        feedback()
         let pendingAutocorrect = lastAutocorrect
         lastAutocorrect = nil
         if spec.action == .backspace, let ac = pendingAutocorrect, revertAutocorrect(ac) { return }
@@ -2029,7 +2030,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func updateHeight() {
-        let fiveRows = (mode == .zhuyin || mode == .pinyin) && layer == .letters
+        let fiveRows = (mode == .zhuyin || mode == .pinyin) && layer == .letters || layer == .numbers
         let content: CGFloat
         if isLandscape {
             content = fiveRows ? 196 : 164
