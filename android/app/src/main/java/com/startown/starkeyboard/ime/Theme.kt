@@ -817,6 +817,14 @@ class KeyboardSettings(context: Context) {
     var clipLimit: Int
         get() = p.getInt("clipLimit", 200)
         set(v) = p.edit().putInt("clipLimit", v).apply()
+    /** 上面那一排關掉的按鈕 */
+    var hiddenTools: Set<ToolbarItem>
+        get() = (p.getString("hiddenTools", "") ?: "").split(",").mapNotNull { n -> ToolbarItem.values().firstOrNull { it.name == n } }.toSet()
+        set(v) = p.edit().putString("hiddenTools", v.joinToString(",") { it.name }).apply()
+    /** 注音十欄排法（像 Gboard） */
+    var zhuyinTenColumns: Boolean
+        get() = p.getBoolean("zhuyinTenColumns", false)
+        set(v) = p.edit().putBoolean("zhuyinTenColumns", v).apply()
     /** 拼音模式輸出簡體字（馬來西亞、中國用簡體） */
     var pinyinSimplified: Boolean
         get() = p.getBoolean("pinyinSimplified", false)

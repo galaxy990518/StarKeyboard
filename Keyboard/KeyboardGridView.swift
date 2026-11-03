@@ -31,6 +31,7 @@ final class KeyButton: UIView {
     // 立體：側面的厚度
     private var depth: CGFloat = 0
     private let label = UILabel()
+    private let hintLabel = UILabel()
     private let icon = UIImageView()
 
     init(spec: KeySpec, style: KeyboardStyle) {
@@ -53,6 +54,8 @@ final class KeyButton: UIView {
         label.minimumScaleFactor = 0.5
         label.baselineAdjustment = .alignCenters
         content.addSubview(label)
+        hintLabel.textAlignment = .right
+        content.addSubview(hintLabel)
         icon.contentMode = .center
         content.addSubview(icon)
         updateFace()
@@ -127,6 +130,8 @@ final class KeyButton: UIView {
         // 字的框左右放寬一點，字放大時才不會被縮小
         label.frame = art ? textRect.insetBy(dx: -textRect.width * 0.15, dy: -textRect.height * 0.2) : textRect.insetBy(dx: 2, dy: 0)
         icon.frame = textRect
+        hintLabel.font = .systemFont(ofSize: min(10 * style.fontScale, textRect.height * 0.3), weight: .medium)
+        hintLabel.frame = CGRect(x: textRect.minX, y: textRect.minY + 1, width: textRect.width - 3, height: hintLabel.font.lineHeight)
         if icon.contentMode == .scaleAspectFit {
             // 空白鍵的圖：小小的放在正中間
             let h = textRect.height * 0.8
@@ -141,6 +146,8 @@ final class KeyButton: UIView {
     }
 
     private func updateFace() {
+        hintLabel.text = spec.hint
+        hintLabel.isHidden = spec.hint.isEmpty
         if let art = spaceArt {
             label.isHidden = true
             icon.isHidden = false
@@ -208,6 +215,7 @@ final class KeyButton: UIView {
         glossLayer.fillColor = UIColor.white.withAlphaComponent(style.finish == .puffy ? (t.isDark ? 0.3 : 0.75) : (t.isDark ? 0.18 : 0.55)).cgColor
         CATransaction.commit()
         label.textColor = text
+        hintLabel.textColor = text.withAlphaComponent(0.6)
         icon.tintColor = text
     }
 
@@ -456,6 +464,19 @@ final class KeyboardGridView: UIView {
         }
     }
 
+    /// 長按有小字的鍵：打出右上角那個字（數字、字母、句號）
+    private func startHint(_ touch: UITouch, _ key: KeyButton) {
+        let hint = key.spec.hint
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self, weak touch, weak key] in
+            guard let self = self, let touch = touch, let key = key, var track = self.tracks[touch],
+                  !track.fired, !track.cursorMode, !track.gliding, track.key === key else { return }
+            track.fired = true
+            self.tracks[touch] = track
+            key.isPressed = false
+            self.onKey?(KeySpec(face: .text(hint), action: .text(hint)))
+        }
+    }
+
     private func fire(_ key: KeyButton) {
         onKey?(key.spec)
     }
@@ -501,6 +522,7 @@ final class KeyboardGridView: UIView {
             if glideEnabled && isLetter(key) { track.points.append(p) }
             spawnEffect(from: key)
             tracks[touch] = track
+            if !key.spec.hint.isEmpty { startHint(touch, key) }
             switch key.spec.action {
             case .backspace:
                 track.fired = true

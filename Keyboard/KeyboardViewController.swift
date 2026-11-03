@@ -1934,6 +1934,7 @@ final class KeyboardViewController: UIInputViewController {
             tintOverlay.isHidden = true
         }
         topBar.style = s
+        topBar.hiddenTools = settings.hiddenToolbarItems
         grid.style = s
         handwritingView?.style = s
         candidatePanel?.style = s
@@ -1984,7 +1985,7 @@ final class KeyboardViewController: UIInputViewController {
         lastReturnTitle = returnTitle
         let context = KeyLayouts.Context(mode: mode, layer: layer, shift: shift, needsGlobe: needsInputModeSwitchKey,
                                          returnTitle: returnTitle, spaceTitle: spaceTitle, nextModeTitle: nextModeTitle,
-                                         fullWidthSymbols: settings.fullWidthSymbols)
+                                         fullWidthSymbols: settings.fullWidthSymbols, zhuyinTenColumns: settings.zhuyinTenColumns)
         grid.setLayout(KeyLayouts.layout(context))
         grid.glideEnabled = mode == .english && layer == .letters && settings.glideTyping
 

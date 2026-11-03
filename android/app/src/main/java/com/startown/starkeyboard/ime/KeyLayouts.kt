@@ -35,6 +35,7 @@ data class KeySpec(
     val width: Float = 1f,          // 以「一個字母鍵」為單位；0 = 填滿剩下的寬度
     val kind: KeyKind = KeyKind.NORMAL,
     val fontSize: Float = 23f,
+    val hint: String = "",          // 右上角的小字：長按這顆鍵會打出它（Gboard 式注音的數字、字母）
 )
 
 data class KeyboardLayout(val rows: List<List<KeySpec>>, val columns: Float)
@@ -49,6 +50,7 @@ object KeyLayouts {
         val spaceTitle: String,
         val nextModeTitle: String,
         val fullWidthSymbols: Boolean = false,
+        val zhuyinTenColumns: Boolean = false,
     )
 
     fun layout(c: Context): KeyboardLayout {
@@ -74,7 +76,7 @@ object KeyLayouts {
         listOf(KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), kind = KeyKind.SPECIAL, fontSize = 15f)),
         listOf(KeySpec("空白", KeyAction.Space, fontSize = 15f)),
         listOf(KeySpec(nextModeTitle, KeyAction.NextMode, kind = KeyKind.SPECIAL, fontSize = 17f)),
-        listOf(KeySpec(returnTitle, KeyAction.Return, kind = KeyKind.ACCENT, fontSize = 15f)),
+        listOf(KeySpec("↵", KeyAction.Return, kind = KeyKind.ACCENT, fontSize = 22f)),
     ), 1f)
 
     private fun keys(chars: String, size: Float = 23f, width: Float = 1f) =
@@ -97,7 +99,7 @@ object KeyLayouts {
                 KeySpec(c.spaceTitle, KeyAction.Space, 0f, KeyKind.NORMAL, 15f),
                 KeySpec("。", KeyAction.Text("。"), 0.9f * k, KeyKind.NORMAL, 20f),
                 KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMPAD), 1.1f * k, KeyKind.SPECIAL, 16f),
-                KeySpec(c.returnTitle, KeyAction.Return, 1.6f * k, KeyKind.ACCENT, 16f),
+                KeySpec("↵", KeyAction.Return, 1.6f * k, KeyKind.ACCENT, 22f),
             )
         }
         val layerKey = if (letters) {
@@ -120,15 +122,39 @@ object KeyLayouts {
             else KeySpec("數字", KeyAction.Layer(KeyboardLayer.NUMPAD), 1.1f * k, KeyKind.SPECIAL, 15f),
             KeySpec("☺︎", KeyAction.Panel(PanelKind.EMOJI), 1.1f * k, KeyKind.SPECIAL, 21f),
             KeySpec(c.spaceTitle, KeyAction.Space, 0f, KeyKind.NORMAL, 15f),
-            KeySpec(c.returnTitle, KeyAction.Return, 2f * k, KeyKind.ACCENT, 16f),
+            KeySpec("↵", KeyAction.Return, 2f * k, KeyKind.ACCENT, 22f),
         )
     }
 
     private fun zhuyin(c: Context): KeyboardLayout {
+        if (c.zhuyinTenColumns) return zhuyinTen(c)
         val rows = Bopomofo.dachenRows.map { line -> line.map { KeySpec(it.toString(), KeyAction.Zhuyin(it), fontSize = 20f) } }.toMutableList()
         rows[3] = rows[3] + backspace(1f)
         rows.add(bottomRow(c, 11f))
         return KeyboardLayout(rows, 11f)
+    }
+
+    /** 注音十欄（像 Gboard）：ㄦ 搬到空白鍵旁邊，每顆鍵右上角有數字／字母，長按就打出來 */
+    private fun zhuyinTen(c: Context): KeyboardLayout {
+        val hints = listOf(
+            "1234567890".map { it.toString() },
+            "qwertyuiop".map { it.toString() },
+            "asdfghjkl".map { it.toString() } + "：",
+            "zxcvbnm".map { it.toString() } + listOf("……", "！", "？"),
+        )
+        val rows = Bopomofo.dachenRows.mapIndexed { r, line ->
+            line.filter { it != 'ㄦ' }.mapIndexed { i, ch -> KeySpec(ch.toString(), KeyAction.Zhuyin(ch), fontSize = 21f, hint = hints[r][i]) }
+        }
+        val bottom = listOf(
+            KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.2f, KeyKind.SPECIAL, 16f),
+            KeySpec(c.nextModeTitle, KeyAction.NextMode, 1f, KeyKind.SPECIAL, 17f),
+            KeySpec("，", KeyAction.Text("，"), 1f, KeyKind.NORMAL, 20f, hint = "。"),
+            KeySpec(c.spaceTitle, KeyAction.Space, 0f, KeyKind.NORMAL, 15f),
+            KeySpec("ㄦ", KeyAction.Zhuyin('ㄦ'), 1f, KeyKind.NORMAL, 21f),
+            backspace(1.2f),
+            KeySpec("↵", KeyAction.Return, 1.5f, KeyKind.ACCENT, 22f),
+        )
+        return KeyboardLayout(rows + listOf(bottom), 10f)
     }
 
     private fun english(c: Context): KeyboardLayout {
@@ -180,7 +206,7 @@ object KeyLayouts {
                 KeySpec(back, KeyAction.Layer(KeyboardLayer.LETTERS), 1f, KeyKind.SPECIAL, 14f),
             ) + keys("0", 26f) + listOf(
                 KeySpec("␣", KeyAction.Space, 1f, KeyKind.SPECIAL, 20f),
-                KeySpec(c.returnTitle, KeyAction.Return, 1f, KeyKind.ACCENT, 15f),
+                KeySpec("↵", KeyAction.Return, 1f, KeyKind.ACCENT, 22f),
             ),
         ), 5f)
     }

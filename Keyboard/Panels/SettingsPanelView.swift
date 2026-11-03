@@ -254,6 +254,17 @@ final class SettingsPanelView: UIView {
             stack.addArrangedSubview(shortcutRow(item))
         }
 
+        stack.addArrangedSubview(header("上面那一排按鈕（不用的關掉，比較不擠）"))
+        for item in ToolbarItem.allCases where item != .settings {
+            stack.addArrangedSubview(switchRow(item.title, on: !settings.hiddenToolbarItems.contains(item)) { [weak self] on in
+                guard let self = self else { return }
+                var hidden = self.settings.hiddenToolbarItems
+                if on { hidden.remove(item) } else { hidden.insert(item) }
+                self.settings.hiddenToolbarItems = hidden
+                self.onChange?()
+            })
+        }
+
         stack.addArrangedSubview(header("輸入法（按「中／英」鍵輪流切換）"))
         for mode in InputMode.allCases {
             stack.addArrangedSubview(switchRow(Self.modeName(mode), on: settings.enabledModes.contains(mode)) { [weak self] on in
@@ -268,6 +279,10 @@ final class SettingsPanelView: UIView {
                 self.onChange?()
             })
         }
+        stack.addArrangedSubview(switchRow("注音十欄排法（像 Gboard：ㄦ 在空白鍵旁，長按打數字）", on: settings.zhuyinTenColumns) { [weak self] on in
+            self?.settings.zhuyinTenColumns = on
+            self?.onChange?()
+        })
         stack.addArrangedSubview(switchRow("拼音輸出簡體字", on: settings.pinyinSimplified) { [weak self] on in
             self?.settings.pinyinSimplified = on
         })

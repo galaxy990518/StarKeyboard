@@ -113,6 +113,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).also { it.style = Paint.Style.STROKE }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+    private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.RIGHT }
 
     fun setLayout(newLayout: KeyboardLayout) {
         layout = newLayout
@@ -398,6 +399,12 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         val fm = textPaint.fontMetrics
         val baseline = k.body.centerY() - (fm.ascent + fm.descent) / 2
         canvas.drawText(k.spec.label, k.body.centerX(), baseline, textPaint)
+        if (k.spec.hint.isNotEmpty()) {
+            hintPaint.color = color
+            hintPaint.alpha = 150
+            hintPaint.textSize = minOf(10 * dp * style.fontScale, k.body.height() * 0.3f)
+            canvas.drawText(k.spec.hint, k.body.right - 3 * dp, k.body.top + hintPaint.textSize + 1 * dp, hintPaint)
+        }
     }
 
     // ===== 觸控 =====
@@ -509,7 +516,19 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                         longPressRunnable = r
                         mainHandler.postDelayed(r, 500)
                     }
-                    else -> {}
+                    else -> if (key.spec.hint.isNotEmpty()) {
+                        // 長按有小字的鍵：打出右上角那個字（數字、字母、句號）
+                        val hint = key.spec.hint
+                        mainHandler.postDelayed({
+                            if (!track.fired && !track.cursorMode && !track.gliding && track.key === key && tracks.containsValue(track)) {
+                                track.fired = true
+                                setPressed(key, false)
+                                previewKey = null
+                                invalidate()
+                                onKey?.invoke(KeySpec(hint, KeyAction.Text(hint)))
+                            }
+                        }, 450)
+                    }
                 }
             }
             MotionEvent.ACTION_MOVE -> {

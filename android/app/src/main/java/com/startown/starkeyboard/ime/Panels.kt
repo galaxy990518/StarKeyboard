@@ -737,6 +737,15 @@ class SettingsPanel(
             col.addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dpi(6f) })
         }
 
+        header("上面那一排按鈕（不用的關掉，比較不擠）")
+        for (item in ToolbarItem.values()) {
+            if (item == ToolbarItem.SETTINGS) continue
+            toggle(item.title, item !in settings.hiddenTools) { on ->
+                settings.hiddenTools = if (on) settings.hiddenTools - item else settings.hiddenTools + item
+                onChange()
+            }
+        }
+
         header("輸入法（按「中／英」鍵輪流切換，長按可換別的鍵盤）")
         for (mode in InputMode.values()) {
             toggle(mode.settingName, mode in settings.enabledModes) { on ->
@@ -746,6 +755,7 @@ class SettingsPanel(
                 onChange()
             }
         }
+        toggle("注音十欄排法（像 Gboard：ㄦ 在空白鍵旁，長按打數字）", settings.zhuyinTenColumns) { settings.zhuyinTenColumns = it; onChange() }
         toggle("拼音輸出簡體字", settings.pinyinSimplified) { settings.pinyinSimplified = it }
         toggle("聯想詞（打完字後推薦下一個字）", settings.associations) { settings.associations = it }
 

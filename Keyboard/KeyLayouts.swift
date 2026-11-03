@@ -66,6 +66,8 @@ struct KeySpec {
     var width: CGFloat = 1
     var kind: KeyKind = .normal
     var fontSize: CGFloat = 23
+    /// 右上角的小字：長按這顆鍵會打出它（Gboard 式注音的數字、字母）
+    var hint: String = ""
 }
 
 struct KeyboardLayout {
@@ -83,6 +85,7 @@ enum KeyLayouts {
         var spaceTitle: String
         var nextModeTitle: String
         var fullWidthSymbols = false
+        var zhuyinTenColumns = false
     }
 
     static func layout(_ c: Context) -> KeyboardLayout {
@@ -111,7 +114,7 @@ enum KeyLayouts {
             [KeySpec(face: .text("123"), action: .layer(.numbers), kind: .special, fontSize: 15)],
             [KeySpec(face: .text("空白"), action: .space, fontSize: 15)],
             [KeySpec(face: .text(nextModeTitle), action: .nextMode, kind: .special, fontSize: 17)],
-            [KeySpec(face: .text(returnTitle), action: .returnKey, kind: .accent, fontSize: 15)],
+            [KeySpec(face: .symbol("return"), action: .returnKey, kind: .accent, fontSize: 15)],
         ], columns: 1)
     }
 
@@ -158,24 +161,52 @@ enum KeyLayouts {
             row.append(KeySpec(face: .text(c.spaceTitle), action: .space, width: 0, fontSize: 15))
             row.append(KeySpec(face: .text("。"), action: .text("。"), width: 0.9 * k, fontSize: 20))
             row.append(KeySpec(face: .text("123"), action: .layer(.numpad), width: 1.1 * k, kind: .special, fontSize: 16))
-            row.append(KeySpec(face: .text(c.returnTitle), action: .returnKey, width: 1.6 * k, kind: .accent, fontSize: 16))
+            row.append(KeySpec(face: .symbol("return"), action: .returnKey, width: 1.6 * k, kind: .accent, fontSize: 16))
             return row
         }
         if !c.needsGlobe {
             row.append(KeySpec(face: .symbol("face.smiling"), action: .panel(.emoji), width: 1.1 * k, kind: .special))
         }
         row.append(KeySpec(face: .text(c.spaceTitle), action: .space, width: 0, fontSize: 15))
-        row.append(KeySpec(face: .text(c.returnTitle), action: .returnKey, width: 2.0 * k, kind: .accent, fontSize: 16))
+        row.append(KeySpec(face: .symbol("return"), action: .returnKey, width: 2.0 * k, kind: .accent, fontSize: 16))
         return row
     }
 
     private static func zhuyin(_ c: Context) -> KeyboardLayout {
+        if c.zhuyinTenColumns { return zhuyinTen(c) }
         var rows: [[KeySpec]] = Bopomofo.dachenRows.map { line in
             line.map { ch in KeySpec(face: .text(String(ch)), action: .zhuyin(ch), fontSize: 20) }
         }
         rows[3].append(backspace(1))
         rows.append(bottomRow(c, columns: 11))
         return KeyboardLayout(rows: rows, columns: 11)
+    }
+
+    /// 注音十欄（像 Gboard）：ㄦ 搬到空白鍵旁邊，每顆鍵右上角有數字／字母，長按就打出來
+    private static func zhuyinTen(_ c: Context) -> KeyboardLayout {
+        let hints: [[String]] = [
+            "1234567890".map { String($0) },
+            "qwertyuiop".map { String($0) },
+            "asdfghjkl".map { String($0) } + ["："],
+            "zxcvbnm".map { String($0) } + ["……", "！", "？"],
+        ]
+        var rows: [[KeySpec]] = Bopomofo.dachenRows.enumerated().map { r, line in
+            line.filter { $0 != "ㄦ" }.enumerated().map { i, ch in
+                KeySpec(face: .text(String(ch)), action: .zhuyin(ch), fontSize: 21, hint: hints[r][i])
+            }
+        }
+        var bottom = [KeySpec(face: .text("123"), action: .layer(.numbers), width: 1.2, kind: .special, fontSize: 16)]
+        if c.needsGlobe {
+            bottom.append(KeySpec(face: .symbol("globe"), action: .globe, width: 1, kind: .special))
+        }
+        bottom.append(KeySpec(face: .text(c.nextModeTitle), action: .nextMode, width: 1, kind: .special, fontSize: 17))
+        bottom.append(KeySpec(face: .text("，"), action: .text("，"), width: 1, fontSize: 20, hint: "。"))
+        bottom.append(KeySpec(face: .text(c.spaceTitle), action: .space, width: 0, fontSize: 15))
+        bottom.append(KeySpec(face: .text("ㄦ"), action: .zhuyin("ㄦ"), width: 1, fontSize: 21))
+        bottom.append(backspace(1.2))
+        bottom.append(KeySpec(face: .symbol("return"), action: .returnKey, width: 1.5, kind: .accent, fontSize: 16))
+        rows.append(bottom)
+        return KeyboardLayout(rows: rows, columns: 10)
     }
 
     private static func english(_ c: Context) -> KeyboardLayout {
@@ -261,7 +292,7 @@ enum KeyLayouts {
              KeySpec(face: .text(back), action: .layer(.letters), kind: .special, fontSize: 14)]
                 + keys("0", size: 26)
                 + [KeySpec(face: .symbol("space"), action: .space, kind: .special),
-                   KeySpec(face: .text(c.returnTitle), action: .returnKey, kind: .accent, fontSize: 15)],
+                   KeySpec(face: .symbol("return"), action: .returnKey, kind: .accent, fontSize: 15)],
         ], columns: 5)
     }
 

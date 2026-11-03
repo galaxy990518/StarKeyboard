@@ -172,15 +172,17 @@ class Tap(context: Context, text: String, sizeSp: Float, color: Int, bold: Boole
 
 enum class Trailing { EXPAND, CLOSE }
 
-enum class ToolbarItem(val label: String) {
-    CLIPBOARD("剪貼"), EMOJI("☺︎"), KAOMOJI("(•ᴗ•)"), SYMBOLS("※"), FANCY("𝒜"), TRANSLATE("譯"),
-    HANDWRITING("✍︎"), VOICE("🎙"), SETTINGS("⚙︎"), DISMISS("▾"),
+enum class ToolbarItem(val label: String, val title: String) {
+    CLIPBOARD("剪貼", "剪貼簿"), EMOJI("☺︎", "表情符號"), KAOMOJI("(•ᴗ•)", "顏文字"), SYMBOLS("※", "特殊符號"), FANCY("𝒜", "花式字"),
+    TRANSLATE("譯", "翻譯"), HANDWRITING("✍︎", "手寫"), VOICE("🎙", "語音"), SETTINGS("⚙︎", "設定"), DISMISS("▾", "收起鍵盤"),
 }
 
 /** 鍵盤最上面那一條：工具列／候選字／編輯框（新增表符、翻譯） */
 @SuppressLint("ViewConstructor")
 class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
     var scriptTitle: String? = null
+    /** 使用者關掉的按鈕（設定鍵永遠留著，不然就回不來了） */
+    var hiddenTools: Set<ToolbarItem> = emptySet()
     var onScriptToggle: (() -> Unit)? = null
     var onToolbar: ((ToolbarItem) -> Unit)? = null
     var onCandidate: ((Int) -> Unit)? = null
@@ -224,6 +226,7 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
             is Content.Toolbar -> {
                 val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
                 for (item in ToolbarItem.values()) {
+                    if (item != ToolbarItem.SETTINGS && item in hiddenTools) continue
                     val size = if (item == ToolbarItem.KAOMOJI || item == ToolbarItem.CLIPBOARD) 14f else 19f
                     row.addView(Tap(context, item.label, size, tint, true) { onToolbar?.invoke(item) },
                         LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))

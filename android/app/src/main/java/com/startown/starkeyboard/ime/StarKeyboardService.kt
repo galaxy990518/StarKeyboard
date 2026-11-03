@@ -1749,6 +1749,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             bgImage.visibility = View.GONE
             tint.visibility = View.GONE
         }
+        topBar.hiddenTools = settings.hiddenTools
         topBar.style = s
         keyboard.style = s
         handwriting?.style = s
@@ -1808,7 +1809,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun rebuildKeys() {
         if (root == null) return
         lastReturnTitle = returnTitle
-        val ctx = KeyLayouts.Context(mode, layer, shift, returnTitle, spaceTitle, nextModeTitle, settings.fullWidthSymbols)
+        val ctx = KeyLayouts.Context(mode, layer, shift, returnTitle, spaceTitle, nextModeTitle, settings.fullWidthSymbols, settings.zhuyinTenColumns)
         keyboard.setLayout(KeyLayouts.layout(ctx))
         keyboard.glideEnabled = mode == InputMode.ENGLISH && layer == KeyboardLayer.LETTERS && settings.glideTyping
         val showHandwriting = mode == InputMode.HANDWRITING && layer == KeyboardLayer.LETTERS

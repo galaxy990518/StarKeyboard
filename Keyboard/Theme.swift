@@ -1052,6 +1052,11 @@ final class KeyboardSettings {
         get { bool("associations", true) }
         set { d.set(newValue, forKey: "associations") }
     }
+    /// 上面那一排關掉的按鈕
+    var hiddenToolbarItems: Set<ToolbarItem> {
+        get { Set((d.stringArray(forKey: "hiddenTools") ?? []).compactMap { ToolbarItem(rawValue: $0) }) }
+        set { d.set(newValue.map { $0.rawValue }, forKey: "hiddenTools") }
+    }
     var enabledModes: [InputMode] {
         get {
             let raw = d.stringArray(forKey: "modes") ?? [InputMode.zhuyin, .english, .handwriting].map { $0.rawValue }
@@ -1116,6 +1121,11 @@ final class KeyboardSettings {
     var notifiedBuild: Int {
         get { d.integer(forKey: "notifiedBuild") }
         set { d.set(newValue, forKey: "notifiedBuild") }
+    }
+    /// 注音十欄排法（像 Gboard）
+    var zhuyinTenColumns: Bool {
+        get { bool("zhuyinTenColumns", false) }
+        set { d.set(newValue, forKey: "zhuyinTenColumns") }
     }
     /// 拼音模式輸出簡體字（馬來西亞、中國用簡體）
     var pinyinSimplified: Bool {

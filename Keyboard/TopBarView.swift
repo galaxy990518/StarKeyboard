@@ -5,8 +5,24 @@ private final class CandidateScrollView: UIScrollView {
     override func touchesShouldCancel(in view: UIView) -> Bool { true }
 }
 
-enum ToolbarItem: CaseIterable {
+enum ToolbarItem: String, CaseIterable {
     case clipboard, emoji, kaomoji, symbols, fancy, translate, handwriting, voice, settings, dismiss
+
+    /// 設定裡「上面那一排按鈕」的名字
+    var title: String {
+        switch self {
+        case .clipboard: return "剪貼簿"
+        case .emoji: return "表情符號"
+        case .kaomoji: return "顏文字"
+        case .symbols: return "特殊符號"
+        case .fancy: return "花式字"
+        case .translate: return "翻譯"
+        case .handwriting: return "手寫"
+        case .voice: return "語音"
+        case .settings: return "設定（不能關）"
+        case .dismiss: return "收起鍵盤"
+        }
+    }
 }
 
 /// 鍵盤最上面那一條：沒在打字時是工具列，打注音時是候選字，新增表符或翻譯時是編輯框
@@ -46,6 +62,14 @@ final class TopBarView: UIView {
     private var trailing: Trailing = .expand
     private let toolbar = UIStackView()
     private var toolbarButtons: [UIButton] = []
+    /// 使用者關掉的按鈕（設定鍵永遠留著，不然就回不來了）
+    var hiddenTools: Set<ToolbarItem> = [] {
+        didSet {
+            for (item, b) in zip(ToolbarItem.allCases, toolbarButtons) {
+                b.isHidden = item != .settings && hiddenTools.contains(item)
+            }
+        }
+    }
     private let compositionScroll = UIScrollView()
     private let compositionLabel = UILabel()
     private var scrollCompositionToEnd = false
