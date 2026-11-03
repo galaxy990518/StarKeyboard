@@ -356,9 +356,85 @@ class ClipboardPanel(
             if (store.categories.isNotEmpty()) row.addView(folder, LayoutParams(dpi(40f), dpi(40f)))
             row.addView(Tap(context, "✕", 15f, t.keyText.withAlpha(0.5f)) { store.remove(item.id); reload() }, LayoutParams(dpi(40f), dpi(40f)))
             row.setOnClickListener { onInsert(item.text) }
-            list.addView(row)
+            list.addView(swipeable(row, item))
             list.addView(View(context).apply { setBackgroundColor(t.shadow.withAlpha(0.4f)) }, LayoutParams(LayoutParams.MATCH_PARENT, maxOf(1, dpi(0.5f))))
         }
+    }
+
+    /** 和 iPhone 一樣：整列往左滑刪除、往右滑釘選（滑超過三成寬才算） */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun swipeable(row: View, item: ClipItem): View {
+        val t = style.theme
+        val box = FrameLayout(context)
+        val pinLabel = TextView(context).apply {
+            text = if (item.pinned) "取消釘選" else "📌 釘選"
+            textSize = 14f
+            setTextColor(t.accentText)
+            setBackgroundColor(t.accent)
+            gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            setPadding(dpi(16f), 0, 0, 0)
+            visibility = View.INVISIBLE
+        }
+        val deleteLabel = TextView(context).apply {
+            text = "刪除"
+            textSize = 14f
+            setTextColor(android.graphics.Color.WHITE)
+            setBackgroundColor(0xFFE5484D.toInt())
+            gravity = Gravity.CENTER_VERTICAL or Gravity.END
+            setPadding(0, 0, dpi(16f), 0)
+            visibility = View.INVISIBLE
+        }
+        box.addView(pinLabel, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        box.addView(deleteLabel, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        box.addView(row, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+
+        // 只露出被滑開的那一塊，字不會和下面的「刪除」「釘選」疊在一起
+        fun reveal(dx: Float) {
+            val w = box.width
+            pinLabel.visibility = if (dx > 0) View.VISIBLE else View.INVISIBLE
+            deleteLabel.visibility = if (dx < 0) View.VISIBLE else View.INVISIBLE
+            if (dx > 0) pinLabel.clipBounds = android.graphics.Rect(0, 0, dx.toInt(), box.height)
+            if (dx < 0) deleteLabel.clipBounds = android.graphics.Rect(w + dx.toInt(), 0, w, box.height)
+        }
+
+        val slop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+        var downX = 0f
+        var downY = 0f
+        var dragging = false
+        row.setOnTouchListener { v, e ->
+            when (e.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> { downX = e.rawX; downY = e.rawY; dragging = false; false }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    val dx = e.rawX - downX
+                    val dy = e.rawY - downY
+                    if (!dragging && Math.abs(dx) > slop && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                        dragging = true
+                        v.parent?.requestDisallowInterceptTouchEvent(true)
+                        // 取消這一列的點擊（滑動不是要貼上）
+                        val cancel = android.view.MotionEvent.obtain(e).apply { action = android.view.MotionEvent.ACTION_CANCEL }
+                        v.onTouchEvent(cancel)
+                        cancel.recycle()
+                    }
+                    if (dragging) { v.translationX = dx; reveal(dx); true } else false
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    if (!dragging) return@setOnTouchListener false
+                    dragging = false
+                    val dx = v.translationX
+                    val far = v.width * 0.3f
+                    when {
+                        dx < -far && e.actionMasked == android.view.MotionEvent.ACTION_UP ->
+                            v.animate().translationX(-v.width.toFloat()).setDuration(150).withEndAction { store.remove(item.id); reload() }.start()
+                        dx > far && e.actionMasked == android.view.MotionEvent.ACTION_UP ->
+                            v.animate().translationX(0f).setDuration(150).withEndAction { store.togglePin(item.id); reload() }.start()
+                        else -> v.animate().translationX(0f).setDuration(150).withEndAction { reveal(0f) }.start()
+                    }
+                    true
+                }
+                else -> dragging
+            }
+        }
+        return box
     }
 
     private fun change(action: () -> Unit) {

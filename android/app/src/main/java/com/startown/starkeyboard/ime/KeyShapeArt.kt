@@ -41,7 +41,7 @@ class KeyShapeArt(
     }
 
     companion object {
-        val order = listOf("catFace", "bear", "paw", "cloudPuff", "pixel", "pixelHeart", "puzzle", "book", "butterfly", "strawberry", "flower", "moon", "star", "heart")
+        val order = listOf("catFace", "bear", "paw", "cloudPuff", "pixel", "pixelHeart", "puzzle", "book", "butterfly", "strawberry", "flower", "moon", "star", "heart", "latte")
 
         val shapes: Map<String, KeyShapeArt> = mapOf(
             "catFace" to KeyShapeArt(
@@ -114,6 +114,11 @@ class KeyShapeArt(
                 floatArrayOf(0f, 50f, 20f, 2f, 52f, 12f, 58f, 6f, 68f, 6f, 2f, 84f, 6f, 96f, 18f, 96f, 38f, 2f, 96f, 62f, 76f, 80f, 57f, 92f, 2f, 53f, 95f, 47f, 95f, 43f, 92f, 2f, 24f, 80f, 4f, 62f, 4f, 38f, 2f, 4f, 18f, 16f, 6f, 32f, 6f, 2f, 42f, 6f, 48f, 12f, 50f, 20f, 4f),
                 floatArrayOf(),
                 null, null, 0f, 0.92f),
+            "latte" to KeyShapeArt(
+                "拉花咖啡", floatArrayOf(18f, 38f, 54f, 40f),
+                floatArrayOf(0f, 83f, 30f, 2f, 83f, 35.52f, 65.99f, 40f, 45f, 40f, 2f, 24.01f, 40f, 7f, 35.52f, 7f, 30f, 2f, 7f, 24.48f, 24.01f, 20f, 45f, 20f, 2f, 65.99f, 20f, 83f, 24.48f, 83f, 30f, 4f, 0f, 83f, 30f, 2f, 83f, 52f, 78f, 70f, 66f, 82f, 2f, 60f, 88f, 53f, 91f, 45f, 91f, 2f, 37f, 91f, 30f, 88f, 24f, 82f, 2f, 12f, 70f, 7f, 52f, 7f, 30f, 4f, 0f, 80f, 38f, 2f, 94f, 32f, 103f, 46f, 97f, 59f, 2f, 93f, 67f, 85f, 71f, 77f, 69f, 1f, 79f, 60f, 2f, 85f, 61f, 89f, 57f, 89f, 52f, 2f, 89f, 46f, 85f, 44f, 81f, 46f, 4f, 0f, 89f, 94f, 2f, 89f, 97.31f, 69.3f, 100f, 45f, 100f, 2f, 20.7f, 100f, 1f, 97.31f, 1f, 94f, 2f, 1f, 90.69f, 20.7f, 88f, 45f, 88f, 2f, 69.3f, 88f, 89f, 90.69f, 89f, 94f, 4f),
+                floatArrayOf(0f, 45f, 37.5f, 2f, 38.5f, 33f, 35f, 29.5f, 36.5f, 26.2f, 2f, 38f, 23.4f, 42f, 23.6f, 45f, 27f, 2f, 48f, 23.6f, 52f, 23.4f, 53.5f, 26.2f, 2f, 55f, 29.5f, 51.5f, 33f, 45f, 37.5f, 4f, 0f, 46.6f, 37.5f, 2f, 46.6f, 38.16f, 45.88f, 38.7f, 45f, 38.7f, 2f, 44.12f, 38.7f, 43.4f, 38.16f, 43.4f, 37.5f, 2f, 43.4f, 36.84f, 44.12f, 36.3f, 45f, 36.3f, 2f, 45.88f, 36.3f, 46.6f, 36.84f, 46.6f, 37.5f, 4f, 0f, 30f, 31f, 2f, 33f, 29f, 36f, 29.5f, 37f, 31f, 2f, 34f, 32.5f, 31.5f, 32.5f, 30f, 31f, 4f, 0f, 60f, 31f, 2f, 58.5f, 32.5f, 56f, 32.5f, 53f, 31f, 2f, 54f, 29.5f, 57f, 29f, 60f, 31f, 4f),
+                0xA8734F, 0xD1A17A, 0.9f, 0.9f),
         )
 
         /** 0 = 移到、1 = 直線、2 = 三次曲線、3 = 二次曲線、4 = 收尾 */
