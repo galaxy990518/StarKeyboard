@@ -314,8 +314,10 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         // 手指一按下去就震動、出聲（不用等放開）
         keyboard.onPress = { feedback() }
         keyboard.onLongPress = { showImePicker() }
-        keyboard.onCursorMove = { steps -> moveCursor(steps) }   // 注音中間、編輯框的游標都在 moveCursor 裡處理
+        keyboard.onCursorMove = { steps -> moveCursor(steps); cursorTick() }   // 注音中間、編輯框的游標都在 moveCursor 裡處理
+        keyboard.onCursorMode = { on -> if (on) cursorTick() }
         keyboard.onCursorLine = { dir ->
+            cursorTick()
             // 文字框自己會照畫面上的行換到上一行／下一行
             if (!isComposing && editorText == null) {
                 currentInputConnection?.let { ic ->
@@ -1188,13 +1190,25 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val rad = radicals ?: SQLitePhraseSource.radicals(this).also { radicals = it }
         val p = CandidatePanel(this, style, { selectCandidate(it, true) }, { closeCandidatePanel() }, { backspace() }, { rad[it] })
         p.setCandidates(candidates.map { it.text })
+        // 墊一層半透明的底，而且先把後面的按鍵藏起來，候選字才不會跟按鍵疊在一起看不清楚
+        p.setBackgroundColor(if (style.theme.dark) android.graphics.Color.BLACK.withAlpha(0.4f) else android.graphics.Color.WHITE.withAlpha(0.6f))
+        p.isClickable = true
         content.addView(p, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         candidatePanel = p
+        keyboard.visibility = View.GONE
+        handwriting?.visibility = View.GONE
     }
 
     private fun closeCandidatePanel() {
-        candidatePanel?.let { content.removeView(it) }
+        val p = candidatePanel ?: return
+        content.removeView(p)
         candidatePanel = null
+        // 按鍵恢復（有開別的面板就維持藏著）
+        if (panelView == null) {
+            val showHandwriting = mode == InputMode.HANDWRITING && layer == KeyboardLayer.LETTERS
+            keyboard.visibility = if (showHandwriting) View.GONE else View.VISIBLE
+            handwriting?.visibility = if (showHandwriting) View.VISIBLE else View.GONE
+        }
     }
 
     // ===== 英文自動修正 =====
@@ -1441,8 +1455,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         panelView = null
         panel = null
         val showHandwriting = mode == InputMode.HANDWRITING && layer == KeyboardLayer.LETTERS
-        keyboard.visibility = if (showHandwriting) View.GONE else View.VISIBLE
-        handwriting?.visibility = if (showHandwriting) View.VISIBLE else View.GONE
+        val hideKeys = showHandwriting || candidatePanel != null
+        keyboard.visibility = if (hideKeys) View.GONE else View.VISIBLE
+        handwriting?.visibility = if (showHandwriting && candidatePanel == null) View.VISIBLE else View.GONE
     }
 
     private fun settingsChanged() {
@@ -1934,9 +1949,10 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             handwriting = null
             if (suggestionSource == SuggestionSource.HANDWRITING) clearSuggestions()
         }
-        if (panelView == null) {
+        if (panelView == null && candidatePanel == null) {
             keyboard.visibility = if (showHandwriting) View.GONE else View.VISIBLE
         } else {
+            if (candidatePanel != null) keyboard.visibility = View.GONE
             handwriting?.visibility = View.GONE
         }
         candidatePanel?.bringToFront()
@@ -1984,6 +2000,16 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     /** 直接叫手機震一下：三星等手機把系統「觸控回饋」關掉時，舊的做法完全不會震 */
+    /** 移動游標時每動一格輕輕「喀」一下（跟著震動開關） */
+    private fun cursorTick() {
+        if (!settings.haptics) return
+        val v = vibrator
+        try {
+            if (v != null && v.hasVibrator() && android.os.Build.VERSION.SDK_INT >= 29) v.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_TICK))
+            else keyboard.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING)
+        } catch (e: Exception) { }
+    }
+
     private fun buzz() {
         val v = vibrator
         if (v == null || !v.hasVibrator()) {

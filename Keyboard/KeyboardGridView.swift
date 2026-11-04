@@ -331,6 +331,17 @@ final class KeyboardGridView: UIView {
     var onCursorMove: ((Int) -> Void)?
     /// 按住空白鍵上下滑：游標換到上一行（-1）或下一行（1）
     var onCursorLine: ((Int) -> Void)?
+    /// 開始／結束用空白鍵移動游標（整片鍵盤變淡，看得出來現在是觸控板）
+    var onCursorMode: ((Bool) -> Void)?
+
+    private func updateCursorLook() {
+        let on = tracks.values.contains { $0.cursorMode }
+        let target: CGFloat = on ? 0.45 : 1
+        if alpha != target {
+            alpha = target
+            onCursorMode?(on)
+        }
+    }
     /// 手指按下去的那一刻（震動、按鍵聲）
     var onPress: (() -> Void)?
     /// 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去
@@ -654,25 +665,30 @@ final class KeyboardGridView: UIView {
             }
             guard var track = tracks[touch], !track.fired else { continue }
             let p = touch.location(in: self)
+            var entered = false
             if track.key.spec.action == .space {
                 if !track.cursorMode && (abs(p.x - track.origin.x) > 16 || abs(p.y - track.origin.y) > 18) {
                     track.cursorMode = true
                     track.cursorX = p.x
                     // 上下從按下去的地方算起：空白鍵在最下面，往下能滑的距離很短
                     track.cursorY = track.origin.y
+                    entered = true
                 }
                 if track.cursorMode {
-                    let steps = Int((p.x - track.cursorX) / 9)
+                    // 左右：每 10 點一個字，跟手、不加速，慢慢滑可以停在任何兩個字中間
+                    let steps = Int((p.x - track.cursorX) / 10)
                     if steps != 0 {
                         onCursorMove?(steps)
-                        track.cursorX += CGFloat(steps) * 9
+                        track.cursorX += CGFloat(steps) * 10
                     }
-                    // 往上滑約 22 點換一行；往下只要 10 點（手指一下就滑出鍵盤了）
+                    // 上下：往上 24 點換一行；往下 16 點（空白鍵在最下面，往下能滑的地方少）
                     let dy = p.y - track.cursorY
-                    let step: CGFloat = dy > 0 ? 10 : 22
+                    let step: CGFloat = dy > 0 ? 16 : 24
                     if abs(dy) >= step {
                         onCursorLine?(dy > 0 ? 1 : -1)
                         track.cursorY += dy > 0 ? step : -step
+                        // 換行時手指左右晃一點不算，游標留在原本的直排位置
+                        track.cursorX = p.x - max(-4, min(4, (p.x - track.cursorX).truncatingRemainder(dividingBy: 10)))
                     }
                 }
             } else if track.key.spec.action.isCharacter {
@@ -689,6 +705,7 @@ final class KeyboardGridView: UIView {
             }
             tracks[touch] = track
             if track.gliding { drawTrail() }
+            if entered { updateCursorLook() }
         }
     }
 
@@ -716,6 +733,7 @@ final class KeyboardGridView: UIView {
                 }
             }
         }
+        updateCursorLook()
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -732,6 +750,7 @@ final class KeyboardGridView: UIView {
                 fire(track.key)
             }
         }
+        updateCursorLook()
     }
 
     private func startRepeat(_ key: KeyButton) {

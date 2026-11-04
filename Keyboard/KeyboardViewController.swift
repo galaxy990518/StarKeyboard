@@ -128,6 +128,10 @@ final class KeyboardViewController: UIInputViewController {
     private let heightRuler = UIView()
     private var toastToken = 0
     private lazy var haptic = UIImpactFeedbackGenerator(style: .light)
+    /// 移動游標時每動一格的輕輕「喀」
+    private lazy var tick = UISelectionFeedbackGenerator()
+    /// 連續上下換行時要回到的直排位置（左右移動後重算）
+    private var goalColumn: Int?
 
     // 畫面
     private let gradientLayer = CAGradientLayer()
@@ -350,8 +354,15 @@ final class KeyboardViewController: UIInputViewController {
             self?.handleInputModeList(from: view, with: event)
         }
         grid.onGlide = { [weak self] path, centers, kw in self?.glideTyped(path: path, centers: centers, keyWidth: kw) }
+        grid.onCursorMode = { [weak self] on in
+            guard let self = self else { return }
+            self.goalColumn = nil
+            if on { self.cursorTick() }
+        }
         grid.onCursorMove = { [weak self] steps in
             guard let self = self else { return }
+            self.cursorTick()
+            self.goalColumn = nil
             // 打注音打到一半：游標在注音裡移動，可以只改打錯的那一個（像 iPhone 內建注音）
             if self.mode == .zhuyin, self.pinyinBuffer.isEmpty, self.kanaBuffer.isEmpty, self.composer.isComposing {
                 self.zhuyin.moveCursor(steps)
@@ -370,6 +381,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         grid.onCursorLine = { [weak self] dir in
             guard let self = self, !self.isComposing, self.editorText == nil else { return }
+            self.cursorTick()
             self.finishHangul()
             self.moveCursorLine(dir)
         }
@@ -1897,31 +1909,35 @@ final class KeyboardViewController: UIInputViewController {
     /// 游標換行：有換行字元就跳到上／下一行的同一欄；同一段太長（畫面上自動折行）就照一行大約幾個字跳
     private func moveCursorLine(_ dir: Int) {
         let perLine = max(8, Int(view.bounds.width / 19))
+        let before = Array(textDocumentProxy.documentContextBeforeInput ?? "")
+        let after = Array(textDocumentProxy.documentContextAfterInput ?? "")
+        // 現在在這一行的第幾個字；連續上下滑時用一開始的位置（經過短的行也能回到原本的直排）
+        let currentCol = before.count - ((before.lastIndex(of: "\n") ?? -1) + 1)
+        let col = goalColumn ?? (currentCol % perLine)
+        goalColumn = col
         if dir < 0 {
-            let before = Array(textDocumentProxy.documentContextBeforeInput ?? "")
             guard !before.isEmpty else { return }
             var offset = -min(perLine, before.count)
-            if let nl = before.lastIndex(of: "\n") {
-                let col = before.count - nl - 1
-                if col <= perLine {
-                    let start = before[..<nl].lastIndex(of: "\n").map { $0 + 1 } ?? 0
-                    let target = start + min(col, nl - start)
-                    offset = target - before.count
-                }
+            if let nl = before.lastIndex(of: "\n"), currentCol <= perLine {
+                let start = before[..<nl].lastIndex(of: "\n").map { $0 + 1 } ?? 0
+                offset = start + min(col, nl - start) - before.count
             }
             textDocumentProxy.adjustTextPosition(byCharacterOffset: offset)
         } else {
-            let before = Array(textDocumentProxy.documentContextBeforeInput ?? "")
-            let after = Array(textDocumentProxy.documentContextAfterInput ?? "")
             guard !after.isEmpty else { return }
             var offset = min(perLine, after.count)
             if let nl = after.firstIndex(of: "\n"), nl <= perLine {
-                let col = before.count - ((before.lastIndex(of: "\n") ?? -1) + 1)
                 let nextEnd = after[(nl + 1)...].firstIndex(of: "\n") ?? after.count
                 offset = min(nl + 1 + col, nextEnd)
             }
             textDocumentProxy.adjustTextPosition(byCharacterOffset: offset)
         }
+    }
+
+    private func cursorTick() {
+        guard hasFullAccess, settings.haptics else { return }
+        tick.selectionChanged()
+        tick.prepare()
     }
 
     /// 空白鍵的圖：剪貼簿裡的 GIF（保持會動）或圖片

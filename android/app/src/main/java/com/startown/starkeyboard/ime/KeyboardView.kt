@@ -34,6 +34,17 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         if (showsPreview && k != null && k.spec.action.isCharacter && k.spec.label.length in 1..2) k else null
     /** 按住空白鍵上下滑：游標換到上一行（-1）或下一行（1） */
     var onCursorLine: ((Int) -> Unit)? = null
+    /** 開始／結束用空白鍵移動游標（整片鍵盤變淡，看得出來現在是觸控板） */
+    var onCursorMode: ((Boolean) -> Unit)? = null
+
+    private fun updateCursorLook() {
+        val on = tracks.values.any { it.cursorMode }
+        val target = if (on) 0.45f else 1f
+        if (alpha != target) {
+            alpha = target
+            onCursorMode?.invoke(on)
+        }
+    }
     /** 手指按下去的那一刻（震動、按鍵聲） */
     var onPress: (() -> Unit)? = null
     /** 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去 */
@@ -656,20 +667,24 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                             t.cursorX = x
                             // 上下從按下去的地方算起：空白鍵在最下面，往下能滑的距離很短
                             t.cursorY = t.startY
+                            updateCursorLook()
                         }
                         if (t.cursorMode) {
-                            val steps = ((x - t.cursorX) / (9 * dp)).toInt()
+                            // 左右：每 10dp 一個字，跟手、不加速，慢慢滑可以停在任何兩個字中間
+                            val steps = ((x - t.cursorX) / (10 * dp)).toInt()
                             if (steps != 0) {
                                 onCursorMove?.invoke(steps)
-                                t.cursorX += steps * 9 * dp
+                                t.cursorX += steps * 10 * dp
                             }
-                            // 往上滑約 22dp 換一行；往下只要 10dp（手指一下就滑出鍵盤了）
+                            // 上下：往上 24dp 換一行；往下 16dp（空白鍵在最下面，往下能滑的地方少）
                             val dy = y - t.cursorY
-                            val step = (if (dy > 0) 10 else 22) * dp
+                            val step = (if (dy > 0) 16 else 24) * dp
                             if (abs(dy) >= step) {
                                 val d = if (dy > 0) 1 else -1
                                 onCursorLine?.invoke(d)
                                 t.cursorY += d * step
+                                // 換行時手指左右晃一點不算，游標留在原本的直排位置
+                                t.cursorX = x - ((x - t.cursorX) % (10 * dp)).coerceIn(-4 * dp, 4 * dp)
                             }
                         }
                     } else if (t.action.isCharacter) {
@@ -706,6 +721,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                     onGlide?.invoke(t.points, letterCenters(), kw)
                     invalidate()
                 } else if (!t.fired && !t.cursorMode && t.action != KeyAction.Backspace && t.action != KeyAction.Shift) fire(t.key)
+                updateCursorLook()
             }
             MotionEvent.ACTION_CANCEL -> {
                 closePopup(false)
@@ -716,6 +732,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 invalidate()
                 stopRepeat()
                 longPressRunnable?.let { mainHandler.removeCallbacks(it) }
+                updateCursorLook()
                 for (t in pending) fire(t.key)
             }
         }
