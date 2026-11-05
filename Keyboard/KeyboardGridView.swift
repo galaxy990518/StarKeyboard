@@ -31,6 +31,10 @@ final class KeyButton: UIView {
     private let edgeMask = CAShapeLayer()
     private let sheenLayer = CAGradientLayer()
     private let sheenMask = CAShapeLayer()
+    // 反光和光點都放在這個照按鍵形狀剪裁的容器裡，造型（貓掌、熊熊…）外面才不會多出一圈圓邊
+    private let shineClip = CALayer()
+    private let shineClipMask = CAShapeLayer()
+    private let dotLayer = CAShapeLayer()
     private var shiny: Bool { style.finish == .liquid || style.finish == .metal }
     private let bodyLayer = CAShapeLayer()
     private let glossLayer = CAShapeLayer()
@@ -79,7 +83,11 @@ final class KeyButton: UIView {
         content.layer.insertSublayer(edgeLayer, above: cushionLayer)
         sheenLayer.mask = sheenMask
         sheenLayer.colors = [UIColor.white.withAlphaComponent(0.72).cgColor, UIColor.white.withAlphaComponent(0).cgColor]
-        content.layer.insertSublayer(sheenLayer, above: edgeLayer)
+        shineClip.mask = shineClipMask
+        shineClip.addSublayer(sheenLayer)
+        dotLayer.fillColor = UIColor.white.withAlphaComponent(0.9).cgColor
+        shineClip.addSublayer(dotLayer)
+        content.layer.insertSublayer(shineClip, above: edgeLayer)
         content.layer.addSublayer(rimLayer)
         bodyLayer.lineJoin = .round
         label.textAlignment = .center
@@ -147,10 +155,8 @@ final class KeyButton: UIView {
                                width: body.width * 0.32, height: body.height * 0.2)
             glossLayer.path = UIBezierPath(ovalIn: gloss).cgPath
         } else if finish == .liquid || finish == .metal {
-            // 左上角一顆很亮的小光點
-            let dot = min(outer.height * 0.13, 6)
-            glossLayer.path = UIBezierPath(ovalIn: CGRect(x: outer.minX + outer.width * 0.12, y: outer.minY + outer.height * 0.12,
-                                                          width: dot * 1.8, height: dot)).cgPath
+            // 光點畫在 dotLayer（會照按鍵形狀剪裁）
+            glossLayer.path = nil
         } else if style.shape == .jelly && finish != .outline {
             let gloss = CGRect(x: body.minX + body.width * 0.2, y: body.minY + 2.5,
                                width: body.width * 0.6, height: max(2.5, body.height * 0.16))
@@ -191,7 +197,7 @@ final class KeyButton: UIView {
         defer { CATransaction.commit() }
         rimLayer.isHidden = !shiny
         edgeLayer.isHidden = !shiny
-        sheenLayer.isHidden = !shiny
+        shineClip.isHidden = !shiny
         // 再往下一點一層淡淡的影子：浮起來的感覺
         shadowLayer.shadowOpacity = shiny ? 0.16 : 0
         shadowLayer.shadowColor = UIColor.black.cgColor
@@ -208,11 +214,19 @@ final class KeyButton: UIView {
             edgeLayer.path = keyPath
             edgeMask.path = keyPath
             edgeLayer.lineWidth = 5
+            shineClip.frame = bounds
+            shineClipMask.frame = bounds
+            shineClipMask.path = keyPath
             if let o = outer {
                 let r = CGRect(x: o.minX + o.width * 0.07, y: o.minY + o.height * 0.06, width: o.width * 0.86, height: o.height * 0.44)
                 sheenLayer.frame = r
                 sheenMask.frame = sheenLayer.bounds
                 sheenMask.path = UIBezierPath(roundedRect: sheenLayer.bounds, cornerRadius: r.height * 0.6).cgPath
+                // 左上角一顆很亮的小光點
+                let dot = min(o.height * 0.13, 6)
+                dotLayer.frame = bounds
+                dotLayer.path = UIBezierPath(ovalIn: CGRect(x: o.minX + o.width * 0.12, y: o.minY + o.height * 0.12,
+                                                            width: dot * 1.8, height: dot)).cgPath
             }
         }
         guard on else { glassLayer.isHidden = true; return }
