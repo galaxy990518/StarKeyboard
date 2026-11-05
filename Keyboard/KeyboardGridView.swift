@@ -42,6 +42,7 @@ final class KeyButton: UIView {
     private let padLo = CAShapeLayer()
     private let padLoMask = CAShapeLayer()
     private var shiny: Bool { style.finish == .liquid || style.finish == .metal }
+    private var glassVersion = -1
     private let bodyLayer = CAShapeLayer()
     private let glossLayer = CAShapeLayer()
     private let detailLayer = CAShapeLayer()
@@ -143,7 +144,8 @@ final class KeyButton: UIView {
         CATransaction.setDisableActions(true)
         bodyLayer.path = path
         // 漸層的範圍比按鍵大，放大的造型才整個都有漸層
-        let big = bounds.insetBy(dx: -bounds.width / 2, dy: -bounds.height / 2)
+        let grow: CGFloat = (finish == .liquid || finish == .metal) ? 0.2 : 0.5
+        let big = bounds.insetBy(dx: -bounds.width * grow, dy: -bounds.height * grow)
         cushionLayer.frame = big
         var toBig = CGAffineTransform(translationX: -big.minX, y: -big.minY)
         cushionMask.path = path.copy(using: &toBig)
@@ -225,20 +227,32 @@ final class KeyButton: UIView {
         }
     }
 
+    /// 照片或位置真的變了才重新對準（打字時版面常常重排，不用每次都重做）
+    func refreshGlassIfNeeded() {
+        guard glassVersion != GlassBackdrop.version else { return }
+        glassVersion = GlassBackdrop.version
+        layoutGlass()
+    }
+
     /// 液態玻璃：照片在 grid 上的位置換成這顆鍵上的位置，再以按鍵中心放大一點點（像透過一滴水看）
     func layoutGlass(path: CGPath? = nil, outer: CGRect? = nil, body: CGRect? = nil) {
         let on = style.finish == .liquid
+        glassVersion = GlassBackdrop.version
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
         rimLayer.isHidden = !shiny
         edgeLayer.isHidden = !shiny
         shineClip.isHidden = !shiny
-        // 再往下一點一層淡淡的影子：浮起來的感覺
+        // 再往下一點一層淡淡的影子：浮起來的感覺（給形狀，系統才不用每次自己算）
         shadowLayer.shadowOpacity = shiny ? 0.16 : 0
         shadowLayer.shadowColor = UIColor.black.cgColor
         shadowLayer.shadowOffset = CGSize(width: 0, height: 2.5)
         shadowLayer.shadowRadius = 2
+        shadowLayer.shadowPath = shiny ? shadowLayer.path : nil
+        // 液態系列一顆鍵疊了很多層：畫好一次存成圖片，打字時不用每層重畫（不然整支手機都會卡）
+        content.layer.shouldRasterize = shiny
+        content.layer.rasterizationScale = UIScreen.main.scale
         let keyPath = path ?? bodyLayer.path
         if shiny {
             rimLayer.frame = bounds
@@ -274,11 +288,16 @@ final class KeyButton: UIView {
         let r = GlassBackdrop.rect.offsetBy(dx: -frame.minX, dy: -frame.minY)
         let zoom: CGFloat = 1.08
         let lens = CGRect(x: c.x + (r.minX - c.x) * zoom, y: c.y + (r.minY - c.y) * zoom, width: r.width * zoom, height: r.height * zoom)
+        guard lens.width > 0, lens.height > 0 else { glassLayer.isHidden = true; return }
+        // 只放這顆鍵後面那一小塊照片（以前放整張再裁，每顆鍵都吃一大塊記憶體）
+        let area = keyPath.boundingBoxOfPath.insetBy(dx: -2, dy: -2)
         glassLayer.isHidden = false
         glassLayer.contents = img
-        glassLayer.frame = lens
+        glassLayer.frame = area
+        glassLayer.contentsRect = CGRect(x: (area.minX - lens.minX) / lens.width, y: (area.minY - lens.minY) / lens.height,
+                                         width: area.width / lens.width, height: area.height / lens.height)
         glassMask.frame = glassLayer.bounds
-        var toLayer = CGAffineTransform(translationX: -lens.minX, y: -lens.minY)
+        var toLayer = CGAffineTransform(translationX: -area.minX, y: -area.minY)
         glassMask.path = keyPath.copy(using: &toLayer)
     }
 
@@ -515,7 +534,7 @@ final class KeyboardGridView: UIView {
 
     /// 液態玻璃：照片或位置變了，每顆鍵重新對準後面那一塊
     func refreshGlass() {
-        for k in keys { k.layoutGlass() }
+        for k in keys { k.refreshGlassIfNeeded() }
     }
     private var layout = KeyboardLayout(rows: [], columns: 10)
     private var tracks: [UITouch: Track] = [:]

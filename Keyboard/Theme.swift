@@ -589,6 +589,8 @@ enum KeyFinish: String, CaseIterable {
 enum GlassBackdrop {
     static var image: CGImage?
     static var rect: CGRect = .zero
+    /// 照片或位置變了就加一；按鍵看到一樣的號碼就不用重新對準
+    static var version = 0
 }
 
 /// 按下去的動作

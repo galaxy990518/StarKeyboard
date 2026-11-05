@@ -365,15 +365,20 @@ final class KeyboardViewController: UIInputViewController {
     private func updateGlass() {
         guard style.finish == .liquid, let img = backgroundImage else {
             glassKey = ""
-            if GlassBackdrop.image != nil { GlassBackdrop.image = nil; grid.refreshGlass() }
+            if GlassBackdrop.image != nil { GlassBackdrop.image = nil; GlassBackdrop.version += 1; grid.refreshGlass() }
             return
         }
         let key = "\(loadedPhoto ?? "")|\(settings.backgroundFade)|\(style.theme.id)"
         if key != glassKey {
             glassKey = key
             GlassBackdrop.image = Self.blurredGlass(img, tint: style.theme.backgroundTop.withAlphaComponent(settings.backgroundFade))
+            GlassBackdrop.version += 1
         }
-        GlassBackdrop.rect = view.convert(backgroundImageView.frame, to: grid)
+        let rect = view.convert(backgroundImageView.frame, to: grid)
+        if rect != GlassBackdrop.rect {
+            GlassBackdrop.rect = rect
+            GlassBackdrop.version += 1
+        }
         grid.refreshGlass()
     }
 
@@ -385,14 +390,19 @@ final class KeyboardViewController: UIInputViewController {
         let size = CGSize(width: max(1, image.size.width * s), height: max(1, image.size.height * s))
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
-        let small = UIGraphicsImageRenderer(size: size, format: format).image { ctx in
-            image.draw(in: CGRect(origin: .zero, size: size))
+        // 先縮成很小（約 1/8）再放大回來，就是柔柔的模糊；不用 CoreImage（它在鍵盤裡會佔一大塊顯示記憶體）
+        let tinySize = CGSize(width: max(1, (size.width / 8).rounded()), height: max(1, (size.height / 8).rounded()))
+        let tiny = UIGraphicsImageRenderer(size: tinySize, format: format).image { ctx in
+            ctx.cgContext.interpolationQuality = .medium
+            image.draw(in: CGRect(origin: .zero, size: tinySize))
             tint.setFill()
-            ctx.fill(CGRect(origin: .zero, size: size))
+            ctx.fill(CGRect(origin: .zero, size: tinySize))
         }
-        guard let input = CIImage(image: small) else { return small.cgImage }
-        let blurred = input.clampedToExtent().applyingGaussianBlur(sigma: 4).cropped(to: input.extent)
-        return CIContext(options: [.useSoftwareRenderer: false]).createCGImage(blurred, from: input.extent) ?? small.cgImage
+        let soft = UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            ctx.cgContext.interpolationQuality = .high
+            tiny.draw(in: CGRect(origin: .zero, size: size))
+        }
+        return soft.cgImage
     }
 
     override func viewDidLayoutSubviews() {
