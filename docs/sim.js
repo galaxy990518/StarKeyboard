@@ -98,7 +98,7 @@
     return { name: '自訂', top: hsb(h, s * .15, 1), bottom: hsb(h2, s2 * .25, .97), key: '#ffffff', text: hsb(h, s * .6 + .2, .45), special: hsb(h2, s2 * .35, .95), specialText: hsb(h2, s2 * .7, .38), accent: hsb(h2, s2 * .6, .9), accentText: '#ffffff', shadow: hsb(h, s * .4, .82) };
   }
   THEMES.custom = customTheme();
-  var FINISHES = [['flat', '平面'], ['puffy', '胖胖'], ['raised', '立體'], ['outline', '線稿', '新']];
+  var FINISHES = [['flat', '平面'], ['puffy', '胖胖'], ['raised', '立體'], ['outline', '線稿'], ['liquid', '液態玻璃', '新']];
   var EFFECTS = [['none', '無', []], ['stars', '星星', ['★', '☆', '✦']], ['hearts', '愛心', ['♥︎', '♡', '❤︎']], ['sparkles', '閃亮', ['✧', '✦', '⋆']], ['flowers', '花花', ['✿', '❀', '❁']], ['bubbles', '泡泡', ['○', '◦', '°']]];
   var JSD = 'https://cdn.jsdelivr.net/gh/';
   var FONTS = [

@@ -1,6 +1,7 @@
 import UIKit
 import AudioToolbox
 import Vision
+import CoreImage
 
 private final class KeyboardInputView: UIInputView, UIInputViewAudioFeedback {
     var enableInputClicksWhenVisible: Bool { true }
@@ -307,6 +308,42 @@ final class KeyboardViewController: UIInputViewController {
         finishPhotoAdjust()
     }
 
+    // 液態玻璃：模糊過的背景照片（照片、淡化、主題沒變就不重做）
+    private var glassKey = ""
+
+    private func updateGlass() {
+        guard style.finish == .liquid, let img = backgroundImage else {
+            glassKey = ""
+            if GlassBackdrop.image != nil { GlassBackdrop.image = nil; grid.refreshGlass() }
+            return
+        }
+        let key = "\(loadedPhoto ?? "")|\(settings.backgroundFade)|\(style.theme.id)"
+        if key != glassKey {
+            glassKey = key
+            GlassBackdrop.image = Self.blurredGlass(img, tint: style.theme.backgroundTop.withAlphaComponent(settings.backgroundFade))
+        }
+        GlassBackdrop.rect = view.convert(backgroundImageView.frame, to: grid)
+        grid.refreshGlass()
+    }
+
+    /// 照片縮到最長邊 360，蓋上淡化那層顏色，再模糊（只做一次，每顆鍵共用）
+    private static func blurredGlass(_ image: UIImage, tint: UIColor) -> CGImage? {
+        let longest = max(image.size.width, image.size.height)
+        guard longest > 0 else { return nil }
+        let s = min(1, 360 / longest)
+        let size = CGSize(width: max(1, image.size.width * s), height: max(1, image.size.height * s))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let small = UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            image.draw(in: CGRect(origin: .zero, size: size))
+            tint.setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+        }
+        guard let input = CIImage(image: small) else { return small.cgImage }
+        let blurred = input.clampedToExtent().applyingGaussianBlur(sigma: 4).cropped(to: input.extent)
+        return CIContext(options: [.useSoftwareRenderer: false]).createCGImage(blurred, from: input.extent) ?? small.cgImage
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         let b = view.bounds
@@ -327,6 +364,7 @@ final class KeyboardViewController: UIInputViewController {
         panelView?.frame = contentView.bounds
         candidatePanel?.frame = contentView.bounds
         handwritingView?.frame = contentView.bounds
+        updateGlass()
         let toastW = min(b.width - 40, 300)
         toastLabel.frame = CGRect(x: (b.width - toastW) / 2, y: folderBoxHeight + CGFloat(settings.candidateBarHeight) + 8, width: toastW, height: 44)
     }
@@ -2089,6 +2127,7 @@ final class KeyboardViewController: UIInputViewController {
         topBar.style = s
         topBar.hiddenTools = settings.hiddenToolbarItems
         grid.style = s
+        updateGlass()
         handwritingView?.style = s
         candidatePanel?.style = s
         if let p = panelView as? EmojiPanelView { p.style = s }

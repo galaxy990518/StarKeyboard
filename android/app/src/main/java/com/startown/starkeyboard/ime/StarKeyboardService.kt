@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.inputmethodservice.InputMethodService
 import android.media.AudioManager
@@ -330,6 +331,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             }
         }
         keyboard.onGlide = { path, centers, kw -> glideTyped(path, centers, kw) }
+        // 鍵盤大小變了，液態玻璃透出來的照片位置要跟著重算
+        keyboard.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob -> if (r - l != or - ol || b - t != ob - ot) updateGlass() }
         topBar.onScriptToggle = {
             if (mode == InputMode.PINYIN) {
                 settings.pinyinSimplified = !settings.pinyinSimplified
@@ -1472,6 +1475,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         settings.backgroundZoom = bgImage.zoom
         settings.backgroundFocusX = bgImage.focusX
         settings.backgroundFocusY = bgImage.focusY
+        updateGlass()
         toast("照片位置存好了")
     }
 
@@ -1888,11 +1892,50 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         topBar.hiddenTools = settings.hiddenTools
         topBar.style = s
         keyboard.style = s
+        updateGlass()
         handwriting?.style = s
         toastView.background = roundRect(s.theme.accent.withAlpha(0.95f), 14 * dp)
         toastView.setTextColor(s.theme.accentText)
         refreshTopBar()
     }
+
+    // 液態玻璃：把背景照片縮小模糊一份給按鍵透出來（照片、位置、淡化沒變就不重做）
+    private var glassStamp = ""
+
+    private fun updateGlass() {
+        if (style.finish != KeyFinish.LIQUID || !settings.hasBackground) {
+            glassStamp = ""
+            keyboard.setGlass(null, null)
+            return
+        }
+        keyboard.post {
+            val r = root ?: return@post
+            if (r.width == 0 || r.height == 0 || keyboard.width == 0) return@post
+            val loc = IntArray(2); val rootLoc = IntArray(2)
+            keyboard.getLocationInWindow(loc); r.getLocationInWindow(rootLoc)
+            val rect = RectF((rootLoc[0] - loc[0]).toFloat(), (rootLoc[1] - loc[1]).toFloat(),
+                (rootLoc[0] - loc[0] + r.width).toFloat(), (rootLoc[1] - loc[1] + r.height).toFloat())
+            val stamp = "$backgroundStamp|${bgImage.zoom}|${bgImage.focusX}|${bgImage.focusY}|${settings.backgroundFade}|${r.width}x${r.height}|${style.theme.id}"
+            if (stamp == glassStamp) { keyboard.setGlass(glassImageCache, rect); return@post }
+            runCatching {
+                // 縮成 1/8 畫一次（照片＋淡化那層），再縮一半放大回來，就是柔柔的模糊
+                val w = maxOf(1, r.width / 8); val h = maxOf(1, r.height / 8)
+                val small = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                val c = android.graphics.Canvas(small)
+                c.scale(w.toFloat() / r.width, h.toFloat() / r.height)
+                bgImage.draw(c)
+                tint.draw(c)
+                val tiny = android.graphics.Bitmap.createScaledBitmap(small, maxOf(1, w / 2), maxOf(1, h / 2), true)
+                val soft = android.graphics.Bitmap.createScaledBitmap(tiny, w, h, true)
+                small.recycle(); tiny.recycle()
+                glassImageCache = soft
+                glassStamp = stamp
+                keyboard.setGlass(soft, rect)
+            }
+        }
+    }
+
+    private var glassImageCache: android.graphics.Bitmap? = null
 
     private var lastReturnTitle = ""
 
