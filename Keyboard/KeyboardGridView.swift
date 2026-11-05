@@ -35,6 +35,12 @@ final class KeyButton: UIView {
     private let shineClip = CALayer()
     private let shineClipMask = CAShapeLayer()
     private let dotLayer = CAShapeLayer()
+    // 液態系列：肉球（細節）也立體：底下影子、上緣亮邊、下緣暗邊
+    private let padShadow = CAShapeLayer()
+    private let padHi = CAShapeLayer()
+    private let padHiMask = CAShapeLayer()
+    private let padLo = CAShapeLayer()
+    private let padLoMask = CAShapeLayer()
     private var shiny: Bool { style.finish == .liquid || style.finish == .metal }
     private let bodyLayer = CAShapeLayer()
     private let glossLayer = CAShapeLayer()
@@ -67,7 +73,16 @@ final class KeyButton: UIView {
         cushionLayer.mask = cushionMask
         cushionLayer.locations = [0, 0.55, 1]
         content.layer.addSublayer(cushionLayer)
+        content.layer.addSublayer(padShadow)
         content.layer.addSublayer(detailLayer)
+        padHi.fillRule = .evenOdd
+        padHi.fillColor = UIColor.white.withAlphaComponent(0.75).cgColor
+        padHi.mask = padHiMask
+        content.layer.addSublayer(padHi)
+        padLo.fillRule = .evenOdd
+        padLo.fillColor = UIColor.black.withAlphaComponent(0.2).cgColor
+        padLo.mask = padLoMask
+        content.layer.addSublayer(padLo)
         linesLayer.fillColor = nil
         linesLayer.lineCap = .round
         linesLayer.lineJoin = .round
@@ -138,7 +153,28 @@ final class KeyButton: UIView {
         bodyLayer.lineWidth = lineWidth
         linesLayer.lineWidth = lineWidth * 0.9
         linesLayer.path = style.shape.linesPath(in: outer)
-        detailLayer.path = style.shape.detailPath(in: outer)
+        let detail = style.shape.detailPath(in: outer)
+        detailLayer.path = detail
+        let padOn = finish == .liquid || finish == .metal
+        padShadow.isHidden = !padOn
+        padHi.isHidden = !padOn
+        padLo.isHidden = !padOn
+        if padOn {
+            // 肉球往下、往上各移一點：「原本的」減掉「移過的」就是上緣、下緣那一彎
+            let d = max(1, outer.height * 0.035)
+            var down = CGAffineTransform(translationX: 0, y: d)
+            var up = CGAffineTransform(translationX: 0, y: -d)
+            let shiftedDown = detail.copy(using: &down)
+            let shiftedUp = detail.copy(using: &up)
+            for l in [padShadow, padHi, padLo, padHiMask, padLoMask] { l.frame = bounds }
+            padShadow.path = shiftedDown
+            let hi = CGMutablePath(); hi.addPath(detail); if let s = shiftedDown { hi.addPath(s) }
+            padHi.path = hi
+            padHiMask.path = detail
+            let lo = CGMutablePath(); lo.addPath(detail); if let s = shiftedUp { lo.addPath(s) }
+            padLo.path = lo
+            padLoMask.path = detail
+        }
         detailLayer.opacity = Float(style.shape.detailOpacity(in: outer))
         shadowLayer.path = path.copy(using: &shift)
         shadowLayer.frame = bounds
@@ -350,6 +386,10 @@ final class KeyButton: UIView {
             detailLayer.fillColor = style.lineColor.cgColor
         } else {
             detailLayer.fillColor = style.shape.detailColor(theme: t).withAlphaComponent(style.keyAlpha).cgColor
+        }
+        // 肉球底下的影子：肉球顏色調暗
+        if let c = detailLayer.fillColor {
+            padShadow.fillColor = UIColor(cgColor: c).darker(0.55).withAlphaComponent(0.45).cgColor
         }
         linesLayer.strokeColor = style.lineColor.cgColor
         glossLayer.fillColor = UIColor.white.withAlphaComponent(style.finish == .puffy ? (t.isDark ? 0.3 : 0.75)

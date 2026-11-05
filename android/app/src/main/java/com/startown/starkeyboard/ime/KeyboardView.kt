@@ -74,6 +74,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         var outer = RectF()
         var metal: LinearGradient? = null // 液態金屬：一條一條明暗的金屬反光（跟著按鍵顏色）
         var metalFor = 0
+        var padDown: Path? = null   // 液態系列：肉球（細節）往下移一點（影子、上緣亮邊）
+        var padUp: Path? = null     // 往上移一點（下緣暗邊）
         var body: RectF = RectF()
         var detailAlpha = 0.4f
         var depth = 0f   // 立體：按鍵側面的厚度
@@ -213,6 +215,14 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             outer.bottom -= k.depth
             k.path = style.shape.path(outer, dp)
             k.detail = style.shape.detailPath(outer, dp)
+            // 液態系列：肉球也做成立體（往下、往上各移一點，用來畫影子和亮邊、暗邊）
+            if (style.finish == KeyFinish.LIQUID || style.finish == KeyFinish.METAL) {
+                val d = maxOf(1f * dp, outer.height() * 0.035f)
+                k.padDown = Path(k.detail).apply { offset(0f, d) }
+                k.padUp = Path(k.detail).apply { offset(0f, -d) }
+            } else {
+                k.padDown = null; k.padUp = null
+            }
             k.lines = style.shape.linesPath(outer)
             // 線稿：線的粗細跟著按鍵大小，細細的
             k.lineWidth = (outer.height() * 0.028f).coerceIn(0.9f * dp, 1.6f * dp)
@@ -389,9 +399,33 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 canvas.drawPath(k.path, linePaint)
                 linePaint.shader = null
             }
-            fillPaint.color = if (style.shape.art?.lineDetail == true) lineColor
+            val padColor = if (style.shape.art?.lineDetail == true) lineColor
                 else style.shape.detailColor(t).withAlpha(style.keyAlpha * k.detailAlpha)
+            val padDown = k.padDown
+            val padUp = k.padUp
+            if (padDown != null) {
+                // 肉球底下一點影子（浮起來）
+                canvas.save()
+                canvas.clipOutPath(k.detail)
+                fillPaint.color = darker(padColor, 0.55f).withAlpha(0.45f)
+                canvas.drawPath(padDown, fillPaint)
+                canvas.restore()
+            }
+            fillPaint.color = padColor
             canvas.drawPath(k.detail, fillPaint)
+            if (padDown != null && padUp != null) {
+                // 上緣一道亮邊、下緣一道暗邊：每顆肉球都鼓鼓的
+                canvas.save()
+                canvas.clipPath(k.detail)
+                canvas.clipOutPath(padDown)
+                canvas.drawColor(Color.WHITE.withAlpha(0.75f))
+                canvas.restore()
+                canvas.save()
+                canvas.clipPath(k.detail)
+                canvas.clipOutPath(padUp)
+                canvas.drawColor(Color.BLACK.withAlpha(0.2f))
+                canvas.restore()
+            }
             k.lines?.let {
                 linePaint.color = lineColor
                 linePaint.strokeWidth = k.lineWidth * 0.9f
