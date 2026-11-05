@@ -26,6 +26,12 @@ final class KeyButton: UIView {
     private let glassMask = CAShapeLayer()
     private let rimLayer = CAGradientLayer()
     private let rimMask = CAShapeLayer()
+    // 液態玻璃、金屬：邊緣往內一圈暗一點（厚度）、上半部一大片反光（鼓鼓的）
+    private let edgeLayer = CAShapeLayer()
+    private let edgeMask = CAShapeLayer()
+    private let sheenLayer = CAGradientLayer()
+    private let sheenMask = CAShapeLayer()
+    private var shiny: Bool { style.finish == .liquid || style.finish == .metal }
     private let bodyLayer = CAShapeLayer()
     private let glossLayer = CAShapeLayer()
     private let detailLayer = CAShapeLayer()
@@ -66,9 +72,14 @@ final class KeyButton: UIView {
         rimMask.strokeColor = UIColor.black.cgColor
         rimMask.lineJoin = .round
         rimLayer.mask = rimMask
-        rimLayer.locations = [0, 0.55, 1]
-        rimLayer.colors = [UIColor.white.withAlphaComponent(0.9).cgColor, UIColor.white.withAlphaComponent(0.12).cgColor,
-                           UIColor.white.withAlphaComponent(0.5).cgColor]
+        rimLayer.locations = [0, 0.5, 1]
+        edgeLayer.fillColor = nil
+        edgeLayer.lineJoin = .round
+        edgeLayer.mask = edgeMask
+        content.layer.insertSublayer(edgeLayer, above: cushionLayer)
+        sheenLayer.mask = sheenMask
+        sheenLayer.colors = [UIColor.white.withAlphaComponent(0.72).cgColor, UIColor.white.withAlphaComponent(0).cgColor]
+        content.layer.insertSublayer(sheenLayer, above: edgeLayer)
         content.layer.addSublayer(rimLayer)
         bodyLayer.lineJoin = .round
         label.textAlignment = .center
@@ -135,11 +146,11 @@ final class KeyButton: UIView {
             let gloss = CGRect(x: body.minX + body.width * 0.14, y: body.minY + body.height * 0.1,
                                width: body.width * 0.32, height: body.height * 0.2)
             glossLayer.path = UIBezierPath(ovalIn: gloss).cgPath
-        } else if finish == .liquid {
-            // 上緣一道細細的反光
-            let gh = max(2, body.height * 0.1)
-            let gloss = CGRect(x: body.minX + body.width * 0.16, y: body.minY + 2, width: body.width * 0.44, height: gh)
-            glossLayer.path = UIBezierPath(roundedRect: gloss, cornerRadius: gh / 2).cgPath
+        } else if finish == .liquid || finish == .metal {
+            // 左上角一顆很亮的小光點
+            let dot = min(outer.height * 0.13, 6)
+            glossLayer.path = UIBezierPath(ovalIn: CGRect(x: outer.minX + outer.width * 0.12, y: outer.minY + outer.height * 0.12,
+                                                          width: dot * 1.8, height: dot)).cgPath
         } else if style.shape == .jelly && finish != .outline {
             let gloss = CGRect(x: body.minX + body.width * 0.2, y: body.minY + 2.5,
                                width: body.width * 0.6, height: max(2.5, body.height * 0.16))
@@ -178,13 +189,33 @@ final class KeyButton: UIView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
-        rimLayer.isHidden = !on
-        guard on else { glassLayer.isHidden = true; return }
+        rimLayer.isHidden = !shiny
+        edgeLayer.isHidden = !shiny
+        sheenLayer.isHidden = !shiny
+        // 再往下一點一層淡淡的影子：浮起來的感覺
+        shadowLayer.shadowOpacity = shiny ? 0.16 : 0
+        shadowLayer.shadowColor = UIColor.black.cgColor
+        shadowLayer.shadowOffset = CGSize(width: 0, height: 2.5)
+        shadowLayer.shadowRadius = 2
         let keyPath = path ?? bodyLayer.path
-        rimLayer.frame = bounds
-        rimMask.frame = bounds
-        rimMask.path = keyPath
-        rimMask.lineWidth = 1.3
+        if shiny {
+            rimLayer.frame = bounds
+            rimMask.frame = bounds
+            rimMask.path = keyPath
+            rimMask.lineWidth = 1.7
+            edgeLayer.frame = bounds
+            edgeMask.frame = bounds
+            edgeLayer.path = keyPath
+            edgeMask.path = keyPath
+            edgeLayer.lineWidth = 5
+            if let o = outer {
+                let r = CGRect(x: o.minX + o.width * 0.07, y: o.minY + o.height * 0.06, width: o.width * 0.86, height: o.height * 0.44)
+                sheenLayer.frame = r
+                sheenMask.frame = sheenLayer.bounds
+                sheenMask.path = UIBezierPath(roundedRect: sheenLayer.bounds, cornerRadius: r.height * 0.6).cgPath
+            }
+        }
+        guard on else { glassLayer.isHidden = true; return }
         guard let img = GlassBackdrop.image, let keyPath = keyPath, GlassBackdrop.rect.width > 0 else {
             glassLayer.isHidden = true
             return
@@ -271,12 +302,19 @@ final class KeyButton: UIView {
             shadowLayer.fillColor = UIColor.clear.cgColor
             cushionLayer.colors = [UIColor.clear.cgColor, UIColor.clear.cgColor, UIColor.clear.cgColor]
         case .liquid:
-            // 液態玻璃：淡淡的顏色＋一層白，後面的照片透出來
+            // 液態玻璃：淡淡的顏色＋一層白，後面的照片透出來；上面亮、底部也亮（光在玻璃裡反射）
             bodyLayer.fillColor = fill.withAlphaComponent(a * (isPressed ? 0.55 : 0.28)).blended(white: t.isDark ? 0.05 : 0.12).cgColor
             bodyLayer.strokeColor = nil
-            shadowLayer.fillColor = t.shadow.withAlphaComponent(0.18).cgColor
-            cushionLayer.colors = [UIColor.white.withAlphaComponent(t.isDark ? 0.22 : 0.38).cgColor,
-                                   UIColor.clear.cgColor, UIColor.white.withAlphaComponent(t.isDark ? 0.08 : 0.16).cgColor]
+            shadowLayer.fillColor = t.shadow.withAlphaComponent(0.32).cgColor
+            cushionLayer.colors = [UIColor.white.withAlphaComponent(t.isDark ? 0.3 : 0.45).cgColor,
+                                   UIColor.clear.cgColor, UIColor.white.withAlphaComponent(t.isDark ? 0.3 : 0.5).cgColor]
+        case .metal:
+            // 液態金屬：按鍵的顏色做成一條一條明暗的金屬反光（像鉻、像水銀）
+            bodyLayer.fillColor = fill.withAlphaComponent(max(a, 0.9)).cgColor
+            bodyLayer.strokeColor = nil
+            shadowLayer.fillColor = fill.darker(0.35).withAlphaComponent(0.55).cgColor
+            cushionLayer.colors = [fill.lighter(0.8), fill.lighter(0.35), fill.darker(0.62), fill.lighter(0.45), fill, fill.darker(0.55)]
+                .map { $0.withAlphaComponent(max(a, 0.9)).cgColor }
         case .raised:
             // 側面用按鍵本身的顏色調暗，按鍵調得很透明也一定看得出厚度；按下去時側面消失（沉下去了）
             bodyLayer.fillColor = fill.withAlphaComponent(a).cgColor
@@ -286,6 +324,14 @@ final class KeyButton: UIView {
             cushionLayer.colors = [UIColor.white.withAlphaComponent(v * (t.isDark ? 0.3 : 0.55)).cgColor,
                                    UIColor.clear.cgColor, UIColor.black.withAlphaComponent(v * (t.isDark ? 0.25 : 0.12)).cgColor]
         }
+        // 金屬是六段明暗，其他是三段
+        cushionLayer.locations = style.finish == .metal ? [0, 0.3, 0.5, 0.62, 0.82, 1] : [0, 0.55, 1]
+        cushionLayer.isHidden = style.finish == .outline || (!style.shape.isSoftShape && style.finish == .flat)
+        // 玻璃邊：上面最亮、中間淡、底部又亮起來；金屬邊：上亮下暗（像斜切的邊）
+        rimLayer.colors = style.finish == .metal
+            ? [UIColor.white.withAlphaComponent(0.95).cgColor, UIColor.white.withAlphaComponent(0.2).cgColor, UIColor.black.withAlphaComponent(0.45).cgColor]
+            : [UIColor.white.cgColor, UIColor.white.withAlphaComponent(0.2).cgColor, UIColor.white.withAlphaComponent(0.85).cgColor]
+        edgeLayer.strokeColor = UIColor.black.withAlphaComponent(style.finish == .metal ? 0.22 : 0.13).cgColor
         if style.shape.art?.lineDetail == true {
             detailLayer.fillColor = style.lineColor.cgColor
         } else {
@@ -293,7 +339,7 @@ final class KeyButton: UIView {
         }
         linesLayer.strokeColor = style.lineColor.cgColor
         glossLayer.fillColor = UIColor.white.withAlphaComponent(style.finish == .puffy ? (t.isDark ? 0.3 : 0.75)
-            : style.finish == .liquid ? (t.isDark ? 0.35 : 0.6) : (t.isDark ? 0.18 : 0.55)).cgColor
+            : (style.finish == .liquid || style.finish == .metal) ? 0.9 : (t.isDark ? 0.18 : 0.55)).cgColor
         CATransaction.commit()
         label.textColor = text
         hintLabel.textColor = text.withAlphaComponent(0.6)
@@ -341,7 +387,7 @@ final class KeyButton: UIView {
                 switch self.style.finish {
                 case .puffy: self.content.transform = CGAffineTransform(scaleX: 1.06, y: 0.86)
                 case .raised: self.content.transform = CGAffineTransform(translationX: 0, y: self.depth * 0.85)
-                case .flat, .outline, .liquid: self.content.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+                case .flat, .outline, .liquid, .metal: self.content.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
                 }
             }
         } else {
@@ -842,6 +888,13 @@ extension UIColor {
         guard outA > 0 else { return .clear }
         return UIColor(red: (r * a + w * (1 - a)) / outA, green: (g * a + w * (1 - a)) / outA,
                        blue: (b * a + w * (1 - a)) / outA, alpha: outA)
+    }
+
+    /// 調亮：往白色靠 f（0～1）
+    func lighter(_ f: CGFloat) -> UIColor {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        getRed(&r, green: &g, blue: &b, alpha: &a)
+        return UIColor(red: r + (1 - r) * f, green: g + (1 - g) * f, blue: b + (1 - b) * f, alpha: a)
     }
 
     /// 調暗（立體按鍵的側面）

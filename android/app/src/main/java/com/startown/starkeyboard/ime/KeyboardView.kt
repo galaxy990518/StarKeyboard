@@ -68,7 +68,12 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         var lines: Path? = null   // 只畫線的部分（尾巴、鬍鬚）
         var lineWidth = 1f
         var shading: LinearGradient? = null
-        var rim: LinearGradient? = null   // 液態玻璃：亮亮的玻璃邊
+        var rim: LinearGradient? = null   // 液態玻璃、金屬：亮亮的邊
+        var sheen: LinearGradient? = null // 上半部一大片由亮到透明的反光（看起來鼓鼓的）
+        var sheenRect = RectF()
+        var outer = RectF()
+        var metal: LinearGradient? = null // 液態金屬：一條一條明暗的金屬反光（跟著按鍵顏色）
+        var metalFor = 0
         var body: RectF = RectF()
         var detailAlpha = 0.4f
         var depth = 0f   // 立體：按鍵側面的厚度
@@ -220,11 +225,23 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 KeyFinish.RAISED -> maxOf(a, 0.6f).let { v -> intArrayOf(Color.WHITE.withAlpha(v * (if (dark) 0.3f else 0.55f)), Color.TRANSPARENT, Color.BLACK.withAlpha(v * (if (dark) 0.25f else 0.12f))) }
                 KeyFinish.OUTLINE -> intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.TRANSPARENT)
                 // 液態玻璃：上面亮、中間透、底部再亮一點（光在玻璃裡反射）
-                KeyFinish.LIQUID -> intArrayOf(Color.WHITE.withAlpha(if (dark) 0.22f else 0.38f), Color.TRANSPARENT, Color.WHITE.withAlpha(if (dark) 0.08f else 0.16f))
+                KeyFinish.LIQUID -> intArrayOf(Color.WHITE.withAlpha(if (dark) 0.3f else 0.45f), Color.TRANSPARENT, Color.WHITE.withAlpha(if (dark) 0.3f else 0.5f))
+                KeyFinish.METAL -> intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.TRANSPARENT)
             }
-            k.rim = if (style.finish == KeyFinish.LIQUID) LinearGradient(0f, outer.top, 0f, outer.bottom,
-                intArrayOf(Color.WHITE.withAlpha(0.9f), Color.WHITE.withAlpha(0.12f), Color.WHITE.withAlpha(0.5f)),
-                floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP) else null
+            val shiny = style.finish == KeyFinish.LIQUID || style.finish == KeyFinish.METAL
+            k.outer = RectF(outer)
+            // 玻璃邊：上面最亮、中間淡、底部又亮起來；金屬邊：上亮下暗（像斜切的邊）
+            k.rim = if (shiny) LinearGradient(0f, outer.top, 0f, outer.bottom,
+                if (style.finish == KeyFinish.METAL) intArrayOf(Color.WHITE.withAlpha(0.95f), Color.WHITE.withAlpha(0.2f), Color.BLACK.withAlpha(0.45f))
+                else intArrayOf(Color.WHITE, Color.WHITE.withAlpha(0.2f), Color.WHITE.withAlpha(0.85f)),
+                floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP) else null
+            // 上半部一大片反光：從很亮慢慢變透明
+            k.sheenRect = RectF(outer.left + outer.width() * 0.07f, outer.top + outer.height() * 0.06f,
+                outer.right - outer.width() * 0.07f, outer.top + outer.height() * 0.5f)
+            k.sheen = if (shiny) LinearGradient(0f, k.sheenRect.top, 0f, k.sheenRect.bottom,
+                intArrayOf(Color.WHITE.withAlpha(if (style.finish == KeyFinish.METAL) 0.75f else 0.7f), Color.WHITE.withAlpha(0f)),
+                null, Shader.TileMode.CLAMP) else null
+            k.metal = null
             k.shading = if (style.finish != KeyFinish.OUTLINE && (style.shape.isSoftShape || style.finish != KeyFinish.FLAT)) LinearGradient(0f, outer.top, 0f, outer.bottom,
                 shadeColors, floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP) else null
             k.shadow = Path(k.path).apply { offset(0f, if (k.depth > 0) k.depth else (if (style.finish == KeyFinish.PUFFY) 3f else 1.5f) * dp) }
@@ -268,12 +285,19 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 // 側面用按鍵本身的顏色調暗，透明的鍵也一定看得到
                 KeyFinish.RAISED -> darker(fill, if (t.dark) 0.55f else 0.78f).withAlpha(maxOf(a, 0.85f) * (1f - press))
                 KeyFinish.OUTLINE -> Color.TRANSPARENT
-                KeyFinish.LIQUID -> t.shadow.withAlpha(0.18f)
+                KeyFinish.LIQUID -> t.shadow.withAlpha(0.32f)
+                KeyFinish.METAL -> darker(fill, 0.35f).withAlpha(0.55f)
             }
             // 影子只畫在按鍵外面，按鍵調透明時才不會看到兩層疊在一起
             canvas.save()
             canvas.clipOutPath(k.path)
             canvas.drawPath(k.shadow, fillPaint)
+            if (finish == KeyFinish.LIQUID || finish == KeyFinish.METAL) {
+                // 再往下一點一層淡淡的影子：浮起來的感覺
+                canvas.translate(0f, 2.5f * dp)
+                fillPaint.color = Color.BLACK.withAlpha(0.12f)
+                canvas.drawPath(k.shadow, fillPaint)
+            }
             canvas.restore()
             val lineColor = style.lineColor
             if (finish == KeyFinish.OUTLINE) {
@@ -285,6 +309,21 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 linePaint.color = lineColor
                 linePaint.strokeWidth = k.lineWidth
                 canvas.drawPath(k.path, linePaint)
+            } else if (finish == KeyFinish.METAL) {
+                // 液態金屬：按鍵的顏色做成一條一條明暗的金屬反光（像鉻、像水銀）
+                if (k.metal == null || k.metalFor != fill) {
+                    val o = k.outer
+                    k.metal = LinearGradient(0f, o.top, 0f, o.bottom,
+                        intArrayOf(lighter(fill, 0.8f), lighter(fill, 0.35f), darker(fill, 0.62f), lighter(fill, 0.45f), fill, darker(fill, 0.55f)),
+                        floatArrayOf(0f, 0.3f, 0.5f, 0.62f, 0.82f, 1f), Shader.TileMode.CLAMP)
+                    k.metalFor = fill
+                }
+                fillPaint.shader = k.metal
+                fillPaint.color = Color.WHITE
+                fillPaint.alpha = (maxOf(a, 0.9f) * 255).toInt()
+                canvas.drawPath(k.path, fillPaint)
+                fillPaint.shader = null
+                fillPaint.alpha = 255
             } else if (finish == KeyFinish.LIQUID) {
                 // 液態玻璃：後面的照片（模糊、稍微放大，像透過一滴水看）＋淡淡的顏色
                 glassImage?.let { img ->
@@ -307,12 +346,28 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 val b = k.body
                 fillPaint.color = Color.WHITE.withAlpha(if (t.dark) 0.3f else 0.75f)
                 canvas.drawOval(RectF(b.left + b.width() * 0.14f, b.top + b.height() * 0.1f, b.left + b.width() * 0.46f, b.top + b.height() * 0.3f), fillPaint)
-            } else if (finish == KeyFinish.LIQUID) {
-                // 上緣一道細細的反光
-                val b = k.body
-                val gh = maxOf(2f * dp, b.height() * 0.1f)
-                fillPaint.color = Color.WHITE.withAlpha(if (t.dark) 0.35f else 0.6f)
-                canvas.drawRoundRect(RectF(b.left + b.width() * 0.16f, b.top + 2f * dp, b.left + b.width() * 0.6f, b.top + 2f * dp + gh), gh / 2, gh / 2, fillPaint)
+            } else if (finish == KeyFinish.LIQUID || finish == KeyFinish.METAL) {
+                canvas.save()
+                canvas.clipPath(k.path)
+                // 邊緣往內一圈暗一點：看得出玻璃／金屬的厚度
+                linePaint.color = Color.BLACK.withAlpha(if (finish == KeyFinish.METAL) 0.22f else 0.13f)
+                linePaint.strokeWidth = 5f * dp
+                canvas.drawPath(k.path, linePaint)
+                // 上半部一大片反光（鼓鼓的）
+                k.sheen?.let { sh ->
+                    fillPaint.shader = sh
+                    fillPaint.color = Color.WHITE
+                    val r = k.sheenRect
+                    canvas.drawRoundRect(r, r.height() * 0.6f, r.height() * 0.6f, fillPaint)
+                    fillPaint.shader = null
+                }
+                // 左上角一顆很亮的小光點
+                val o = k.outer
+                fillPaint.color = Color.WHITE.withAlpha(0.9f)
+                val dot = minOf(o.height() * 0.13f, 6f * dp)
+                canvas.drawOval(RectF(o.left + o.width() * 0.12f, o.top + o.height() * 0.12f,
+                    o.left + o.width() * 0.12f + dot * 1.8f, o.top + o.height() * 0.12f + dot), fillPaint)
+                canvas.restore()
             } else if (style.shape == KeyShape.JELLY && finish != KeyFinish.OUTLINE) {
                 val b = k.body
                 val gh = maxOf(2.5f * dp, b.height() * 0.16f)
@@ -330,7 +385,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 // 玻璃邊：上面亮、下面也微微亮
                 linePaint.color = Color.WHITE
                 linePaint.shader = shader
-                linePaint.strokeWidth = 1.3f * dp
+                linePaint.strokeWidth = 1.7f * dp
                 canvas.drawPath(k.path, linePaint)
                 linePaint.shader = null
             }
@@ -432,6 +487,10 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         }
         return true
     }
+
+    /** 調亮：往白色靠 f（0～1） */
+    private fun lighter(c: Int, f: Float) = Color.rgb((Color.red(c) + (255 - Color.red(c)) * f).toInt(),
+        (Color.green(c) + (255 - Color.green(c)) * f).toInt(), (Color.blue(c) + (255 - Color.blue(c)) * f).toInt())
 
     private fun darker(c: Int, f: Float) = Color.rgb((Color.red(c) * f).toInt(), (Color.green(c) * f).toInt(), (Color.blue(c) * f).toInt())
 

@@ -396,8 +396,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 runQuickTranslate(q.first)
                 return@onEditorSource
             }
-            // 新增表符、符號：把剪貼簿的文字貼進編輯框
-            if (editorPurpose == EditorPurpose.EMOTICON || editorPurpose == EditorPurpose.SYMBOL) {
+            // 新增表符、符號、快捷片語：把剪貼簿的文字貼進編輯框
+            if (editorPurpose == EditorPurpose.EMOTICON || editorPurpose == EditorPurpose.SYMBOL || editorPurpose == EditorPurpose.SHORTCUT_PHRASE) {
                 pasteIntoEditor()
                 return@onEditorSource
             }
@@ -1186,6 +1186,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 when (editorPurpose) {
                     EditorPurpose.EMOTICON -> topBar.showEditor("新增表符：", ed + pending, "(•ᴗ•)", "儲存", "📋 貼上")
                     EditorPurpose.SYMBOL -> topBar.showEditor("新增符號：", ed + pending, "※", "儲存", "📋 貼上")
+                    // 很長的地址、自我介紹：先在別的地方複製，再按「📋 貼上」
+                    EditorPurpose.SHORTCUT_PHRASE -> topBar.showEditor(editorLabel(editorPurpose), editorDisplay(ed, pending), "", editorConfirmTitle(editorPurpose), "📋 貼上")
                     EditorPurpose.TRANSLATE -> {
                         val name = Translator.targets.firstOrNull { it.code == settings.translateTarget }?.name ?: "英文"
                         val from = Translator.targets.firstOrNull { it.code == settings.translateSource }?.name ?: "自動"
@@ -1607,7 +1609,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             EditorPurpose.SYMBOL -> "打想加的符號，空白隔開可以一次加好幾個"
             EditorPurpose.TRANSLATE -> "先打要翻譯的話，按「→語言」換目標語言"
             EditorPurpose.FANCY -> "打想變花樣的字（英文樣式最多），再按「變花樣」"
-            EditorPurpose.SHORTCUT_PHRASE -> "先打常用的整段話，例如地址、自我介紹"
+            EditorPurpose.SHORTCUT_PHRASE -> "打常用的整段話，或先複製好再按「📋 貼上」"
             EditorPurpose.SHORTCUT_CODE -> "再打縮寫"
             EditorPurpose.CLIPBOARD_CATEGORY -> "輸入名稱後按建立；取消不會新增資料夾"
             EditorPurpose.CLIPBOARD_ITEM -> "改完按儲存。按取消會留下原本的文字"

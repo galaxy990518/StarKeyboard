@@ -409,7 +409,7 @@ enum class KeyMotion(val id: String, val title: String) {
 
 /** 按鍵質感：平面、胖胖（圓滾滾、按下去會壓扁）、立體（有厚度、按下去往下沉） */
 enum class KeyFinish(val title: String) {
-    FLAT("平面"), PUFFY("胖胖"), RAISED("立體"), OUTLINE("線稿"), LIQUID("液態玻璃");
+    FLAT("平面"), PUFFY("胖胖"), RAISED("立體"), OUTLINE("線稿"), LIQUID("液態玻璃"), METAL("液態金屬");
 }
 
 /** 按下按鍵時冒出來的小圖案 */

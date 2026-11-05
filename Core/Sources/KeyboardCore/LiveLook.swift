@@ -33,9 +33,8 @@ public struct LiveLook: Equatable {
     }
 
     #if canImport(UIKit)
-    private static var board: UIPasteboard? {
-        UIPasteboard(name: UIPasteboard.Name(pasteboardName), create: true)
-    }
+    // 只拿一次：每次都重新拿具名剪貼簿，鍵盤一直開著時會越吃越多記憶體
+    private static let board: UIPasteboard? = UIPasteboard(name: UIPasteboard.Name(pasteboardName), create: true)
 
     /// 剪貼簿目前的版本號（有人寫進新的值就會變）
     public static var changeCount: Int { board?.changeCount ?? -1 }

@@ -571,7 +571,7 @@ struct KeyboardStyle {
 /// 按鍵質感：平面、胖胖（圓滾滾、按下去會壓扁）、立體（有厚度、按下去往下沉）
 /// 立體的存檔名沿用舊的 "glass"，以前選玻璃的人會直接變成立體
 enum KeyFinish: String, CaseIterable {
-    case flat, puffy, raised = "glass", outline, liquid
+    case flat, puffy, raised = "glass", outline, liquid, metal
 
     var title: String {
         switch self {
@@ -580,6 +580,7 @@ enum KeyFinish: String, CaseIterable {
         case .raised: return "立體"
         case .outline: return "線稿"
         case .liquid: return "液態玻璃"
+        case .metal: return "液態金屬"
         }
     }
 }

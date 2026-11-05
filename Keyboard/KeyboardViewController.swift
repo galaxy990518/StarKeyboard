@@ -307,7 +307,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         liveLookCount = currentLook.publish(from: "keyboard")
         liveLookTimer?.invalidate()
-        liveLookTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+        liveLookTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             let count = LiveLook.changeCount
             guard count != self.liveLookCount else { return }
@@ -541,8 +541,8 @@ final class KeyboardViewController: UIInputViewController {
                 self.runQuickTranslate(q.original)
                 return
             }
-            // 新增表符、符號：把剪貼簿的文字貼進編輯框
-            if self.editorPurpose == .emoticon || self.editorPurpose == .symbol {
+            // 新增表符、符號、快捷片語：把剪貼簿的文字貼進編輯框
+            if self.editorPurpose == .emoticon || self.editorPurpose == .symbol || self.editorPurpose == .shortcutPhrase {
                 self.pasteIntoEditor()
                 return
             }
@@ -1304,6 +1304,9 @@ final class KeyboardViewController: UIInputViewController {
                 topBar.show(.editor(prompt: "新增表符：", text: text, extra: "(•ᴗ•)", confirm: "儲存", source: "📋 貼上"))
             case .symbol:
                 topBar.show(.editor(prompt: "新增符號：", text: text, extra: "※", confirm: "儲存", source: "📋 貼上"))
+            case .shortcutPhrase:
+                // 很長的地址、自我介紹：先在別的地方複製，再按「📋 貼上」
+                topBar.show(.editor(prompt: editorLabel(editorPurpose), text: editorDisplay(text), extra: "", confirm: editorConfirmTitle(editorPurpose), source: "📋 貼上"))
             case .translate:
                 let name = Translator.targets.first { $0.code == settings.translateTarget }?.name ?? "英文"
                 let from = Translator.targets.first { $0.code == settings.translateSource }?.name ?? "自動"
@@ -1583,7 +1586,7 @@ final class KeyboardViewController: UIInputViewController {
         case .symbol: toast("打想加的符號，空白隔開可以一次加好幾個")
         case .translate: toast("先打要翻譯的話，按「→語言」換目標語言")
         case .fancy: toast("打想變花樣的字（英文樣式最多），再按「變花樣」")
-        case .shortcutPhrase: toast("先打常用的整段話，例如地址、自我介紹")
+        case .shortcutPhrase: toast("打常用的整段話，或先複製好再按「📋 貼上」")
         case .shortcutCode: toast("再打縮寫")
         case .clipboardCategory: break
         case .clipboardItem: toast("改完按儲存。按取消會留下原本的文字")
