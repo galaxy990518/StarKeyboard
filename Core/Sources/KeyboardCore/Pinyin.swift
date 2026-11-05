@@ -202,6 +202,7 @@ final class ChineseConverter {
                 i += 1
             }
         }
+        if cache.count >= 512 { cache.removeAll() }
         cache[text] = out
         return out
     }

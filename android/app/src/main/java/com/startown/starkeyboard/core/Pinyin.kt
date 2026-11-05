@@ -141,7 +141,7 @@ class ChineseConverter(private val lookup: (String) -> String?) {
     }
 
     /** 從左邊找最長有對照的詞，沒有就逐字轉 */
-    fun convert(text: String): String = cache.getOrPut(text) {
+    fun convert(text: String): String = (if (cache.size >= 512) cache.apply { clear() } else cache).getOrPut(text) {
         val out = StringBuilder()
         var i = 0
         while (i < text.length) {

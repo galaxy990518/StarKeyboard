@@ -253,6 +253,8 @@ final class ZhuyinEngine {
             return a.0 < b.0
         }
         let result = list.map { $0.1 }
+        // 快取要有上限：打字打久了會越存越多，iPhone 鍵盤記憶體很少會被系統關掉
+        if cache.count >= 256 { cache.removeAll() }
         cache[key] = result
         return result
     }
@@ -307,6 +309,7 @@ final class ZhuyinEngine {
             return $0.1.score != $1.1.score ? $0.1.score > $1.1.score : $0.0 < $1.0
         }
         let result = list.map { $0.1 }
+        if fuzzyCache.count >= 128 { fuzzyCache.removeAll() }
         fuzzyCache[key] = result
         return result
     }
@@ -367,6 +370,7 @@ final class ZhuyinEngine {
                 }
             }
         }
+        if alternativeCache.count >= 256 { alternativeCache.removeAll() }
         alternativeCache[reading] = out
         return out
     }

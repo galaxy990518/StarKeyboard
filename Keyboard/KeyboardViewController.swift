@@ -2,6 +2,7 @@ import UIKit
 import AudioToolbox
 import Vision
 import CoreImage
+import ImageIO
 
 private final class KeyboardInputView: UIInputView, UIInputViewAudioFeedback {
     var enableInputClicksWhenVisible: Bool { true }
@@ -1992,12 +1993,36 @@ final class KeyboardViewController: UIInputViewController {
     /// 目前載入的是哪一張（沒換就不用重新讀檔）
     private var loadedPhoto: String?
 
+    private var loadedMaxSide: CGFloat = 0
+
     private func loadBackground() {
         let url = settings.hasBackground ? settings.currentPhotoURL : nil
-        guard url?.path != loadedPhoto || (url != nil && backgroundImage == nil) else { return }
+        let need = url.map { backgroundMaxSide(url: $0) } ?? 0
+        // 同一張照片：放大後需要更清楚才重讀
+        guard url?.path != loadedPhoto || (url != nil && backgroundImage == nil) || need > loadedMaxSide * 1.15 else { return }
         loadedPhoto = url?.path
-        // 照片存的時候已經縮到 1000；舊版存的大照片也在這裡縮小再用
-        backgroundImage = url.flatMap { UIImage.downsampled(url: $0, maxSide: 1600) }
+        loadedMaxSide = need
+        backgroundImage = nil   // 先放掉舊的，不要兩張同時在記憶體裡
+        backgroundImageView.image = nil
+        backgroundImage = url.flatMap { UIImage.downsampled(url: $0, maxSide: need) }
+    }
+
+    /// 背景照片要讀多大：剛好蓋滿鍵盤（含放大倍數），照螢幕真正的解析度（一樣清楚），最多 1600。
+    /// 蓋滿鍵盤用不到那麼大時（例如橫的照片）就讀小一點，省記憶體
+    private func backgroundMaxSide(url: URL) -> CGFloat {
+        let b = view.bounds.size
+        let w = b.width > 0 ? b.width : UIScreen.main.bounds.width
+        let h = b.height > 0 ? b.height : 300
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let p = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+              let iw = (p[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
+              let ih = (p[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue, iw > 0, ih > 0 else { return 1000 }
+        // 照片轉向（直拍）時寬高要對調
+        let rotated = ((p[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1) >= 5
+        let pw = CGFloat(rotated ? ih : iw), ph = CGFloat(rotated ? iw : ih)
+        let s = max(w / pw, h / ph) * CGFloat(max(1, settings.backgroundZoom))
+        let longSide = max(pw, ph) * s * max(2, UIScreen.main.scale)
+        return min(1600, max(640, longSide.rounded()))
     }
 
     private func pasteBackground() {

@@ -214,6 +214,8 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
             .sortedWith(compareByDescending<Scored> { userModel.pickCount(key, it.text) }
                 .thenByDescending { userModel.recency(key, it.text) }
                 .thenByDescending { it.score })
+        // 快取要有上限：打字打久了會越存越多
+        if (cache.size >= 256) cache.clear()
         cache[key] = result
         return result
     }
@@ -249,6 +251,7 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         // 照打的音查到的排在猜錯字的前面
         val result = best.entries.map { Scored(it.key, it.value, errors[it.key]!!) }
             .sortedWith(compareBy<Scored> { it.corrections }.thenByDescending { it.score })
+        if (fuzzyCache.size >= 128) fuzzyCache.clear()
         fuzzyCache[key] = result
         return result
     }
@@ -296,6 +299,7 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
                 }
             }
         }
+        if (alternativeCache.size >= 256) alternativeCache.clear()
         alternativeCache[reading] = out
         return out
     }
