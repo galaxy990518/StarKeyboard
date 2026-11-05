@@ -159,7 +159,7 @@ final class KeyButton: UIView {
         padShadow.isHidden = !padOn
         padHi.isHidden = !padOn
         padLo.isHidden = !padOn
-        if padOn {
+        if padOn, let detail = detail {
             // 肉球往下、往上各移一點：「原本的」減掉「移過的」就是上緣、下緣那一彎
             let d = max(1, outer.height * 0.035)
             var down = CGAffineTransform(translationX: 0, y: d)
