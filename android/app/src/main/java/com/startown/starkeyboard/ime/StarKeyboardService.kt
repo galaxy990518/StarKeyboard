@@ -160,9 +160,21 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     // ===== 生命週期 =====
 
+    // App 裡拖大小、透明度的滑桿時，鍵盤馬上跟著變（App 和鍵盤共用同一份設定）
+    private val liveKeys = setOf("heightScale", "fontScale", "gapScale", "shapeScale", "keyAlpha", "backgroundFade")
+    private var livePending = false
+    private val liveListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key in liveKeys && root != null && !livePending) {
+            // 拖滑桿一秒會改很多次：合併成一次重畫
+            livePending = true
+            mainHandler.postDelayed({ livePending = false; if (root != null) settingsChanged() }, 60)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         settings = KeyboardSettings(this)
+        getSharedPreferences("keyboard", Context.MODE_PRIVATE).registerOnSharedPreferenceChangeListener(liveListener)
         clipStore = ClipboardStore(File(filesDir, "clipboard.json"), settings.clipLimit)
         emoStore = EmoticonStore(filesDir)
         shortcuts = ShortcutStore(File(filesDir, "shortcuts.json"))
@@ -203,6 +215,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     override fun onDestroy() {
+        getSharedPreferences("keyboard", Context.MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(liveListener)
         soundPool?.release()
         soundPool = null
         (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).removePrimaryClipChangedListener(clipListener)

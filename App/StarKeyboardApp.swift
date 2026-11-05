@@ -24,6 +24,10 @@ struct ContentView: View {
     @State private var latest: ReleaseInfo?
     /// 檢查新版：checking 檢查中、done 檢查完、failed 連不上
     @State private var updateState = "checking"
+    /// 邊調邊看：大小和透明度（拖滑桿時透過具名剪貼簿傳給鍵盤）
+    @State private var look = LiveLook()
+    @State private var lookCount = -1
+    private let lookTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     private let pink = Color(red: 1.0, green: 0.5, blue: 0.65)
 
@@ -95,6 +99,27 @@ struct ContentView: View {
                     Text("直接在聊天框輸入可用鍵盤右下的系統麥克風；也可在這裡辨識、確認，再複製貼上。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
+                Section {
+                    Text("先點下面「試打看看」的框，叫出糯糯鍵盤，再拖滑桿，鍵盤會馬上跟著變。（要打開「允許完整取用」）")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    lookSlider("鍵盤高度", value: $look.heightScale, range: 0.8...1.3)
+                    lookSlider("字的大小", value: $look.fontScale, range: 0.8...1.4)
+                    lookSlider("按鍵間距", value: $look.gapScale, range: 0.3...1.6)
+                    lookSlider("造型大小", value: $look.shapeScale, range: 0.9...1.6)
+                    lookSlider("按鍵透明度", value: $look.keyAlpha, range: 0.35...1)
+                    lookSlider("照片淡化", value: $look.backgroundFade, range: 0...0.9)
+                    Button("大小恢復預設") {
+                        look.heightScale = 1; look.fontScale = 1; look.gapScale = 1; look.shapeScale = 1.15
+                    }
+                } header: {
+                    Text("大小與透明度（邊調邊看）")
+                }
+                .onAppear { readLook() }
+                .onReceive(lookTimer) { _ in readLook() }
+                .onChange(of: look) { newValue in
+                    lookCount = newValue.publish(from: "app")
+                }
+
                 Section("試打看看") {
                     Text("在這裡試試新鍵盤").font(.caption).foregroundStyle(.secondary)
                     TextEditor(text: $testText)
@@ -282,6 +307,24 @@ struct ContentView: View {
         UIPasteboard.general.setItems([["tw.nuonuo.font": data, "tw.nuonuo.fontname": name]],
                                       options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(600)])
         message = "字體複製好了！現在打開鍵盤，到 ⚙️ 設定 › 字體 按「貼上我的字體」。"
+    }
+
+    private func lookSlider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        HStack {
+            Text(title).frame(width: 88, alignment: .leading)
+            Slider(value: value, in: range)
+        }
+    }
+
+    /// 鍵盤那邊改過（或剛打開時）就把滑桿移到鍵盤現在的值
+    private func readLook() {
+        let count = LiveLook.changeCount
+        guard count != lookCount else { return }
+        lookCount = count
+        if let last = LiveLook.read(), last.from == "keyboard", last.look != look {
+            look = last.look
+            lookCount = LiveLook.changeCount
+        }
     }
 
     /// 一張或好幾張照片一起放進剪貼簿（每張一個項目），鍵盤貼上時一次全部加進去

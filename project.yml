@@ -6,7 +6,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.9.7"
+    MARKETING_VERSION: "0.9.8"
     CURRENT_PROJECT_VERSION: "1"
     TARGETED_DEVICE_FAMILY: "1"
     DEVELOPMENT_TEAM: ""
@@ -17,6 +17,7 @@ targets:
     sources:
       - path: App
       - path: Core/Sources/KeyboardCore/Release.swift
+      - path: Core/Sources/KeyboardCore/LiveLook.swift
     info:
       path: App/Info.plist
       properties:

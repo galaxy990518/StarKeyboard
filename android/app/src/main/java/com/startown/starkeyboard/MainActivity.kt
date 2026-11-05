@@ -79,6 +79,27 @@ class MainActivity : Activity() {
         setOnClickListener { action() }
     }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, px(48f)).apply { topMargin = px(8f) })
 
+    /** 一條滑桿；回傳（滑桿, 把滑桿移到某個值） */
+    private fun lookSlider(title: String, value: Float, lo: Float, hi: Float, set: (Float) -> Unit): Pair<android.widget.SeekBar, (Float) -> Unit> {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        row.addView(TextView(this).apply { text = title; textSize = 15f; setTextColor(Color.parseColor("#5B3A45")) },
+            LinearLayout.LayoutParams(px(96f), LinearLayout.LayoutParams.WRAP_CONTENT))
+        val seek = android.widget.SeekBar(this).apply {
+            max = 100
+            progress = (((value - lo) / (hi - lo)) * 100).toInt().coerceIn(0, 100)
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: android.widget.SeekBar, p: Int, fromUser: Boolean) {
+                    if (fromUser) set(lo + (hi - lo) * p / 100f)
+                }
+                override fun onStartTrackingTouch(s: android.widget.SeekBar) {}
+                override fun onStopTrackingTouch(s: android.widget.SeekBar) {}
+            })
+        }
+        row.addView(seek, LinearLayout.LayoutParams(0, px(44f), 1f))
+        col.addView(row)
+        return seek to { v: Float -> seek.progress = (((v - lo) / (hi - lo)) * 100).toInt().coerceIn(0, 100) }
+    }
+
     /** 版本那一格：檢查中／已經是最新版／有新版／連不上，都可以再檢查一次 */
     private fun checkUpdate() {
         updateBox.removeAllViews()
@@ -146,6 +167,23 @@ class MainActivity : Activity() {
             gravity = Gravity.TOP
         }
         col.addView(tryBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = px(6f) })
+
+        // 邊調邊看：App 和鍵盤共用同一份設定，拖滑桿時鍵盤馬上跟著變
+        title("大小與透明度（邊調邊看）")
+        text("先點上面「在這裡試試新鍵盤」的框叫出糯糯鍵盤，再拖滑桿，鍵盤會馬上跟著變。")
+        val ks = KeyboardSettings(this)
+        val sliders = listOf(
+            lookSlider("鍵盤高度", ks.heightScale, 0.8f, 1.3f) { ks.heightScale = it },
+            lookSlider("字的大小", ks.fontScale, 0.8f, 1.4f) { ks.fontScale = it },
+            lookSlider("按鍵間距", ks.gapScale, 0.3f, 1.6f) { ks.gapScale = it },
+            lookSlider("造型大小", ks.shapeScale, 0.9f, 1.6f) { ks.shapeScale = it },
+            lookSlider("按鍵透明度", ks.keyAlpha, 0.35f, 1f) { ks.keyAlpha = it },
+            lookSlider("照片淡化", ks.backgroundFade, 0f, 0.9f) { ks.backgroundFade = it },
+        )
+        button("大小恢復預設") {
+            ks.heightScale = 1f; ks.fontScale = 1f; ks.gapScale = 1f; ks.shapeScale = 1.15f
+            listOf(1f, 1f, 1f, 1.15f).forEachIndexed { i, v -> sliders[i].second(v) }
+        }
 
         title("背景照片與自製貼圖")
         button("新增背景照片（可以一次挑好幾張）") { pick(PICK_BACKGROUND) }

@@ -280,6 +280,52 @@ final class KeyboardViewController: UIInputViewController {
         }
         rebuildKeys()
         updateAutoShift()
+        startLiveLook()
+    }
+
+    // MARK: - App 裡邊調邊看：App 拖滑桿時，鍵盤馬上跟著變
+
+    private var liveLookTimer: Timer?
+    private var liveLookCount = -1
+
+    private var currentLook: LiveLook {
+        var l = LiveLook()
+        l.heightScale = Double(settings.heightScale)
+        l.fontScale = Double(settings.fontScale)
+        l.gapScale = Double(settings.gapScale)
+        l.shapeScale = Double(settings.shapeScale)
+        l.keyAlpha = Double(settings.keyAlpha)
+        l.backgroundFade = Double(settings.backgroundFade)
+        return l
+    }
+
+    private func startLiveLook() {
+        guard hasFullAccess else { return }
+        // 先把鍵盤現在的值告訴 App（App 的滑桿才會從現在的位置開始）
+        if let last = LiveLook.read(), last.from == "app", last.look != currentLook {
+            applyLiveLook(last.look)
+        }
+        liveLookCount = currentLook.publish(from: "keyboard")
+        liveLookTimer?.invalidate()
+        liveLookTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            let count = LiveLook.changeCount
+            guard count != self.liveLookCount else { return }
+            self.liveLookCount = count
+            if let last = LiveLook.read(), last.from == "app", last.look != self.currentLook {
+                self.applyLiveLook(last.look)
+            }
+        }
+    }
+
+    private func applyLiveLook(_ l: LiveLook) {
+        settings.heightScale = CGFloat(l.heightScale)
+        settings.fontScale = CGFloat(l.fontScale)
+        settings.gapScale = CGFloat(l.gapScale)
+        settings.shapeScale = CGFloat(l.shapeScale)
+        settings.keyAlpha = CGFloat(l.keyAlpha)
+        settings.backgroundFade = CGFloat(l.backgroundFade)
+        settingsChanged()
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -303,6 +349,10 @@ final class KeyboardViewController: UIInputViewController {
         super.viewWillDisappear(animated)
         clipboardTimer?.invalidate()
         clipboardTimer = nil
+        liveLookTimer?.invalidate()
+        liveLookTimer = nil
+        // 在鍵盤裡調過的大小也告訴 App
+        if hasFullAccess { currentLook.publish(from: "keyboard") }
         for model in learningModels { model.flushPendingWrites() }
         finishHangul()
         finishPhotoAdjust()
