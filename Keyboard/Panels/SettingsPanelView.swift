@@ -1,7 +1,14 @@
 import UIKit
 
+/// 設定頁的捲動：手指一滑就算捲動，不會順便按到按鈕或開關（滑桿除外，滑桿要能左右拖）
+private final class SettingsScrollView: UIScrollView {
+    override func touchesShouldCancel(in view: UIView) -> Bool {
+        !(view is UISlider)
+    }
+}
+
 /// 鍵盤裡的設定：主題、按鍵造型、背景圖片、輸入法、聲音震動
-final class SettingsPanelView: UIView {
+final class SettingsPanelView: UIView, UIScrollViewDelegate {
     var onChange: (() -> Void)?
     var onPasteBackground: (() -> Void)?
     var onClearBackground: (() -> Void)?
@@ -14,6 +21,8 @@ final class SettingsPanelView: UIView {
     var onAddShortcut: (() -> Void)?
     var onResetLearning: (() -> Void)?
     var onBack: (() -> Void)?
+    /// 「邊看邊調大小」：關掉設定，選字列換成滑桿
+    var onLiveSize: (() -> Void)?
     var style: KeyboardStyle {
         didSet {
             // 拖滑桿時不要重建（不然滑桿會被拿掉），只有換主題或造型才重建
@@ -28,7 +37,12 @@ final class SettingsPanelView: UIView {
     private let settings: KeyboardSettings
     private let hasFullAccess: Bool
     private let shortcuts: ShortcutStore
-    private let scroll = UIScrollView()
+    private let scroll = SettingsScrollView()
+    // 最上面一排：「跳到…」選單（點了直接捲到那一段）＋「邊看邊調大小」
+    private let jumpButton = UIButton(type: .system)
+    private let liveButton = UIButton(type: .system)
+    private var sections: [(name: String, view: UIView)] = []
+    private let topH: CGFloat = 40
     private let stack = UIStackView()
     private let bar: PanelBottomBar
     // 換主題會重建，要記住主題那排橫向捲到哪
@@ -47,7 +61,20 @@ final class SettingsPanelView: UIView {
         stack.spacing = 10
         scroll.addSubview(stack)
         scroll.alwaysBounceVertical = true
+        scroll.delegate = self
         addSubview(scroll)
+        jumpButton.showsMenuAsPrimaryAction = true
+        jumpButton.contentHorizontalAlignment = .left
+        jumpButton.titleLabel?.font = .rounded(14, .bold)
+        jumpButton.layer.cornerRadius = 10
+        jumpButton.contentEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 8)
+        addSubview(jumpButton)
+        liveButton.setTitle("📏 邊看邊調大小", for: .normal)
+        liveButton.titleLabel?.font = .rounded(14, .bold)
+        liveButton.layer.cornerRadius = 10
+        liveButton.contentEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
+        liveButton.addAction(UIAction { [weak self] _ in self?.onLiveSize?() }, for: .touchUpInside)
+        addSubview(liveButton)
         bar.showsBackspace = false
         bar.setTabs(["設定"])
         bar.onBack = { [weak self] in self?.onBack?() }
@@ -60,7 +87,10 @@ final class SettingsPanelView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         let barH: CGFloat = 40
-        scroll.frame = CGRect(x: 0, y: 0, width: bounds.width, height: bounds.height - barH)
+        let lw = liveButton.sizeThatFits(CGSize(width: 200, height: 34)).width
+        liveButton.frame = CGRect(x: bounds.width - 8 - lw, y: 4, width: lw, height: 34)
+        jumpButton.frame = CGRect(x: 8, y: 4, width: liveButton.frame.minX - 14, height: 34)
+        scroll.frame = CGRect(x: 0, y: topH, width: bounds.width, height: bounds.height - barH - topH)
         bar.frame = CGRect(x: 0, y: bounds.height - barH, width: bounds.width, height: barH)
         let w = bounds.width - 24
         let size = stack.systemLayoutSizeFitting(CGSize(width: w, height: 0),
@@ -72,11 +102,16 @@ final class SettingsPanelView: UIView {
 
     // MARK: 建立內容
 
-    private func rebuild() {
+    func rebuild() {
         bar.style = style
         let offset = scroll.contentOffset
         let themeX = themeScroll?.contentOffset.x ?? 0
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        sections = []
+        jumpButton.backgroundColor = style.theme.key.withAlphaComponent(0.8)
+        jumpButton.setTitleColor(style.theme.keyText, for: .normal)
+        liveButton.backgroundColor = style.theme.specialKey
+        liveButton.setTitleColor(style.theme.specialText, for: .normal)
 
         stack.addArrangedSubview(header("主題"))
         stack.addArrangedSubview(themeRow())
@@ -357,9 +392,13 @@ final class SettingsPanelView: UIView {
         }
         stack.addArrangedSubview(note("糯糯鍵盤 v\(ReleaseChecker.currentVersion) ・ 注音字典來自小麥注音（MIT 授權）"))
 
+        jumpButton.menu = UIMenu(title: "跳到…", children: sections.map { s in
+            UIAction(title: s.name) { [weak self] _ in self?.jump(to: s.view) }
+        })
         setNeedsLayout()
         layoutIfNeeded()
         scroll.contentOffset = CGPoint(x: 0, y: min(offset.y, max(0, scroll.contentSize.height - scroll.bounds.height)))
+        updateJumpTitle()
         if let s = themeScroll {
             s.contentOffset = CGPoint(x: min(themeX, max(0, s.contentSize.width - s.bounds.width)), y: 0)
         }
@@ -383,7 +422,27 @@ final class SettingsPanelView: UIView {
         l.text = text
         l.font = .rounded(14, .bold)
         l.textColor = textColor.withAlphaComponent(0.8)
+        let short = text.components(separatedBy: "（").first?.components(separatedBy: "？").first ?? text
+        sections.append((short, l))
         return l
+    }
+
+    /// 點「跳到…」裡的一段：捲到那一段的標題
+    private func jump(to view: UIView) {
+        let y = stack.frame.minY + view.frame.minY - 4
+        scroll.setContentOffset(CGPoint(x: 0, y: max(0, min(y, scroll.contentSize.height - scroll.bounds.height))), animated: true)
+    }
+
+    /// 捲動時左上角跟著顯示現在在哪一段
+    private func updateJumpTitle() {
+        let y = scroll.contentOffset.y - stack.frame.minY + 12
+        let cur = sections.last { $0.view.frame.minY <= y } ?? sections.first
+        jumpButton.setTitle("📑 跳到：\(cur?.name ?? "主題") ▾", for: .normal)
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        guard scrollView === scroll else { return }
+        updateJumpTitle()
     }
 
     private func note(_ text: String) -> UILabel {

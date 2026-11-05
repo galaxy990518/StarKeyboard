@@ -281,6 +281,8 @@ class ClipboardPanel(
             menu.menu.add("＋新增分類").setOnMenuItemClickListener { onEditCategory(null); true }
             store.categories.toList().forEach { name ->
                 val sub = menu.menu.addSubMenu(name)
+                // 點了直接跳到這個資料夾
+                sub.add("📂 打開這個資料夾").setOnMenuItemClickListener { selectCategory(name); true }
                 sub.add("重新命名").setOnMenuItemClickListener { onEditCategory(name); true }
                 sub.add("移除分類（內容留在未分類）").setOnMenuItemClickListener { change { store.deleteCategory(name) }; true }
             }
@@ -471,9 +473,14 @@ class SettingsPanel(
     private val onPickSpaceImage: () -> Unit,
     private val onPasteSpaceEmoji: () -> Unit,
     private val onCopyTypingLog: () -> Unit,
+    private val onLiveSize: () -> Unit = {},
     onBack: () -> Unit,
 ) : LinearLayout(context) {
     private val col = LinearLayout(context).apply { orientation = VERTICAL; setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(12f)) }
+    private val scroll = ScrollView(context)
+    // 每一段的標題（「跳到…」選單用）：短的名字和那一行
+    private val sections = ArrayList<Pair<String, View>>()
+    private lateinit var jump: TextView
     private var t = style.theme
     // 自訂配色：現在點色票是改主色還是第二色
     private var editingSecond = false
@@ -487,18 +494,53 @@ class SettingsPanel(
 
     init {
         orientation = VERTICAL
-        val scroll = ScrollView(context)
+        // 最上面一排：「跳到…」選單（點了直接捲到那一段）＋「邊看邊調大小」
+        val top = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dpi(8f), dpi(4f), dpi(8f), dpi(2f)) }
+        jump = Tap(context, "📑 跳到：主題 ▾", 14f, t.keyText, true) { showJumpMenu() }.apply {
+            background = roundRect(t.key.withAlpha(0.8f), dp(10f))
+            gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            setPadding(dpi(12f), 0, dpi(8f), 0)
+        }
+        top.addView(jump, LayoutParams(0, dpi(34f), 1f))
+        top.addView(Tap(context, "📏 邊看邊調大小", 14f, t.specialText, true) { onLiveSize() }.apply {
+            background = roundRect(t.special, dp(10f))
+            setPadding(dpi(10f), 0, dpi(10f), 0)
+        }, LayoutParams(LayoutParams.WRAP_CONTENT, dpi(34f)).apply { leftMargin = dpi(6f) })
+        addView(top, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         scroll.addView(col)
+        // 捲動時左上角跟著顯示現在在哪一段
+        scroll.setOnScrollChangeListener { _, _, y, _, _ ->
+            val cur = sections.lastOrNull { it.second.top <= y + dpi(12f) } ?: sections.firstOrNull()
+            cur?.let { jump.text = "📑 跳到：${it.first} ▾" }
+        }
         addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
         addView(PanelBottomBar(context, style, listOf("設定"), 0, showBackspace = false, onBack = onBack, onTab = {}, onBackspace = {}),
             LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
         build()
     }
 
-    private fun header(s: String) = col.addView(TextView(context).apply {
-        text = s; textSize = 13f; setTextColor(t.keyText.withAlpha(0.8f)); paint.isFakeBoldText = true
-        setPadding(0, dpi(12f), 0, dpi(4f))
-    })
+    private fun header(s: String) {
+        val v = TextView(context).apply {
+            text = s; textSize = 13f; setTextColor(t.keyText.withAlpha(0.8f)); paint.isFakeBoldText = true
+            setPadding(0, dpi(12f), 0, dpi(4f))
+        }
+        col.addView(v)
+        sections.add(s.substringBefore("（").substringBefore("？") to v)
+    }
+
+    /** 「跳到…」：列出每一段，點了直接捲過去 */
+    private fun showJumpMenu() {
+        val menu = PopupMenu(context, jump)
+        for ((i, s) in sections.withIndex()) menu.menu.add(0, i, i, s.first)
+        menu.setOnMenuItemClickListener { item ->
+            sections.getOrNull(item.itemId)?.let { (name, v) ->
+                scroll.smoothScrollTo(0, maxOf(0, v.top))
+                jump.text = "📑 跳到：$name ▾"
+            }
+            true
+        }
+        menu.show()
+    }
 
     private fun note(s: String) = col.addView(TextView(context).apply {
         text = s; textSize = 12f; setTextColor(t.keyText.withAlpha(0.65f)); setPadding(0, dpi(2f), 0, dpi(2f))
@@ -650,6 +692,7 @@ class SettingsPanel(
     }
 
     private fun build() {
+        sections.clear()
         header("主題")
         val themes = LinearLayout(context).apply { orientation = HORIZONTAL }
         for (theme in KeyboardTheme.all + KeyboardTheme.custom(settings.customHue, settings.customSaturation, settings.customDark, settings.customHue2, settings.customSaturation2)) {

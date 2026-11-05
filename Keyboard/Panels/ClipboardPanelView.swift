@@ -188,6 +188,8 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
     private func updateCategoryMenu() {
         let groups: [UIMenuElement] = store.categories.map { name in
             UIMenu(title: name, children: [
+                // 點了直接跳到這個資料夾
+                UIAction(title: "📂 打開這個資料夾") { [weak self] _ in self?.selectCategory(name) },
                 UIAction(title: "重新命名") { [weak self] _ in self?.onEditCategory?(name) },
                 UIAction(title: "移除分類（內容留在未分類）", attributes: .destructive) { [weak self] _ in
                     self?.perform { try self?.store.deleteCategory(name) }

@@ -215,6 +215,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     override fun onEvaluateFullscreenMode() = false
 
     override fun onCreateInputView(): View {
+        sizeBar = null
         val r = FrameLayout(this)
         bgImage = Backdrop(this)
         tint = Backdrop(this)
@@ -1391,6 +1392,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 onChange = { settingsChanged() },
                 onOpenApp = { openApp() },
                 onAdjustPhoto = { startPhotoAdjust() },
+                onLiveSize = { startSizeAdjust() },
                 shortcuts = shortcuts,
                 onAddShortcut = { beginEditor(EditorPurpose.SHORTCUT_PHRASE) },
                 onResetLearning = { engine?.resetLearning(); toast("已清除選字學習紀錄") },
@@ -1416,6 +1418,29 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         panelView = v
         keyboard.visibility = View.GONE
         handwriting?.visibility = View.GONE
+    }
+
+    // ===== 邊看鍵盤邊調大小：選字列換成滑桿，下面的鍵盤照常顯示、可以直接試打 =====
+
+    private var sizeBar: SizeAdjustBar? = null
+
+    private fun startSizeAdjust() {
+        if (sizeBar != null) return
+        closePanel()
+        val bar = SizeAdjustBar(this, style, settings, onChange = { settingsChanged() }, onDone = { finishSizeAdjust() })
+        bar.setBackgroundColor(if (style.theme.dark) android.graphics.Color.BLACK.withAlpha(0.35f) else android.graphics.Color.WHITE.withAlpha(0.55f))
+        column.addView(bar, column.indexOfChild(topBar), LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, maxOf((44 * dp).toInt(), topBar.layoutParams.height)))
+        topBar.visibility = View.GONE
+        sizeBar = bar
+        toast("拖滑桿調整，下面的鍵盤可以直接試打")
+    }
+
+    private fun finishSizeAdjust() {
+        val bar = sizeBar ?: return
+        column.removeView(bar)
+        sizeBar = null
+        topBar.visibility = View.VISIBLE
+        toast("大小存好了")
     }
 
     // ===== 調整背景照片（直接在鍵盤上拖拉、縮放，看到的就是實際的樣子） =====

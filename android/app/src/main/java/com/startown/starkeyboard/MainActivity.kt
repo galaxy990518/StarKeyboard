@@ -148,7 +148,7 @@ class MainActivity : Activity() {
         col.addView(tryBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = px(6f) })
 
         title("背景照片與自製貼圖")
-        button("新增一張背景照片") { pick(PICK_BACKGROUND) }
+        button("新增背景照片（可以一次挑好幾張）") { pick(PICK_BACKGROUND) }
         text("可以放好幾張，在鍵盤的 ⚙ 設定裡選要用哪張，或設定每天、每次打開自動換。")
         button("拿掉全部背景照片") {
             KeyboardSettings(this).clearPhotos()
@@ -206,16 +206,24 @@ class MainActivity : Activity() {
             return
         }
         val intent = Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE)
+        // 背景照片可以一次挑好幾張
+        if (what == PICK_BACKGROUND) intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
         @Suppress("DEPRECATION")
-        startActivityForResult(Intent.createChooser(intent, "挑一張照片"), what)
+        startActivityForResult(Intent.createChooser(intent, if (what == PICK_BACKGROUND) "挑照片（可以一次挑好幾張）" else "挑一張照片"), what)
     }
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
-        val uri = data?.data ?: return
         if (resultCode != RESULT_OK) return
+        // 一次挑好幾張：每張都加進背景照片
+        val clip = data?.clipData
+        if (requestCode == PICK_BACKGROUND && clip != null && clip.itemCount > 1) {
+            addBackgrounds((0 until minOf(clip.itemCount, 10)).map { clip.getItemAt(it).uri })
+            return
+        }
+        val uri = data?.data ?: clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri ?: return
         if (requestCode == PICK_FONT) {
             importFont(uri)
             return
@@ -253,6 +261,22 @@ class MainActivity : Activity() {
                 toast("做好貼圖了！在鍵盤的 ☺ › ⭐ 我的")
             }
         }
+    }
+
+    /** 一次加好幾張背景照片（一張一張讀，不會一次吃光記憶體） */
+    private fun addBackgrounds(uris: List<Uri>) {
+        val s = KeyboardSettings(this)
+        var added = 0
+        for (u in uris) {
+            val bitmap = load(u, 2048) ?: continue
+            val face = faceCenter(bitmap)
+            s.addPhoto(face?.first ?: 0.5f, face?.second ?: 0.3f) { f ->
+                f.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+            }
+            bitmap.recycle()
+            added++
+        }
+        toast(if (added == 0) "讀不到這些照片" else "加好 $added 張背景照片了！在鍵盤 ⚙ 設定 › 背景照片 點縮圖就能換")
     }
 
     /** 空白鍵的圖：GIF 原樣保存；照片問要不要去背 */

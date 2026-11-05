@@ -19,6 +19,7 @@ import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.TextView
 
 fun View.dp(v: Float) = v * resources.displayMetrics.density
@@ -168,6 +169,63 @@ class Tap(context: Context, text: String, sizeSp: Float, color: Int, bold: Boole
         maxLines = 1
         if (bold) typeface = Typeface.DEFAULT_BOLD
         setOnClickListener { onTap() }
+    }
+}
+
+/** 邊看鍵盤邊調大小：放在選字列的位置，下面的鍵盤照常顯示、可以直接試打 */
+@android.annotation.SuppressLint("ViewConstructor")
+class SizeAdjustBar(context: Context, private val style: KeyboardStyle, private val settings: KeyboardSettings,
+                    private val onChange: () -> Unit, onDone: () -> Unit) : LinearLayout(context) {
+    private class Item(val title: String, val lo: Float, val hi: Float, val get: () -> Float, val set: (Float) -> Unit)
+    private val items = listOf(
+        Item("高度", 0.8f, 1.3f, { settings.heightScale }) { settings.heightScale = it },
+        Item("字", 0.8f, 1.4f, { settings.fontScale }) { settings.fontScale = it },
+        Item("間距", 0.3f, 1.6f, { settings.gapScale }) { settings.gapScale = it },
+        Item("造型", 0.9f, 1.6f, { settings.shapeScale }) { settings.shapeScale = it },
+    )
+    private var current = 0
+    private val tabs = ArrayList<TextView>()
+    private val seek = SeekBar(context).apply { max = 100 }
+
+    init {
+        orientation = HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dpi(6f), 0, dpi(6f), 0)
+        val t = style.theme
+        for ((i, item) in items.withIndex()) {
+            val v = Tap(context, item.title, 13f, t.keyText, true) { select(i) }
+            tabs.add(v)
+            addView(v, LayoutParams(LayoutParams.WRAP_CONTENT, dpi(30f)).apply { rightMargin = dpi(3f) })
+            v.setPadding(dpi(8f), 0, dpi(8f), 0)
+        }
+        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar, p: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                val item = items[current]
+                item.set(item.lo + (item.hi - item.lo) * p / 100f)
+                onChange()
+            }
+            override fun onStartTrackingTouch(s: SeekBar) {}
+            override fun onStopTrackingTouch(s: SeekBar) {}
+        })
+        addView(seek, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
+        addView(Tap(context, "完成", 14f, t.accentText, true, onDone).apply {
+            background = roundRect(t.accent, dp(10f))
+            setPadding(dpi(12f), 0, dpi(12f), 0)
+        }, LayoutParams(LayoutParams.WRAP_CONTENT, dpi(30f)))
+        select(0)
+    }
+
+    private fun select(i: Int) {
+        current = i
+        val t = style.theme
+        for ((j, v) in tabs.withIndex()) {
+            val on = j == i
+            v.background = roundRect(if (on) t.accent else t.key.withAlpha(0.8f), dp(9f))
+            v.setTextColor(if (on) t.accentText else t.keyText)
+        }
+        val item = items[i]
+        seek.progress = (((item.get() - item.lo) / (item.hi - item.lo)) * 100).toInt().coerceIn(0, 100)
     }
 }
 

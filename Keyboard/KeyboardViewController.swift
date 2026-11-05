@@ -137,6 +137,8 @@ final class KeyboardViewController: UIInputViewController {
     private let gradientLayer = CAGradientLayer()
     private let backgroundImageView = UIImageView()
     private var photoAdjustView: PhotoAdjustView?
+    /// 邊看鍵盤邊調大小（蓋在選字列的位置）
+    private var sizeBar: SizeAdjustBar?
     private let tintOverlay = UIView()
     private var topBar: TopBarView!
     private let contentView = UIView()
@@ -319,6 +321,7 @@ final class KeyboardViewController: UIInputViewController {
         let barH = CGFloat(settings.candidateBarHeight)
         topBar.candidateFontSize = CGFloat(CandidateBarMetrics.fontSize(barHeight: settings.candidateBarHeight))
         topBar.frame = CGRect(x: 0, y: folderBoxHeight, width: b.width, height: barH)
+        sizeBar?.frame = CGRect(x: 0, y: folderBoxHeight, width: b.width, height: barH)
         contentView.frame = CGRect(x: 0, y: folderBoxHeight + barH, width: b.width, height: max(0, b.height - barH - folderBoxHeight))
         grid.frame = contentView.bounds
         panelView?.frame = contentView.bounds
@@ -1378,6 +1381,7 @@ final class KeyboardViewController: UIInputViewController {
             p.onPasteBackground = { [weak self] in self?.pasteBackground() }
             p.onClearBackground = { [weak self] in self?.clearBackground() }
             p.onAdjustPhoto = { [weak self] in self?.startPhotoAdjust() }
+            p.onLiveSize = { [weak self] in self?.startSizeAdjust() }
             p.onPasteFont = { [weak self] in self?.pasteFont() }
             p.onDownloadFont = { [weak self] id in self?.downloadFont(id) }
             p.onPasteSpaceImage = { [weak self] in self?.pasteSpaceImage() }
@@ -1812,6 +1816,29 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: - 調整背景照片（直接在鍵盤上拖拉、縮放，看到的就是實際的樣子）
 
+    // MARK: - 邊看鍵盤邊調大小：選字列換成滑桿，下面的鍵盤照常顯示、可以直接試打
+
+    private func startSizeAdjust() {
+        guard sizeBar == nil else { return }
+        closePanel()
+        let bar = SizeAdjustBar(style: style, settings: settings)
+        bar.onChange = { [weak self] in self?.settingsChanged() }
+        bar.onDone = { [weak self] in self?.finishSizeAdjust() }
+        view.addSubview(bar)
+        sizeBar = bar
+        topBar.isHidden = true
+        view.setNeedsLayout()
+        toast("拖滑桿調整，下面的鍵盤可以直接試打")
+    }
+
+    private func finishSizeAdjust() {
+        guard let bar = sizeBar else { return }
+        bar.removeFromSuperview()
+        sizeBar = nil
+        topBar.isHidden = false
+        toast("大小存好了")
+    }
+
     private func startPhotoAdjust() {
         guard backgroundImage != nil else {
             toast("先貼上一張照片")
@@ -1888,21 +1915,33 @@ final class KeyboardViewController: UIInputViewController {
             return
         }
         // 背景照片留到 1600（放大對準臉比較不糊；再大鍵盤的記憶體會不夠）
-        guard let small = UIPasteboard.general.downsampledImage(maxSide: 1600) else {
+        // App 一次挑好幾張時，剪貼簿裡會有好幾張，全部一起加進來
+        let images = UIPasteboard.general.downsampledImages(maxSide: 1600)
+        guard !images.isEmpty else {
             toast("剪貼簿裡沒有圖片，先到相簿「拷貝」一張")
             return
         }
-        guard let data = small.jpegData(compressionQuality: 0.85) else { return }
-        do {
-            // 對準臉；找不到臉就偏上面一點（人像的頭通常在上面）
-            let face = faceCenter(in: small)
-            try settings.addPhoto(data, fx: Double(face?.x ?? 0.5), fy: Double(face?.y ?? 0.3))
-            loadBackground()
-            applyStyle()
+        var added = 0
+        for small in images {
+            autoreleasepool {
+                guard let data = small.jpegData(compressionQuality: 0.85) else { return }
+                // 對準臉；找不到臉就偏上面一點（人像的頭通常在上面）
+                let face = faceCenter(in: small)
+                if (try? settings.addPhoto(data, fx: Double(face?.x ?? 0.5), fy: Double(face?.y ?? 0.3))) != nil { added += 1 }
+            }
+        }
+        guard added > 0 else {
+            toast("存檔失敗")
+            return
+        }
+        loadBackground()
+        applyStyle()
+        if added == 1 {
             // 貼上後直接在鍵盤上拖拉、縮放照片
             startPhotoAdjust()
-        } catch {
-            toast("存檔失敗")
+        } else {
+            toast("加好 \(added) 張背景照片了！點縮圖可以換，選好再按「調整照片位置」")
+            (panelView as? SettingsPanelView)?.rebuild()
         }
     }
 

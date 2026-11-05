@@ -104,9 +104,9 @@ struct ContentView: View {
 
                 Section {
                     Button { pickPurpose = "photo"; showingPhotoPicker = true } label: {
-                        Label("挑一張照片", systemImage: "photo.on.rectangle.angled")
+                        Label("挑照片（可以一次挑好幾張）", systemImage: "photo.on.rectangle.angled")
                     }
-                    Text("照片會被複製到剪貼簿。接著打開鍵盤：\n• 當背景：⚙️ 設定 › 背景圖片 › 從剪貼簿貼上圖片\n• 做成貼圖：☺ 表符 › ⭐ 我的 › ＋ › 把剪貼簿的圖片做成貼圖")
+                    Text("照片會被複製到剪貼簿，一次最多 10 張。接著打開鍵盤：\n• 當背景：⚙️ 設定 › 背景圖片 › 從剪貼簿貼上圖片（挑幾張就一次加幾張）\n• 做成貼圖：☺ 表符 › ⭐ 我的 › ＋ › 把剪貼簿的圖片做成貼圖（用第一張）")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } header: {
@@ -159,10 +159,10 @@ struct ContentView: View {
             .tint(pink)
             .task { checkUpdate() }
             .sheet(isPresented: $showingPhotoPicker) {
-                KeyboardPhotoPicker { image in
+                KeyboardPhotoPicker(limit: pickPurpose == "photo" ? 10 : 1) { images in
                     showingPhotoPicker = false
-                    guard let image = image else { return }
-                    if pickPurpose == "photo" { copyPhoto(image) } else { copySpaceImage(image, cutout: pickPurpose == "cutout") }
+                    guard let image = images.first else { return }
+                    if pickPurpose == "photo" { copyPhotos(images) } else { copySpaceImage(image, cutout: pickPurpose == "cutout") }
                 }
             }
             .fileImporter(isPresented: $showingFontPicker, allowedContentTypes: [.font]) { result in
@@ -284,17 +284,25 @@ struct ContentView: View {
         message = "字體複製好了！現在打開鍵盤，到 ⚙️ 設定 › 字體 按「貼上我的字體」。"
     }
 
+    /// 一張或好幾張照片一起放進剪貼簿（每張一個項目），鍵盤貼上時一次全部加進去
     @MainActor
-    private func copyPhoto(_ image: UIImage) {
-        let longest = max(image.size.width, image.size.height)
-        let scale = min(1, 1000 / longest)
-        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        let resized = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            image.draw(in: CGRect(origin: .zero, size: size))
+    private func copyPhotos(_ images: [UIImage]) {
+        // 縮到 1600（跟鍵盤存的大小一樣，放大對準臉也不糊）
+        let items: [[String: Any]] = images.compactMap { image in
+            let longest = max(image.size.width, image.size.height)
+            let scale = min(1, 1600 / longest)
+            let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            let resized = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+                image.draw(in: CGRect(origin: .zero, size: size))
+            }
+            return resized.jpegData(compressionQuality: 0.9).map { ["public.jpeg": $0] }
         }
-        UIPasteboard.general.image = resized
-        message = "已經複製好了！現在打開鍵盤，到 ⚙️ 設定貼上當背景，或到 ⭐ 我的 做成貼圖。"
+        guard !items.isEmpty else { return }
+        UIPasteboard.general.setItems(items)
+        message = images.count > 1
+            ? "\(images.count) 張照片複製好了！現在打開鍵盤，到 ⚙️ 設定 › 背景圖片 按「從剪貼簿貼上」，會一次全部加進去。"
+            : "已經複製好了！現在打開鍵盤，到 ⚙️ 設定貼上當背景，或到 ⭐ 我的 做成貼圖。"
     }
 }

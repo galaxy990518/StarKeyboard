@@ -1243,6 +1243,26 @@ extension UIImage {
 
 extension UIPasteboard {
     /// 剪貼簿裡的圖片，讀成小圖（不用 .image，那會把整張大照片解開）
+    /// 剪貼簿裡每一個項目各一張圖（App 一次挑好幾張照片時會放好幾個項目），一張一張縮小，不會一次吃光記憶體
+    func downsampledImages(maxSide: CGFloat, limit: Int = 10) -> [UIImage] {
+        guard numberOfItems > 1 else { return downsampledImage(maxSide: maxSide).map { [$0] } ?? [] }
+        let imageTypes = ["public.jpeg", "public.png", "public.heic", "public.tiff", "public.image"]
+        var out: [UIImage] = []
+        for i in 0..<min(numberOfItems, limit) {
+            autoreleasepool {
+                let set = IndexSet(integer: i)
+                for type in imageTypes {
+                    if let data = data(forPasteboardType: type, inItemSet: set)?.first,
+                       let img = UIImage.downsampled(CGImageSourceCreateWithData(data as CFData, nil), maxSide: maxSide) {
+                        out.append(img)
+                        break
+                    }
+                }
+            }
+        }
+        return out
+    }
+
     func downsampledImage(maxSide: CGFloat) -> UIImage? {
         let imageTypes = ["public.heic", "public.jpeg", "public.png", "com.compuserve.gif", "public.tiff", "public.image"]
         for type in types where imageTypes.contains(type) || type.hasPrefix("public.") && type.contains("image") {
