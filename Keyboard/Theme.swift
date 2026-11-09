@@ -144,6 +144,7 @@ struct KeyboardTheme {
                       specialKey: UIColor(hex: 0x474749), specialText: .white,
                       accent: UIColor(hex: 0x2F7BF6), accentText: .white,
                       shadow: UIColor(hex: 0x111111), decoration: "", isDark: true),
+        FoxLetterArtwork.theme,
     ]
 
     static func named(_ id: String) -> KeyboardTheme {

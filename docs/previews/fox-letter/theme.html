@@ -1,0 +1,215 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>小狐狸的楓葉信 · 輸入法與版面預覽</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eee5df;color:#513e3b;font:14px/1.6 system-ui,"Microsoft JhengHei","PingFang TC",sans-serif}main{max-width:1180px;margin:auto;padding:28px}h1{font-size:29px;letter-spacing:.06em;margin:2px 0 6px}h2{font-size:15px;margin:0}p{margin:5px 0}.eyebrow{font-size:11px;letter-spacing:.18em;color:#a26c4b}.subtitle{color:#8b7066}.controls{background:#fffbf6;border:1px solid #d9c6b8;padding:14px 18px;border-radius:14px;display:flex;gap:10px 17px;flex-wrap:wrap;margin:22px 0}label{display:flex;align-items:center;gap:6px;font-size:12px}select,input{accent-color:#a8623e}select{border:1px solid #d9c6b8;background:white;border-radius:6px;padding:5px;color:#513e3b}input[type=range]{width:86px}.workspace{background:#e5d7ce;border-radius:20px;padding:25px 14px;overflow:auto;display:flex;justify-content:center}.keyboard{flex:none;background:linear-gradient(#51424d,#392f3d);border:1px solid #8b737b;border-radius:20px;overflow:hidden;box-shadow:0 12px 22px #46303a25}.banner{height:50px;background:#e1c2b8;color:#654738;display:flex;align-items:center;justify-content:center;gap:14px;font-size:15px;font-weight:700;letter-spacing:.09em}.banner span{font-size:20px}.toolbar{background:#362d34;color:#fff5e4;display:flex;align-items:center;justify-content:space-around;border:1px solid #c1a49a;border-radius:18px;margin:7px 8px 3px;height:41px;font-size:18px}.toolbar svg{width:21px;height:21px}.keyboard>svg{display:block}.foot{padding:6px 20px 10px;color:#e1c8b8;border-top:1px solid #81677355;display:flex;align-items:center;gap:12px;font-size:12px}.foot svg{width:20px;height:20px}.art{transition:opacity .08s}.key{cursor:pointer}.key:active .art,.key.pressed .art{opacity:var(--pressed-alpha)!important}.key:active .main-text,.key.pressed .main-text{fill:var(--pressed-ink)}.key:active .icon path,.key.pressed .icon path{stroke:var(--pressed-ink)}.zone{fill:#50cdb826;stroke:#72e3ca;stroke-width:.3;pointer-events:none}.face-zone{fill:#e0709026;stroke:#f1a0bb}.hint-zone{fill:#e4af3030;stroke:#f6cf67}.zones-off .zone{display:none}.meta{display:flex;gap:13px;flex-wrap:wrap;margin-top:15px;font-size:12px;color:#826b60}.swatches{display:flex;gap:12px;flex-wrap:wrap;margin:15px 0}.swatch{display:flex;gap:5px;align-items:center;font-size:12px}.swatch i{width:20px;height:20px;border-radius:50%;border:1px solid #80554340}.status{padding:9px 13px;background:#fff9f1;border-radius:8px;margin:14px 0;font-size:12px}.note{font-size:12px;color:#897568}.panel{background:#46353e;color:#fff5e4;padding:12px;min-height:250px}.panel .item{background:#6c5050;border-radius:10px;margin:8px 0;padding:11px;font-size:12px}.emoji-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:18px 0;font-size:24px;text-align:center}.panel h2{color:#edba8d}.caption{font-size:11px;color:#876c5e;margin-top:9px}.backlink{color:#956044;font-size:12px}.illustration-header{font-size:12px;margin-top:20px}@media(max-width:750px){main{padding:18px 12px}.workspace{justify-content:flex-start}h1{font-size:23px}.controls{padding:10px;gap:10px}.banner{font-size:12px}}
+</style><style>.workspace{display:block}.keyboard{margin-inline:auto}
+.keyboard{background:#443741;border-color:#967f82;box-shadow:0 12px 25px #30242f33}
+.banner{position:relative;isolation:isolate;background:none;color:#674838;font-family:"jf-openhuninn-2.1","Chiron GoRound TC",system-ui,sans-serif;letter-spacing:.08em}.banner .landscape{position:absolute;inset:0;z-index:-1;width:100%;height:100%}.banner .theme-title{font-size:inherit;text-shadow:0 1px #fff8e8;max-width:57%;text-align:center;line-height:1.2}
+.toolbar{background:linear-gradient(#151218a8,#151218a8),url('../../../Keyboard/Resources/FoxLetter/background-watercolor-v2.png') center bottom/100% auto;border:1px solid #e4d9ce;border-radius:999px;box-shadow:inset 0 0 0 2px #fff1,inset 0 1px 8px #110d16}.foot{background:#e9e7ee;border:0;color:#17131b}
+.toolbar .icon{width:var(--tool-size,21px);height:var(--tool-size,21px)}.foot .icon{width:var(--globe-size,30px);height:var(--globe-size,30px)}
+.key .main-text{stroke:var(--normal-outline);stroke-width:.03em;paint-order:stroke fill}.key:active .main-text,.key.pressed .main-text{stroke:var(--pressed-outline)}
+.key .icon{--edge:var(--normal-outline);filter:drop-shadow(.45px 0 0 var(--edge)) drop-shadow(-.45px 0 0 var(--edge)) drop-shadow(0 .45px 0 var(--edge)) drop-shadow(0 -.45px 0 var(--edge))}.key:active .icon,.key.pressed .icon{--edge:var(--pressed-outline)}
+</style>
+<main id="app" class="zones-off"><div class="eyebrow">FOX LETTER / THEME PREVIEW</div><h1>小狐狸的楓葉信</h1><p class="subtitle">狐狸臉形 · 五色交錯 · 楓葉、帽子、信封與圍巾</p>
+<div class="controls">
+<label>輸入法 <select id="mode"><option value="zhuyin">注音</option><option value="english">英文</option><option value="pinyin">拼音</option><option value="japanese">日文（羅馬字）</option><option value="korean">韓文</option><option value="handwriting">手寫</option></select></label>
+<label>頁面 <select id="layer"><option value="letters">文字／手寫</option><option value="numbers">123</option><option value="symbols">#+=</option><option value="numpad">數字盤</option></select></label>
+<label>面板 <select id="panel"><option value="keyboard">鍵盤</option><option value="emoji">表情</option><option value="clipboard">剪貼簿</option><option value="settings">設定</option></select></label>
+<label><input type="checkbox" id="ten" checked>注音十欄</label><label><input type="checkbox" id="shift">Shift</label><label><input type="checkbox" id="globe">地球鍵</label><label><input type="checkbox" id="full" checked>全形</label><label><input type="checkbox" id="candidates">候選字</label>
+<label>高度 <input type="range" id="height" min="0.8" max="1.3" step="0.05" value="1"></label><label>字體 <input type="range" id="font" min="0.8" max="1.3" step="0.05" value="1"></label><label>間距 <input type="range" id="gap" min="0.3" max="1.8" step="0.1" value="1"></label><label>造型大小 <input type="range" id="shape" min="0.8" max="1.3" step="0.05" value="1.15"></label><label>透明度 <input type="range" id="alpha" min="0.35" max="1" step="0.05" value="1"></label>
+<label>寬度 <select id="width"><option>320</option><option selected>390</option><option>430</option><option>700</option></select></label><label>預覽倍率 <select id="zoom"><option value="1">1 倍</option><option value="1.7" selected>1.7 倍</option></select></label><label><input type="checkbox" id="zones">顯示分區</label>
+</div><div class="workspace"><div class="keyboard" id="keyboard"></div></div><div class="caption">放大預覽可看配件細節；切到 1 倍檢查實際可讀性。山景標題區已接入 iPhone 主題；下方地球區為系統區域示意，仍由 iOS 管理。</div>
+<div class="swatches" id="swatches"></div><div class="status" id="status">可切換所有現有輸入法與數字／符號頁，點按鍵檢查按下回饋。</div><div class="meta"><span id="summary"></span><a class="backlink" href="index.html">查看單顆水彩版型</a></div><p class="note">這是離線外觀預覽，未連接文字辨識或輸入引擎。注音與符號字元取自專案資料；真實配置及觸控行為以 iPhone 的 KeyLayouts 為準。UIKit 編譯、實際字型和效能仍需 Xcode 與真機驗證。</p></main>
+<script>
+'use strict';
+const source={"id":"fox-letter-prototype","title":"小狐狸的楓葉信","revision":"A02-watercolor","endCapAspect":0.85,"labelRect":[14,26,72,44],"hintRect":[34,0,32,20],"faceWidthFraction":0.58,"faceHeightLimit":0.5,"faceAspect":0.45,"faceBottomInset":0.05,"textColor":"#FFFAF1","hintColor":"#F8E6CE","themeColors":{"backgroundTop":"#51424D","backgroundBottom":"#392F3D","key":"#6C5050","keyText":"#FFF5E4","specialKey":"#59434A","specialText":"#FFF5E4","accent":"#E9AE78","accentText":"#3F2C27","shadow":"#271D27"},"variants":[{"name":"楓葉橘","fur":"#A95B30","cheek":"#F7DEC0","text":"#FFF9EF","accessory":"leaf"},{"name":"奶油米","fur":"#DCBC8E","cheek":"#FAE8CF","text":"#543B2F","accessory":"beret"},{"name":"栗子棕","fur":"#71514C","cheek":"#DDBA9D","text":"#FFF9EF","accessory":"scarf"},{"name":"楓紅","fur":"#A85747","cheek":"#E8B99B","text":"#FFF9EF","accessory":"letter"},{"name":"霧橄欖","fur":"#737344","cheek":"#E7D3AE","text":"#FFF9EF","accessory":"leaf"}],"accessories":{"leaf":[{"name":"leaf","space":"head","fill":"#E3A04F","stroke":"#975634","strokeWidth":0.35,"path":"M80 25 L68 22 L73 17 L67 11 L77 12 L78 3 L84 9 L90 4 L91 13 L98 12 L94 20 L99 24 L87 26 L86 31 L82 30 Z"},{"name":"leaf-vein","space":"head","fill":"#B76A39","path":"M80 9 L83 20 L87 29 L85 30 L81 21 L75 16 L77 15 L81 18 L79 10 Z"}],"beret":[{"name":"beret","space":"head","fill":"#8B4F42","stroke":"#683F37","strokeWidth":0.4,"path":"M4 19 C0 12 8 5 20 5 C32 1 43 5 43 13 Q46 18 40 23 Q22 24 4 19 Z M24 6 L23 1 Q26 -1 29 1 L28 6 Z"},{"name":"beret-band","space":"head","fill":"#6B413A","path":"M5 18 Q23 22 42 18 L40 23 Q22 25 5 21 Z"}],"letter":[{"name":"envelope","space":"head","fill":"#FFF0D9","stroke":"#805543","strokeWidth":0.4,"path":"M67 6 L97 9 L95 29 L65 26 Z"},{"name":"envelope-fold","space":"head","fill":"#D4AF89","path":"M67 7 L81 18 L97 10 L96 12 L81 20 L66 9 Z M65 25 L76 18 L77 20 L67 27 Z M85 20 L95 27 L95 29 L83 21 Z"},{"name":"envelope-seal","space":"head","fill":"#B95F44","path":"M81 16 C76 11 73 17 78 20 L82 24 L86 21 C91 17 86 12 82 16 Z"}],"scarf":[{"name":"scarf","space":"head","fill":"#B69454","stroke":"#795D40","strokeWidth":0.3,"path":"M1 80 Q12 85 25 84 L25 95 Q12 97 2 91 Z M19 88 L29 88 L32 100 L23 100 Z"},{"name":"scarf-checks","space":"head","fill":"#687748","path":"M7 83 L11 84 L11 94 L7 93 Z M17 84 L21 84 L21 95 L17 95 Z M25 90 L29 90 L31 100 L27 100 Z M2 87 L25 89 L25 92 L2 90 Z"}]},"layers":[{"name":"outline","space":"head","fill":"#C87843","stroke":"#825138","strokeWidth":0.65,"path":"M5 34 C5 23 8 9 12 3 Q13 0 17 4 L32 20 Q50 15 68 20 L83 4 Q87 0 89 4 C94 14 96 26 95 37 C101 55 99 75 91 89 C83 98 67 99 50 99 C29 99 14 97 7 87 C0 74 0 53 5 34 Z"},{"name":"inner-ears","space":"head","fill":"#F6D9B5","path":"M11 29 Q12 16 15 10 L27 24 Q18 24 11 29 Z M73 24 L85 10 Q89 18 90 31 Q83 26 73 24 Z"},{"name":"cheeks","space":"head","fill":"#F6E2C6","path":"M3 69 C15 68 31 79 50 84 C69 79 85 68 97 69 C97 83 88 93 74 96 C59 100 39 100 25 96 C10 93 3 83 3 69 Z"},{"name":"expression","space":"face","fill":"#56382C","path":"E18 32 6 13.333333 E82 32 6 13.333333 M43 57 Q50 52 57 57 Q59 60 56 65 L51 72 Q50 73 49 72 L44 65 Q41 61 43 57 Z"}]},layers=[{"name":"outline","space":"head","fill":"#C87843","stroke":"#825138","strokeWidth":0.65,"path":"M5 34 C5 23 8 9 12 3 Q13 0 17 4 L32 20 Q50 15 68 20 L83 4 Q87 0 89 4 C94 14 96 26 95 37 C101 55 99 75 91 89 C83 98 67 99 50 99 C29 99 14 97 7 87 C0 74 0 53 5 34 Z","ops":[0,5,34,2,5,23,8,9,12,3,3,13,0,17,4,1,32,20,3,50,15,68,20,1,83,4,3,87,0,89,4,2,94,14,96,26,95,37,2,101,55,99,75,91,89,2,83,98,67,99,50,99,2,29,99,14,97,7,87,2,0,74,0,53,5,34,4]},{"name":"inner-ears","space":"head","fill":"#F6D9B5","path":"M11 29 Q12 16 15 10 L27 24 Q18 24 11 29 Z M73 24 L85 10 Q89 18 90 31 Q83 26 73 24 Z","ops":[0,11,29,3,12,16,15,10,1,27,24,3,18,24,11,29,4,0,73,24,1,85,10,3,89,18,90,31,3,83,26,73,24,4]},{"name":"cheeks","space":"head","fill":"#F6E2C6","path":"M3 69 C15 68 31 79 50 84 C69 79 85 68 97 69 C97 83 88 93 74 96 C59 100 39 100 25 96 C10 93 3 83 3 69 Z","ops":[0,3,69,2,15,68,31,79,50,84,2,69,79,85,68,97,69,2,97,83,88,93,74,96,2,59,100,39,100,25,96,2,10,93,3,83,3,69,4]},{"name":"expression","space":"face","fill":"#56382C","path":"E18 32 6 13.333333 E82 32 6 13.333333 M43 57 Q50 52 57 57 Q59 60 56 65 L51 72 Q50 73 49 72 L44 65 Q41 61 43 57 Z","ops":[0,24,32,2,24,39.3637965,21.3137085,45.333333,18,45.333333,2,14.6862915,45.333333,12,39.3637965,12,32,2,12,24.6362035,14.6862915,18.666667,18,18.666667,2,21.3137085,18.666667,24,24.6362035,24,32,4,0,88,32,2,88,39.3637965,85.3137085,45.333333,82,45.333333,2,78.6862915,45.333333,76,39.3637965,76,32,2,76,24.6362035,78.6862915,18.666667,82,18.666667,2,85.3137085,18.666667,88,24.6362035,88,32,4,0,43,57,3,50,52,57,57,3,59,60,56,65,1,51,72,3,50,73,49,72,1,44,65,3,41,61,43,57,4]}],accessories={"leaf":[{"name":"leaf","space":"head","fill":"#E3A04F","stroke":"#975634","strokeWidth":0.35,"path":"M80 25 L68 22 L73 17 L67 11 L77 12 L78 3 L84 9 L90 4 L91 13 L98 12 L94 20 L99 24 L87 26 L86 31 L82 30 Z","ops":[0,80,25,1,68,22,1,73,17,1,67,11,1,77,12,1,78,3,1,84,9,1,90,4,1,91,13,1,98,12,1,94,20,1,99,24,1,87,26,1,86,31,1,82,30,4]},{"name":"leaf-vein","space":"head","fill":"#B76A39","path":"M80 9 L83 20 L87 29 L85 30 L81 21 L75 16 L77 15 L81 18 L79 10 Z","ops":[0,80,9,1,83,20,1,87,29,1,85,30,1,81,21,1,75,16,1,77,15,1,81,18,1,79,10,4]}],"beret":[{"name":"beret","space":"head","fill":"#8B4F42","stroke":"#683F37","strokeWidth":0.4,"path":"M4 19 C0 12 8 5 20 5 C32 1 43 5 43 13 Q46 18 40 23 Q22 24 4 19 Z M24 6 L23 1 Q26 -1 29 1 L28 6 Z","ops":[0,4,19,2,0,12,8,5,20,5,2,32,1,43,5,43,13,3,46,18,40,23,3,22,24,4,19,4,0,24,6,1,23,1,3,26,-1,29,1,1,28,6,4]},{"name":"beret-band","space":"head","fill":"#6B413A","path":"M5 18 Q23 22 42 18 L40 23 Q22 25 5 21 Z","ops":[0,5,18,3,23,22,42,18,1,40,23,3,22,25,5,21,4]}],"letter":[{"name":"envelope","space":"head","fill":"#FFF0D9","stroke":"#805543","strokeWidth":0.4,"path":"M67 6 L97 9 L95 29 L65 26 Z","ops":[0,67,6,1,97,9,1,95,29,1,65,26,4]},{"name":"envelope-fold","space":"head","fill":"#D4AF89","path":"M67 7 L81 18 L97 10 L96 12 L81 20 L66 9 Z M65 25 L76 18 L77 20 L67 27 Z M85 20 L95 27 L95 29 L83 21 Z","ops":[0,67,7,1,81,18,1,97,10,1,96,12,1,81,20,1,66,9,4,0,65,25,1,76,18,1,77,20,1,67,27,4,0,85,20,1,95,27,1,95,29,1,83,21,4]},{"name":"envelope-seal","space":"head","fill":"#B95F44","path":"M81 16 C76 11 73 17 78 20 L82 24 L86 21 C91 17 86 12 82 16 Z","ops":[0,81,16,2,76,11,73,17,78,20,1,82,24,1,86,21,2,91,17,86,12,82,16,4]}],"scarf":[{"name":"scarf","space":"head","fill":"#B69454","stroke":"#795D40","strokeWidth":0.3,"path":"M1 80 Q12 85 25 84 L25 95 Q12 97 2 91 Z M19 88 L29 88 L32 100 L23 100 Z","ops":[0,1,80,3,12,85,25,84,1,25,95,3,12,97,2,91,4,0,19,88,1,29,88,1,32,100,1,23,100,4]},{"name":"scarf-checks","space":"head","fill":"#687748","path":"M7 83 L11 84 L11 94 L7 93 Z M17 84 L21 84 L21 95 L17 95 Z M25 90 L29 90 L31 100 L27 100 Z M2 87 L25 89 L25 92 L2 90 Z","ops":[0,7,83,1,11,84,1,11,94,1,7,93,4,0,17,84,1,21,84,1,21,95,1,17,95,4,0,25,90,1,29,90,1,31,100,1,27,100,4,0,2,87,1,25,89,1,25,92,1,2,90,4]}]},data={"rows":["ㄅㄉˇˋㄓˊ˙ㄚㄞㄢㄦ","ㄆㄊㄍㄐㄔㄗㄧㄛㄟㄣ","ㄇㄋㄎㄑㄕㄘㄨㄜㄠㄤ","ㄈㄌㄏㄒㄖㄙㄩㄝㄡㄥ"],"symbols":{"zhuyinSymbolRow1":"`*_~|#\\^+=","zhuyinSymbolRow2":"{[]<>%}～—…","zhuyinNumberRow2":"-/：；（）$@「」","zhuyinNumberRow3":"。，、？！.","zhuyinNumberRow2Half":"-/:;()$@「」","zhuyinNumberRow3Half":"。，、?!.","zhuyinNumberExtra":"+×÷=%&*#_~","englishNumberExtra":"+×÷=%_<>#*","englishSymbolRow1":"[]{}#%^*+=","englishSymbolRow2":"_\\|~<>€£¥`"}};
+const atlas={"revision":"watercolor-v2","columns":3,"rows":3,"keycaps":"../../../Keyboard/Resources/FoxLetter/keycaps-watercolor-v2.png","wideKeycaps":"../../../Keyboard/Resources/FoxLetter/wide-keycaps-watercolor-v2.png","backdrop":"../../../Keyboard/Resources/FoxLetter/background-watercolor-v2.png","palettes":[[0,3,6],[1,5],[2,7],[4],[8]],"cuts":[0,0.15,0.425,0.575,0.85,1],"wideCells":[[0.02,0.065,0.96,0.4],[0.02,0.54,0.96,0.4]]},spriteIndex=function spriteIndex(index, action, personalSpaceArt = false) {
+  if (action === 'space') return personalSpaceArt ? 3 : 0;
+  if (action === 'returnKey') return 7;
+  const options = atlas.palettes[Math.max(0, index) % 5];
+  return options[Math.floor(Math.max(0, index) / 5) % options.length];
+},imageSlices=function imageSlices(frame, sprite, compact = false, wideRow = 0) {
+  const cell = { x: (sprite % 3) / 3, y: Math.floor(sprite / 3) / 3,
+    width: 1 / 3, height: (compact ? .78 : 1) / 3 };
+  const wide = frame.width > frame.height * 1.35;
+  if (!wide) return [{ frame, source: cell, url: atlas.keycaps }];
+  const [sx, sy, sw, sh] = atlas.wideCells[wideRow];
+  const wideCell = { x: sx, y: sy, width: sw, height: sh * (compact ? .78 : 1) };
+  const naturalWidth = frame.height * 2.9;
+  const stretch = (frame.width - naturalWidth * .45) / 2;
+  let x = frame.x;
+  return atlas.cuts.slice(0, -1).map((start, i) => {
+    const fraction = atlas.cuts[i + 1] - start;
+    const width = i === 1 || i === 3 ? stretch : naturalWidth * fraction;
+    const result = { frame: { x, y: frame.y, width, height: frame.height },
+      source: { x: wideCell.x + wideCell.width * start, y: wideCell.y, width: wideCell.width * fraction, height: wideCell.height },
+      url: atlas.wideKeycaps };
+    x += width;
+    return result;
+  });
+},watercolorSVG=function watercolorSVG(frame, index, action, compact = false) {
+  return imageSlices(frame, spriteIndex(index, action), compact, action === 'space' ? 0 : 1).map(piece => {
+    const f = piece.frame, s = piece.source;
+    return '<svg class="watercolor-piece" x="' + f.x + '" y="' + f.y + '" width="' + f.width + '" height="' + f.height +
+      '" viewBox="' + [s.x, s.y, s.width, s.height].join(' ') + '" preserveAspectRatio="none" overflow="hidden" style="overflow:hidden">' +
+      '<image href="' + piece.url + '" x="0" y="0" width="1" height="1" preserveAspectRatio="none"/></svg>';
+  }).join('');
+};
+const layout=function layout(c, data) {
+  const names = {zhuyin:'注音',english:'English',pinyin:'拼音',japanese:'日本語',korean:'한국어',handwriting:'手寫'};
+  const key=(text,w=1,role='normal',action='text',hint='',symbol=false)=>({text,w,role,action,hint,symbol});
+  const chars=(text,w=1)=>[...text].map(ch=>key(ch,w));
+  const icon=(name,w=1,action=name,role='special')=>key(name,w,role,action,'',true);
+  const back=(w=1.4)=>icon('backspace',w);
+  const enter=(w=2)=>icon('return',w,'returnKey','accent');
+  const shift=()=>icon(c.shift?'shift.fill':'shift',1.4,'shift');
+  const bottom=columns=>{
+    const k=columns/10;
+    const title=c.layer==='letters'?(c.mode==='pinyin'?'!#1':'123'):({zhuyin:'ㄅㄆㄇ',english:'ABC',handwriting:'手寫',japanese:'かな',korean:'한글',pinyin:'拼音'}[c.mode]);
+    const row=[key(title,1.3*k,'special',c.layer==='letters'?'numbers':'letters')];
+    if(c.globe)row.push(icon('globe',1.1*k));
+    row.push(key(c.layer==='letters'?'英':'數字',1.1*k,'special',c.layer==='letters'?'nextMode':'numpad'));
+    if(c.layer==='letters'&&c.mode==='pinyin')return [...row,key('，',.9*k),key(names[c.mode],0,'normal','space'),key('。',.9*k),key('123',1.1*k,'special','numpad'),enter(1.6*k)];
+    if(!c.globe)row.push(icon('smile',1.1*k,'emoji'));
+    return [...row,key(names[c.mode],0,'normal','space'),enter(2*k)];
+  };
+  const s=data.symbols;
+  const chinese=c.mode!=='english'&&c.mode!=='korean';
+  if(c.layer==='numpad')return {columns:5,rows:[
+    [key('-',1,'special'),...chars('123'),back(1)],
+    [key('@',1,'special'),...chars('456'),key('.',1,'special')],
+    [key(':',1,'special'),...chars('789'),key(',',1,'special')],
+    [key('!#1',1,'special','numbers'),key(({zhuyin:'ㄅㄆㄇ',english:'ABC',handwriting:'手寫',japanese:'かな',korean:'한글',pinyin:'拼音'})[c.mode],1,'special','letters'),key('0'),icon('space',1,'space'),enter(1)]
+  ]};
+  if(c.layer==='numbers')return chinese?{columns:10,rows:[chars('1234567890'),chars(c.full?s.zhuyinNumberRow2:s.zhuyinNumberRow2Half),chars(s.zhuyinNumberExtra),[key('#+=',1.25,'special','symbols'),...chars(c.full?s.zhuyinNumberRow3:s.zhuyinNumberRow3Half,1.05),key(c.full?'全形':'半形',1.1,'special','full'),back(1.35)],bottom(10)]}
+    :{columns:10,rows:[chars('1234567890'),chars('-/:;()$&@"'),chars(s.englishNumberExtra),[key('#+=',1.4,'special','symbols'),...chars(".,?!'",1.4),back()],bottom(10)]};
+  if(c.layer==='symbols')return chinese?{columns:10,rows:[chars(s.zhuyinSymbolRow1),chars(s.zhuyinSymbolRow2),[key('123',1.25,'special','numbers'),...chars('『』♡☆‧→※',.9),key(c.full?'全形':'半形',1.1,'special','full'),back(1.35)],bottom(10)]}
+    :{columns:10,rows:[chars(s.englishSymbolRow1),chars(s.englishSymbolRow2),[key('123',1.4,'special','numbers'),...chars(".,?!'",1.4),back()],bottom(10)]};
+  if(c.mode==='handwriting')return {columns:1,handwriting:true,rows:[[back(1)],[key('重寫',1,'special','clearCanvas')],[key('123',1,'special','numbers')],[key('空白',1,'normal','space')],[key('英',1,'special','nextMode')],[enter(1)]]};
+  if(c.mode==='zhuyin'){
+    if(!c.ten)return {columns:11,rows:[...data.rows.map((row,i)=>i===3?[...chars(row),back(1)]:chars(row)),bottom(11)]};
+    const hints=[...'1234567890',...'qwertyuiop',...'asdfghjkl','：',...'zxcvbnm','……','！','？'];
+    let h=0;const rows=data.rows.map(row=>[...row].filter(x=>x!=='ㄦ').map(ch=>key(ch,1,'normal','text',hints[h++])));
+    const last=[key('123',1.2,'special','numbers')];
+    if(c.globe)last.push(icon('globe',1));
+    last.push(key('英',1,'special','nextMode'),key('，',1,'normal','text','。'),key('注音',0,'normal','space'),key('ㄦ'),back(1.2),enter(1.5));
+    return {columns:10,rows:[...rows,last]};
+  }
+  if(c.mode==='korean')return {columns:10,rows:[chars(c.shift?'ㅃㅉㄸㄲㅆㅛㅕㅑㅒㅖ':'ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ'),chars('ㅁㄴㅇㄹㅎㅗㅓㅏㅣ'),[shift(),...chars('ㅋㅌㅊㅍㅠㅜㅡ'),back()],bottom(10)]};
+  const latin=text=>chars(c.mode==='english'&&c.shift?text.toUpperCase():text);
+  const first=c.mode==='english'?shift():key(c.mode==='japanese'?'ー':"'",1.4,'special');
+  const rows=[latin('qwertyuiop'),latin('asdfghjkl'),[first,...latin('zxcvbnm'),back()],bottom(10)];
+  if(c.mode==='pinyin')rows.unshift(chars('1234567890'));
+  return {columns:10,rows};
+},positions=function positions(layout, width, height) {
+  const side=layout.handwriting?Math.min(84,width*.22):width;
+  const left=layout.handwriting?width-side-2:0;
+  const unit=(side-4)/layout.columns,rowHeight=(height-6)/layout.rows.length;
+  let index=0;
+  return layout.rows.flatMap((row,r)=>{
+    const fixed=row.reduce((sum,k)=>sum+Math.max(k.w,0),0),flexCount=row.filter(k=>k.w===0).length;
+    const flex=flexCount?Math.max(1,(layout.columns-fixed)/flexCount):0;
+    let x=left+2+Math.max(0,layout.columns-fixed-flex*flexCount)*unit/2;
+    return row.map(k=>{const item={...k,index:index++,x,y:3+r*rowHeight,width:(k.w||flex)*unit,height:rowHeight};x+=item.width;return item;});
+  });
+},geometry=function geometry(width, height) {
+  assert(width > 0 && height > 0, '預覽尺寸必須大於零');
+  const frame = { x: 2, y: 2, width: width - 4, height: height - 4 };
+  assert(frame.width > 0 && frame.height > 0, '按鍵太小');
+  const faceWidth = Math.min(frame.width * source.faceWidthFraction, frame.height * source.faceHeightLimit);
+  const face = { x: frame.x + (frame.width - faceWidth) / 2,
+    y: frame.y + frame.height * (1 - source.faceBottomInset) - faceWidth * source.faceAspect,
+    width: faceWidth, height: faceWidth * source.faceAspect };
+  const rect = ([x, y, w, h]) => ({ x: frame.x + frame.width * x / 100,
+    y: frame.y + frame.height * y / 100, width: frame.width * w / 100, height: frame.height * h / 100 });
+  return { frame, face, label: rect(source.labelRect), hint: rect(source.hintRect),
+    ends: Math.min(frame.width, frame.height * source.endCapAspect) };
+},svgPath=function svgPath(ops, rect, ends) {
+  const px = x => ends === null ? rect.x + rect.width * x / 100
+    : x < 50 ? rect.x + ends * x / 100 : rect.x + rect.width - ends * (100 - x) / 100;
+  const pt = k => `${px(ops[k]).toFixed(4)} ${(rect.y + rect.height * ops[k + 1] / 100).toFixed(4)}`;
+  let result = '', i = 0;
+  while (i < ops.length) {
+    switch (ops[i]) {
+      case 0: result += `M${pt(i + 1)}`; i += 3; break;
+      case 1: result += `L${pt(i + 1)}`; i += 3; break;
+      case 2: result += `C${pt(i + 1)} ${pt(i + 3)} ${pt(i + 5)}`; i += 7; break;
+      case 3: result += `Q${pt(i + 1)} ${pt(i + 3)}`; i += 5; break;
+      case 4: result += 'Z'; i++; break;
+      default: throw new Error('無效路徑操作');
+    }
+  }
+  return result;
+},artGeometry=function artGeometry(width, height, gap, scale, compact) {
+  const factor=Math.min(1.12,Math.max(.8,scale/1.15));
+  gap=Math.min(1.8,Math.max(.3,gap));
+  const w=Math.min(width-1.4,Math.max(5,width-2*gap)*factor),h=Math.min(height-1.4,Math.max(5,height-4*gap)*factor);
+  const offset={x:(width-w)/2,y:(height-h)/2};
+  const g=geometry(w,h);
+  if(compact && h<38){g.face={x:0,y:0,width:0,height:0};g.label={x:g.frame.x+g.frame.width*.16,y:g.frame.y+g.frame.height*.24,width:g.frame.width*.68,height:g.frame.height*.64};}
+  return {...g,offset,compact:compact&&h<38};
+},legibleInk=function legibleInk(palette, opacity, colors) {
+  const rgb=hex=>hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255);
+  const lum=values=>values.map(c=>c<=.04045?c/12.92:((c+.055)/1.055)**2.4).reduce((sum,c,i)=>sum+c*[.2126,.7152,.0722][i],0);
+  const fur=rgb(palette.fur),alpha=Math.min(1,Math.max(0,opacity));
+  const backgrounds=[colors.backgroundTop,colors.backgroundBottom].map(b=>lum(rgb(b).map((c,i)=>fur[i]*alpha+c*(1-alpha))));
+  const score=color=>{const l=lum(rgb(color));return Math.min(...backgrounds.map(b=>(Math.max(l,b)+.05)/(Math.min(l,b)+.05)))};
+  if(score(palette.text)>=4.5)return {color:palette.text,outline:null};
+  const color=[palette.text,'#FFF9EF','#000000'].reduce((best,color)=>score(color)>score(best)?color:best,palette.text);
+  return {color,outline:score(color)>=4.5?null:lum(rgb(color))>.5?'#000000':'#FFFFFF'};
+},legibleColor=function legibleColor(palette, opacity, colors) { return legibleInk(palette,opacity,colors).color; };
+const assert=(x,message)=>{if(!x)throw new Error(message)},escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const iconPaths={backspace:'M9 5H21V19H9L2 12ZM12 9L18 15M18 9L12 15',return:'M20 4V13H5M10 8L5 13L10 18',shift:'M3 11L12 2L21 11H16V21H8V11Z','shift.fill':'M3 11L12 2L21 11H16V21H8V11Z',globe:'M21 12A9 9 0 1 1 3 12A9 9 0 1 1 21 12M3 12H21M12 3C6 8 6 16 12 21C18 16 18 8 12 3',smile:'M21 12A9 9 0 1 1 3 12A9 9 0 1 1 21 12M8 9H8.1M16 9H16.1M7 14Q12 19 17 14',space:'M3 8V16H21V8',clipboard:'M9 5H5V22H20V5H16M9 2H16V7H9ZM8 11H17M8 16H17',gear:'M9 2H15L16 6L20 5L23 10L20 13L22 17L17 21L14 19L10 22L7 19L3 19L1 13L5 11L4 6L9 6ZM16 12A4 4 0 1 1 8 12A4 4 0 1 1 16 12',dismiss:'M3 4H21V15H3ZM8 19L12 23L16 19'};
+function icon(name,x,y,w,h,color){const d=iconPaths[name]||iconPaths.smile;return '<svg class="icon" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" viewBox="0 0 24 24"><path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'}
+function motif(name){return '<svg width="25" height="25" viewBox="65 0 35 33" aria-hidden="true">'+accessories[name].map(l=>'<path d="'+svgPath(l.ops,{x:0,y:0,width:100,height:100},null)+'" fill="'+l.fill+'"'+(l.stroke?' stroke="'+l.stroke+'" stroke-width="1"':'')+'/>').join('')+'</svg>'}
+function drawKey(k,c){
+ const functional=k.action!=='text';const g=artGeometry(k.width,k.height,c.gap,c.shape,functional);
+ const index=k.action==='returnKey'?2:k.action==='space'?0:k.index%source.variants.length,p=source.variants[index];
+ const normal=legibleInk(p,c.alpha,source.themeColors),pressed=legibleInk(p,c.alpha*.82,source.themeColors);
+ for(const ink of [normal,pressed])if(!ink.outline&&parseInt(ink.color.slice(1,3),16)>200)ink.outline='#68472BA6';
+ const ink=normal.color,pressedInk=pressed.color;
+ const accessory=k.action==='space'?'letter':k.action==='returnKey'?'leaf':p.accessory;
+ const defs=g.compact?layers.slice(0,2):[...layers.slice(0,-1),...(accessories[accessory]||[]),layers[layers.length-1]];
+ const parts=watercolorSVG({x:0,y:0,width:g.frame.width+4,height:g.frame.height+4},k.index,k.action,g.compact);
+ const zone=(r,cls)=>'<rect class="zone '+cls+'" x="'+r.x+'" y="'+r.y+'" width="'+r.width+'" height="'+r.height+'"/>';
+ const r=g.label,hint=g.hint;
+ let face=k.symbol?icon(k.text,r.x,r.y,r.width,r.height,ink):'<text class="main-text" x="'+(r.x+r.width/2)+'" y="'+(r.y+r.height/2)+'" dominant-baseline="central" text-anchor="middle" fill="'+ink+'" font-size="'+Math.min(24*c.font,r.height)+'" font-weight="750">'+escape(k.text)+'</text>';
+ face+='<text class="hint-text" x="'+(hint.x+hint.width/2)+'" y="'+(hint.y+hint.height/2)+'" dominant-baseline="central" text-anchor="middle" fill="#FFF5E4" font-size="'+Math.min(9*c.font,hint.height)+'">'+escape(k.hint)+'</text>';
+ return '<svg class="key" data-label="'+escape(k.text)+'" data-action="'+k.action+'" style="--pressed-alpha:'+c.alpha*.82+';--pressed-ink:'+pressedInk+';--normal-outline:'+(normal.outline||'transparent')+';--pressed-outline:'+(pressed.outline||'transparent')+'" x="'+k.x+'" y="'+k.y+'" width="'+k.width+'" height="'+k.height+'" viewBox="0 0 '+k.width+' '+k.height+'"><g transform="translate('+g.offset.x+' '+g.offset.y+')"><g class="art" opacity="'+c.alpha+'">'+parts+'</g>'+zone(r,'label-zone')+zone(hint,'hint-zone')+zone(g.face,'face-zone')+face+'</g></svg>';
+}
+function fitText(svg){
+ for(const [selector,zoneSelector]of [['.main-text','.label-zone'],['.hint-text','.hint-zone']]){
+  const text=svg.querySelector(selector),r=svg.querySelector(zoneSelector);if(!text||!text.textContent)continue;
+  const outlined=selector==='.main-text'&&['--normal-outline','--pressed-outline'].some(name=>svg.style.getPropertyValue(name)!=='transparent');
+  const edge=outlined?Math.min(.6,Number(r.getAttribute('height'))*.05):0;
+  let b=text.getBBox();const w=Number(r.getAttribute('width'))-2*edge,h=Number(r.getAttribute('height'))-2*edge;
+  // 小字型的像素對齊並非完全線性，反覆量測，避免提示字卡在整數像素行高。
+  for(let i=0;i<8;i++){
+   b=text.getBBox();const fit=Math.min(1,w/Math.max(.01,b.width),h/Math.max(.01,b.height));
+   if(fit>=.999)break;
+   text.setAttribute('font-size',Number(text.getAttribute('font-size'))*fit*.96);
+  }
+  b=text.getBBox();text.setAttribute('y',Number(text.getAttribute('y'))+Number(r.getAttribute('y'))+edge+h/2-b.y-b.height/2);
+  text.setAttribute('x',Number(text.getAttribute('x'))+Number(r.getAttribute('x'))+edge+w/2-b.x-b.width/2);
+ }
+}
+function state(){const c={};for(const id of ['mode','layer','panel'])c[id]=document.querySelector('#'+id).value;for(const id of ['ten','shift','globe','full','candidates','zones'])c[id]=document.querySelector('#'+id).checked;for(const id of ['height','font','gap','shape','alpha','width','zoom'])c[id]=Number(document.querySelector('#'+id).value);return c;}
+function render(){
+ const c=state(),l=layout(c,data),w=c.width,h=Math.round((l.rows.length>=5?252:216)*c.height);
+ const keys=positions(l,w,h);let main='';
+ if(c.panel==='keyboard'){
+  if(l.handwriting){const cw=w-Math.min(84,w*.22)-10;main+='<rect x="6" y="6" width="'+cw+'" height="'+(h-12)+'" rx="10" fill="#654b4c"/><text x="'+cw/2+'" y="'+h/2+'" fill="#e9c4a9" font-size="16" text-anchor="middle">手寫區</text>';}
+  main='<svg class="key-scene" width="'+w*c.zoom+'" height="'+h*c.zoom+'" viewBox="0 0 '+w+' '+h+'"><svg width="'+w+'" height="'+h+'" viewBox="0 .2 1 .8" preserveAspectRatio="none"><image href="'+atlas.backdrop+'" width="1" height="1"/></svg>'+main+keys.map(k=>drawKey(k,c)).join('')+'</svg>';
+ }else if(c.panel==='emoji')main='<div class="panel" style="width:'+w*c.zoom+'px"><h2>最近使用 · 表情 · 顏文字</h2><div class="emoji-grid">🦊 🍁 ✉️ 🍂 🐻 🌰 😊 🧡 🌿 🍄 ☺️ ⭐</div><div class="item">(•ᴗ•)　(˶ᵔ ᵕ ᵔ˶)　♡</div></div>';
+ else if(c.panel==='clipboard')main='<div class="panel" style="width:'+w*c.zoom+'px"><h2>剪貼簿 · 釘選</h2><div class="item">把秋天寄給你 🍁</div><div class="item">小狐狸的楓葉信</div><div class="item">今天也要好好休息。</div></div>';
+ else main='<div class="panel" style="width:'+w*c.zoom+'px"><h2>主題 · 小狐狸的楓葉信 ✓</h2><div class="item">角色造型與插畫質感已搭配好</div><div class="item">原本的造型、質感、照片都會保留</div><div class="item">高度、字體、間距與空白鍵圖片可繼續使用</div></div>';
+ const toolbar=c.candidates?'<div>秋天　 楓葉　 寄信　▾</div>':['clipboard','smile','gear','dismiss'].map(name=>icon(name,0,0,22,22,'#fff5e4')).join('<span style="font-size:12px;opacity:.45">│</span>');
+ const keyboard=document.querySelector('#keyboard');keyboard.style.width=w*c.zoom+'px';
+ keyboard.innerHTML='<div class="banner" style="height:'+52*c.zoom+'px;font-size:'+18*c.zoom+'px"><svg class="landscape" viewBox="0 0 1 .18" preserveAspectRatio="none"><image href="'+atlas.backdrop+'" width="1" height="1"/></svg><span class="theme-title">小狐狸的楓葉信</span></div><div class="toolbar" style="height:'+41*c.zoom+'px;--tool-size:'+21*c.zoom+'px">'+toolbar+'</div>'+main+'<div class="foot" style="height:'+66*c.zoom+'px;padding-left:'+22*c.zoom+'px;--globe-size:'+30*c.zoom+'px">'+icon('globe',0,0,30,30,'#17131b')+'</div>';
+ keyboard.querySelectorAll('.key').forEach(fitText);
+ document.querySelector('#app').classList.toggle('zones-off',!c.zones);
+ document.querySelector('#summary').textContent=w+' pt 寬 · '+Math.round(c.height*100)+'% 高度 · '+keys.length+' 顆鍵 · '+(l.handwriting?'手寫側欄':l.rows.length+' 排');
+ keyboard.querySelectorAll('.key').forEach(key=>key.addEventListener('click',()=>{key.classList.add('pressed');setTimeout(()=>key.classList.remove('pressed'),130);document.querySelector('#status').textContent='點選：'+key.dataset.label+'（'+key.dataset.action+'） · 此頁只測外觀，iPhone 保留原本按鍵行為。';}));
+}
+document.querySelector('#swatches').innerHTML=source.variants.map(p=>'<span class="swatch"><i style="background:'+p.fur+'"></i>'+p.name+'</span>').join('');
+document.querySelectorAll('.controls input,.controls select').forEach(e=>e.addEventListener('input',render));render();document.fonts.ready.then(render);
+</script></html>

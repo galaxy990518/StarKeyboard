@@ -64,6 +64,8 @@ final class TopBarView: UIView {
     private var hasSource = false
     private var trailing: Trailing = .expand
     private let backdropView = KeyboardBackdropView(fadesBottom: false)
+    private let foxTexture = CALayer()
+    private let foxShade = CALayer()
     private var nativeGlass: KeyboardGlassSurface?
     private let toolbar = UIStackView()
     private var toolbarButtons: [UIButton] = []
@@ -94,6 +96,8 @@ final class TopBarView: UIView {
         super.init(frame: .zero)
         isOpaque = false
         addSubview(backdropView)
+        backdropView.layer.addSublayer(foxTexture)
+        backdropView.layer.addSublayer(foxShade)
 
         toolbar.axis = .horizontal
         toolbar.distribution = .fillEqually
@@ -243,7 +247,7 @@ final class TopBarView: UIView {
                 b.backgroundColor = style.theme.accent.withAlphaComponent(style.usesNativeGlassBar ? 0.85 : 1)
                 b.setTitleColor(style.theme.accentText, for: .normal)
                 b.layer.shadowColor = style.theme.shadow.cgColor
-                b.layer.shadowOpacity = style.usesNativeGlassBar ? 0.12 : 0.6
+                b.layer.shadowOpacity = (style.usesNativeGlassBar || style.isFoxLetter) ? 0.12 : 0.6
                 b.layer.shadowRadius = 2
                 b.layer.shadowOffset = CGSize(width: 0, height: 1.5)
             } else {
@@ -255,7 +259,13 @@ final class TopBarView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        backdropView.frame = bounds
+        backdropView.frame = style.isFoxLetter ? bounds.insetBy(dx: 4, dy: 4) : bounds
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        foxTexture.frame = backdropView.bounds
+        foxShade.frame = backdropView.bounds
+        backdropView.layer.cornerRadius = style.isFoxLetter ? backdropView.bounds.height / 2 : 0
+        CATransaction.commit()
         // 原生玻璃獨立放在未遮罩的父層，頂部留出空間銜接第一階段的背景過渡。
         let glassBounds = bounds.insetBy(dx: min(4, bounds.width / 2), dy: min(4, bounds.height / 2))
         nativeGlass?.frame = glassBounds
@@ -327,8 +337,17 @@ final class TopBarView: UIView {
 
     private func applyStyle() {
         let t = style.theme
+        backdropView.softensEdges = !style.isFoxLetter
         // 底色單獨過渡，工具列、選字與編輯文字維持原本的清晰度。
         backdropView.backgroundColor = t.isDark ? UIColor.black.withAlphaComponent(0.35) : UIColor.white.withAlphaComponent(0.6)
+        backdropView.layer.cornerRadius = style.isFoxLetter ? 16 : 0
+        backdropView.layer.borderWidth = style.isFoxLetter ? 0.65 : 0
+        backdropView.layer.borderColor = style.isFoxLetter ? t.keyText.withAlphaComponent(0.3).cgColor : nil
+        foxTexture.contents = style.isFoxLetter ? FoxLetterWatercolor.backdrop : nil
+        foxTexture.contentsRect = CGRect(x: 0.2, y: 0.3, width: 0.6, height: 0.6)
+        foxTexture.isHidden = !style.isFoxLetter
+        foxShade.backgroundColor = UIColor.black.withAlphaComponent(0.65).cgColor
+        foxShade.isHidden = !style.isFoxLetter
         if style.usesNativeGlassBar {
             if nativeGlass == nil {
                 let glass = KeyboardGlassSurface()

@@ -79,11 +79,40 @@ jobs:
       - name: 核心邏輯測試（注音組字、選字、剪貼簿）
         run: swift test --package-path Core
 
+      - name: 狐狸主題向量與預覽資料檢查
+        run: |
+          node tools/tests/fox_letter_prototype.test.js
+          node tools/tests/fox_letter_theme.test.js
+          node tools/tests/fox_letter_watercolor.test.js
+          node tools/build_fox_letter_prototype.js --check
+          node tools/build_fox_letter_theme.js --check
+
       - name: 產生 Xcode 專案
         run: |
           xcodebuild -version
           brew install xcodegen
           xcodegen generate
+
+      - name: 角色主題版面、重用與效能測試
+        run: |
+          set -o pipefail
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/theme-simulators.json"
+          THEME_SIMULATOR_ID=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); ids=[v["udid"] for runtime, devices in d["devices"].items() if "iOS-26" in runtime for v in devices if v["name"].startswith("iPhone")]; assert ids, "找不到 iOS 26 iPhone 模擬器"; print(ids[0])' "$RUNNER_TEMP/theme-simulators.json")
+          xcodebuild test -project StarKeyboard.xcodeproj -scheme StarKeyboardThemeTests \
+            -destination "platform=iOS Simulator,id=$THEME_SIMULATOR_ID" \
+            -resultBundlePath "$RUNNER_TEMP/fox-letter-tests.xcresult" \
+            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "$RUNNER_TEMP/fox-letter-tests.log"
+
+      - name: 保存角色主題測試結果（包含效能量測）
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fox-letter-tests
+          path: |
+            ${{ runner.temp }}/fox-letter-tests.xcresult
+            ${{ runner.temp }}/fox-letter-tests.log
+          if-no-files-found: ignore
 
       - name: 編譯
         run: |

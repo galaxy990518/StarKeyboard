@@ -42,6 +42,10 @@ targets:
     platform: iOS
     sources:
       - path: Keyboard
+        excludes:
+          - Resources/FoxLetter/**
+      - path: Keyboard/Resources/FoxLetter
+        type: folder
       - path: Core/Sources/KeyboardCore
     info:
       path: Keyboard/Info.plist
@@ -61,3 +65,29 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.startown.starkeyboard.keyboard
         PRODUCT_NAME: StarKeyboardExtension
+  StarKeyboardThemeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: KeyboardTests
+      - path: Keyboard
+        excludes:
+          - Resources/**
+          - "**/*.plist"
+      - path: Core/Sources/KeyboardCore
+      - path: Keyboard/Resources/FoxLetter
+        type: folder
+    dependencies:
+      - target: StarKeyboard
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.startown.starkeyboard.theme-tests
+schemes:
+  StarKeyboardThemeTests:
+    build:
+      targets:
+        StarKeyboardThemeTests: all
+    test:
+      targets:
+        - StarKeyboardThemeTests

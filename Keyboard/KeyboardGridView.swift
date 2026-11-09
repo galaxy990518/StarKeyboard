@@ -6,6 +6,7 @@ final class KeyButton: UIView {
         didSet {
             updateFace()
             applyColors()
+            if style.isFoxLetter { setNeedsLayout() }
         }
     }
     var style: KeyboardStyle {
@@ -21,8 +22,27 @@ final class KeyButton: UIView {
     var visualOpacity: CGFloat = 1 {
         didSet { updateVisualOpacity() }
     }
+    var illustratedIndex = 0 {
+        didSet { if oldValue != illustratedIndex && style.isFoxLetter { applyColors() } }
+    }
 
     private let content = UIView()
+    private var foxArtwork: FoxLetterArtworkView?
+    private struct FoxInkConfiguration: Equatable {
+        let fur: UIColor
+        let preferred: UIColor
+        let top: UIColor
+        let bottom: UIColor
+        let opacity: CGFloat
+    }
+    private var foxInkConfiguration: FoxInkConfiguration?
+    private var foxNormalInk = FoxLetterTheme.Ink(color: .white, outline: nil)
+    private var foxPressedInk = FoxLetterTheme.Ink(color: .white, outline: nil)
+    private var foxNormalTitle: NSAttributedString?
+    private var foxPressedTitle: NSAttributedString?
+    private var foxNormalSymbol: UIImage?
+    private var foxPressedSymbol: UIImage?
+    private var hasPersonalSpaceArt = false
     private var nativeGlass: KeyboardGlassSurface?
     private let shadowLayer = CAShapeLayer()
     // 液態玻璃：透出後面的照片（模糊、稍微放大）＋亮亮的玻璃邊
@@ -116,6 +136,8 @@ final class KeyButton: UIView {
         label.baselineAdjustment = .alignCenters
         content.addSubview(label)
         hintLabel.textAlignment = .right
+        hintLabel.adjustsFontSizeToFitWidth = true
+        hintLabel.minimumScaleFactor = 0.5
         content.addSubview(hintLabel)
         icon.contentMode = .center
         content.addSubview(icon)
@@ -129,6 +151,10 @@ final class KeyButton: UIView {
         super.layoutSubviews()
         content.bounds = bounds
         content.center = CGPoint(x: bounds.midX, y: bounds.midY)
+        if style.isFoxLetter {
+            layoutFoxLetter()
+            return
+        }
         // 線條造型（貓咪、熊熊…）有自己的形狀，空隙留小一點，圖案才夠大
         let art = style.shape.art != nil
         var outer = bounds.insetBy(dx: (art ? 1.2 : 3) * style.gapScale, dy: (art ? 1.8 : 4.5) * style.gapScale)
@@ -240,6 +266,11 @@ final class KeyButton: UIView {
 
     /// 原生玻璃直接取景；替代畫法則把背景照片換成按鍵座標，再稍微放大。
     func layoutGlass(path: CGPath? = nil, outer: CGRect? = nil, body: CGRect? = nil) {
+        if style.isFoxLetter {
+            glassVersion = GlassBackdrop.version
+            setPaintedLayersHidden(true)
+            return
+        }
         let on = style.finish == .liquid
         let native = style.usesNativeGlassKeys
         let paintedShine = shiny && !native
@@ -326,30 +357,90 @@ final class KeyButton: UIView {
     }
 
     private func updateFace() {
+        foxNormalSymbol = nil
+        foxPressedSymbol = nil
         hintLabel.text = spec.hint
         hintLabel.isHidden = spec.hint.isEmpty
         if let art = spaceArt {
+            hasPersonalSpaceArt = true
             label.isHidden = true
             icon.isHidden = false
             icon.contentMode = .scaleAspectFit
             icon.image = art
             return
         }
+        hasPersonalSpaceArt = false
         switch spec.face {
         case .text(let s):
             label.isHidden = false
             icon.isHidden = true
+            label.attributedText = nil
             label.text = s
             label.font = KeyFonts.font(style.fontID, size: spec.fontSize * style.fontScale, weight: spec.kind == .normal ? .regular : .semibold)
         case .symbol(let name):
             label.isHidden = true
             icon.isHidden = false
+            icon.contentMode = .center
             icon.image = UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(pointSize: 18 * style.fontScale, weight: .medium))
         }
     }
 
     private func applyColors() {
+        if style.isFoxLetter {
+            nativeGlass?.removeFromSuperview()
+            nativeGlass = nil
+            if foxArtwork == nil {
+                let artwork = FoxLetterArtworkView(frame: .zero)
+                content.insertSubview(artwork, at: 0)
+                foxArtwork = artwork
+                setNeedsLayout()
+            }
+            setPaintedLayersHidden(true)
+            glassLayer.contents = nil
+            content.layer.shouldRasterize = false
+            foxArtwork?.configure(index: illustratedIndex, action: spec.action, personalSpaceArt: hasPersonalSpaceArt)
+            guard let artwork = foxArtwork else { return }
+            let configuration = FoxInkConfiguration(fur: artwork.furColor, preferred: artwork.textColor,
+                top: style.theme.backgroundTop, bottom: style.theme.backgroundBottom, opacity: style.keyAlpha)
+            if configuration != foxInkConfiguration {
+                foxInkConfiguration = configuration
+                foxNormalInk = FoxLetterTheme.paperInk(FoxLetterTheme.ink(fur: artwork.furColor, preferred: artwork.textColor,
+                    opacity: style.keyAlpha, theme: style.theme))
+                foxPressedInk = FoxLetterTheme.paperInk(FoxLetterTheme.ink(fur: artwork.furColor, preferred: artwork.textColor,
+                    opacity: style.keyAlpha * 0.82, theme: style.theme))
+            }
+            foxNormalTitle = nil
+            foxPressedTitle = nil
+            if case .text(let text) = spec.face {
+                label.attributedText = nil
+                label.text = text
+                if foxNormalInk.outline != nil || foxPressedInk.outline != nil {
+                    foxNormalTitle = FoxLetterTheme.title(text, ink: foxNormalInk)
+                    foxPressedTitle = FoxLetterTheme.title(text, ink: foxPressedInk)
+                }
+            } else {
+                foxNormalSymbol = nil
+                foxPressedSymbol = nil
+                setNeedsLayout()
+            }
+            hintLabel.textColor = style.theme.keyText
+            hintLabel.textAlignment = .center
+            updateFoxFeedback()
+            return
+        }
+        if let artwork = foxArtwork {
+            artwork.removeFromSuperview()
+            foxArtwork = nil
+            foxInkConfiguration = nil
+            foxNormalTitle = nil
+            foxPressedTitle = nil
+            foxNormalSymbol = nil
+            foxPressedSymbol = nil
+            setPaintedLayersHidden(false)
+            setNeedsLayout()
+        }
         let t = style.theme
+        hintLabel.textAlignment = .right
         var fill: UIColor
         let text: UIColor
         switch spec.kind {
@@ -462,8 +553,9 @@ final class KeyButton: UIView {
     }
 
     private func pressChanged() {
-        applyColors()
-        if style.usesNativeGlassKeys && UIAccessibility.isReduceMotionEnabled {
+        if style.isFoxLetter { updateFoxFeedback() }
+        else { applyColors() }
+        if (style.usesNativeGlassKeys || style.isFoxLetter) && UIAccessibility.isReduceMotionEnabled {
             content.layer.removeAllAnimations()
             content.transform = .identity
             return
@@ -505,6 +597,7 @@ final class KeyButton: UIView {
             UIView.animate(withDuration: 0.05, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
                 // 胖胖的鍵按下去會被壓扁
                 switch self.style.finish {
+                case _ where self.style.isFoxLetter: self.content.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
                 case .puffy: self.content.transform = CGAffineTransform(scaleX: 1.06, y: 0.86)
                 case .raised: self.content.transform = CGAffineTransform(translationX: 0, y: self.depth * 0.85)
                 case .liquid:
@@ -551,7 +644,25 @@ final class KeyButton: UIView {
         }
     }
 
+    /// 連打時只改既有圖層與字色；不重新配置插畫、讀取圖片或要求排版。
+    private func updateFoxFeedback() {
+        let ink = isPressed ? foxPressedInk : foxNormalInk
+        label.textColor = ink.color
+        icon.tintColor = ink.color
+        if let title = isPressed ? foxPressedTitle : foxNormalTitle { label.attributedText = title }
+        if let symbol = isPressed ? foxPressedSymbol : foxNormalSymbol { icon.image = symbol }
+        updateVisualOpacity()
+    }
+
     private func updateVisualOpacity() {
+        if style.isFoxLetter {
+            content.alpha = 1
+            foxArtwork?.setSurfaceOpacity(style.keyAlpha * visualOpacity, pressed: isPressed)
+            label.alpha = visualOpacity
+            hintLabel.alpha = visualOpacity
+            icon.alpha = visualOpacity
+            return
+        }
         let native = style.usesNativeGlassKeys
         // 游標模式／照片調整時暫時隱藏材質，只淡化字面，避免整個玻璃父層 alpha < 1。
         content.alpha = native ? 1 : visualOpacity
@@ -559,6 +670,48 @@ final class KeyButton: UIView {
         label.alpha = native ? visualOpacity : 1
         hintLabel.alpha = native ? visualOpacity : 1
         icon.alpha = native ? visualOpacity : 1
+    }
+
+    private func setPaintedLayersHidden(_ hidden: Bool) {
+        let layers: [CALayer] = [shadowLayer, glassLayer, bodyLayer, glossLayer, cushionLayer, padShadow,
+                                detailLayer, padHi, padLo, linesLayer, rimLayer, edgeLayer, shineClip]
+        for layer in layers {
+            layer.isHidden = hidden
+        }
+    }
+
+    private func layoutFoxLetter() {
+        guard let artwork = foxArtwork else { return }
+        let frame = FoxLetterTheme.frame(in: bounds, gap: style.gapScale, scale: style.shapeScale)
+        artwork.frame = frame
+        let compact = frame.height < 38 && !spec.action.isCharacter
+        artwork.configure(index: illustratedIndex, action: spec.action, personalSpaceArt: hasPersonalSpaceArt, compact: compact)
+        let geometry = FoxLetterTheme.layout(in: artwork.bounds, compact: compact)
+        guard !geometry.frame.isEmpty else {
+            label.frame = .zero
+            hintLabel.frame = .zero
+            icon.frame = .zero
+            return
+        }
+        let edge = foxNormalInk.outline != nil || foxPressedInk.outline != nil ? min(0.6, geometry.label.height * 0.05) : 0
+        let textRect = geometry.label.offsetBy(dx: frame.minX, dy: frame.minY).insetBy(dx: edge, dy: edge)
+        let wanted = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, textRect.height), weight: .bold)
+        label.font = wanted.withSize(wanted.pointSize * min(1, textRect.height / wanted.lineHeight))
+        label.frame = textRect
+        icon.frame = textRect
+        if case .symbol(let name) = spec.face {
+            if let image = UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(
+                pointSize: min(18 * style.fontScale, textRect.height * 0.9), weight: .semibold)) {
+                foxNormalSymbol = FoxLetterTheme.outlinedSymbol(image, ink: foxNormalInk)
+                foxPressedSymbol = FoxLetterTheme.outlinedSymbol(image, ink: foxPressedInk)
+                icon.image = isPressed ? foxPressedSymbol : foxNormalSymbol
+            }
+        }
+        hintLabel.frame = geometry.hint.offsetBy(dx: frame.minX, dy: frame.minY)
+        let hintFont = UIFont.rounded(min(9 * style.fontScale, geometry.hint.height), .medium)
+        hintLabel.font = hintFont.withSize(hintFont.pointSize * min(1, geometry.hint.height / hintFont.lineHeight))
+        // 自選空白鍵圖片沿用原圖比例，不與主題配件重疊。
+        if hasPersonalSpaceArt { icon.contentMode = .scaleAspectFit }
     }
 }
 
@@ -685,6 +838,7 @@ final class KeyboardGridView: UIView {
                 addSubview(key)
                 keys.append(key)
             }
+            keys[i].illustratedIndex = i
         }
         updateKeyOpacity()
         setNeedsLayout()

@@ -114,6 +114,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         liveButton.setTitleColor(style.theme.specialText, for: .normal)
 
         stack.addArrangedSubview(header("主題"))
+        stack.addArrangedSubview(foxLetterThemeRow())
         stack.addArrangedSubview(themeRow())
         if settings.themeID == "custom" {
             // 自訂配色：點色票選顏色；雙色時可以分別選主色和第二色
@@ -145,18 +146,25 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             })
         }
 
-        stack.addArrangedSubview(header("按鍵造型"))
-        stack.addArrangedSubview(shapeRow())
+        if style.isFoxLetter {
+            stack.addArrangedSubview(note("小狐狸主題已搭配角色造型與插畫質感。原本的造型、質感和背景照片會保留，切回其他主題即可恢復；高度、字體、間距與動畫仍可調整。"))
+        } else {
+            stack.addArrangedSubview(header("按鍵造型"))
+            stack.addArrangedSubview(shapeRow())
 
-        stack.addArrangedSubview(header("按鍵質感"))
-        stack.addArrangedSubview(choiceRow(KeyFinish.allCases.map { $0.title },
-                                           selected: KeyFinish.allCases.firstIndex(of: settings.keyFinish) ?? 0) { [weak self] i in
-            self?.settings.keyFinish = KeyFinish.allCases[i]
-            self?.onChange?()
-        })
-        stack.addArrangedSubview(note("胖胖：圓滾滾，按下去會壓扁。立體：按鍵有厚度，按下去會往下沉；按鍵調透明也看得出來。"))
+            stack.addArrangedSubview(header("按鍵質感"))
+            stack.addArrangedSubview(choiceRow(KeyFinish.allCases.map { $0.title },
+                                               selected: KeyFinish.allCases.firstIndex(of: settings.keyFinish) ?? 0) { [weak self] i in
+                self?.settings.keyFinish = KeyFinish.allCases[i]
+                self?.onChange?()
+            })
+            stack.addArrangedSubview(note("胖胖：圓滾滾，按下去會壓扁。立體：按鍵有厚度，按下去會往下沉；按鍵調透明也看得出來。"))
+        }
 
         stack.addArrangedSubview(header("空白鍵"))
+        if style.isFoxLetter {
+            stack.addArrangedSubview(note("可繼續使用自己的空白鍵圖片／GIF或表符。使用圖片時會收起信封配件，保留中央圖案空間。"))
+        }
         let spaceModes = [("theme", "主題符號"), ("image", "我的圖片"), ("emoji", "表符"), ("text", "只有字")]
         stack.addArrangedSubview(choiceRow(spaceModes.map { $0.1 }, selected: spaceModes.firstIndex { $0.0 == settings.spaceStyle } ?? 0) { [weak self] i in
             guard let self = self else { return }
@@ -466,7 +474,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         scrollRow.showsHorizontalScrollIndicator = false
         scrollRow.heightAnchor.constraint(equalToConstant: 78).isActive = true
         var x: CGFloat = 0
-        for theme in KeyboardTheme.all + [KeyboardTheme.named("custom")] {
+        for theme in KeyboardTheme.all.filter({ $0.id != FoxLetterTheme.id }) + [KeyboardTheme.named("custom")] {
             let selected = theme.id == settings.themeID
             let b = UIButton(type: .custom)
             b.frame = CGRect(x: x, y: 0, width: 64, height: 76)
@@ -501,6 +509,53 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         scrollRow.contentSize = CGSize(width: x, height: 76)
         themeScroll = scrollRow
         return scrollRow
+    }
+
+    private func foxLetterThemeRow() -> UIView {
+        let selected = settings.themeID == FoxLetterTheme.id
+        let button = UIButton(type: .custom)
+        button.heightAnchor.constraint(equalToConstant: 82).isActive = true
+        button.backgroundColor = UIColor(hex: 0x51424D)
+        button.layer.cornerRadius = 14
+        button.layer.borderWidth = selected ? 2 : 0.7
+        button.layer.borderColor = UIColor(hex: selected ? 0xE9AE78 : 0xA1847E).cgColor
+        button.accessibilityLabel = "小狐狸的楓葉信，角色主題"
+        button.accessibilityTraits = selected ? [.button, .selected] : [.button]
+        let preview = FoxLetterArtworkView(frame: .zero)
+        preview.translatesAutoresizingMaskIntoConstraints = false
+        preview.configure(index: 0, action: .text(""), personalSpaceArt: false)
+        button.addSubview(preview)
+        let title = UILabel()
+        title.text = selected ? "小狐狸的楓葉信 ✓" : "小狐狸的楓葉信"
+        title.textColor = UIColor(hex: 0xFFF5E4)
+        title.font = .rounded(16, .bold)
+        title.adjustsFontSizeToFitWidth = true
+        title.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(title)
+        let subtitle = UILabel()
+        subtitle.text = "秋日角色按鍵 · 點一下套用"
+        subtitle.textColor = UIColor(hex: 0xE7C8B1)
+        subtitle.font = .rounded(11)
+        subtitle.adjustsFontSizeToFitWidth = true
+        subtitle.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(subtitle)
+        NSLayoutConstraint.activate([
+            preview.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 12),
+            preview.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            preview.widthAnchor.constraint(equalToConstant: 43),
+            preview.heightAnchor.constraint(equalToConstant: 62),
+            title.leadingAnchor.constraint(equalTo: preview.trailingAnchor, constant: 12),
+            title.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -12),
+            title.topAnchor.constraint(equalTo: button.topAnchor, constant: 18),
+            subtitle.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+            subtitle.trailingAnchor.constraint(equalTo: title.trailingAnchor),
+            subtitle.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 5),
+        ])
+        button.addAction(UIAction { [weak self] _ in
+            self?.settings.themeID = FoxLetterTheme.id
+            self?.onChange?()
+        }, for: .touchUpInside)
+        return button
     }
 
     private func shortcutRow(_ item: ShortcutStore.Item) -> UIView {
