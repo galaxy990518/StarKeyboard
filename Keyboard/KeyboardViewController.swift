@@ -136,6 +136,7 @@ final class KeyboardViewController: UIInputViewController {
     private var goalColumn: Int?
 
     // 畫面
+    private let backdropView = KeyboardBackdropView()
     private let gradientLayer = CAGradientLayer()
     private let backgroundImageView = UIImageView()
     private var photoAdjustView: PhotoAdjustView?
@@ -163,6 +164,9 @@ final class KeyboardViewController: UIInputViewController {
 
     override func loadView() {
         view = KeyboardInputView(frame: .zero, inputViewStyle: .keyboard)
+        // 保留系統鍵盤材質，讓自訂背景邊緣能銜接系統管理的區域。
+        view.backgroundColor = .clear
+        view.isOpaque = false
     }
 
     deinit {
@@ -186,11 +190,12 @@ final class KeyboardViewController: UIInputViewController {
         mode = modes.contains(settings.lastMode) ? settings.lastMode : modes[0]
 
         view.clipsToBounds = true   // 照片放大後會超出鍵盤，超出的部分不要畫
-        view.layer.insertSublayer(gradientLayer, at: 0)
+        view.addSubview(backdropView)
+        backdropView.layer.insertSublayer(gradientLayer, at: 0)
         backgroundImageView.contentMode = .scaleAspectFill
         backgroundImageView.clipsToBounds = true
-        view.addSubview(backgroundImageView)
-        view.addSubview(tintOverlay)
+        backdropView.addSubview(backgroundImageView)
+        backdropView.addSubview(tintOverlay)
 
         topBar = TopBarView(style: style)
         view.addSubview(topBar)
@@ -374,7 +379,7 @@ final class KeyboardViewController: UIInputViewController {
             GlassBackdrop.image = Self.blurredGlass(img, tint: style.theme.backgroundTop.withAlphaComponent(settings.backgroundFade))
             GlassBackdrop.version += 1
         }
-        let rect = view.convert(backgroundImageView.frame, to: grid)
+        let rect = backdropView.convert(backgroundImageView.frame, to: grid)
         if rect != GlassBackdrop.rect {
             GlassBackdrop.rect = rect
             GlassBackdrop.version += 1
@@ -410,6 +415,7 @@ final class KeyboardViewController: UIInputViewController {
         let b = view.bounds
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        backdropView.frame = b
         gradientLayer.frame = b
         CATransaction.commit()
         backgroundImageView.frame = backgroundFrame(in: b)

@@ -60,6 +60,7 @@ final class TopBarView: UIView {
     private var content: Content = .toolbar
     private var hasSource = false
     private var trailing: Trailing = .expand
+    private let backdropView = KeyboardBackdropView(fadesBottom: false)
     private let toolbar = UIStackView()
     private var toolbarButtons: [UIButton] = []
     /// 使用者關掉的按鈕（設定鍵永遠留著，不然就回不來了）
@@ -87,6 +88,8 @@ final class TopBarView: UIView {
     init(style: KeyboardStyle) {
         self.style = style
         super.init(frame: .zero)
+        isOpaque = false
+        addSubview(backdropView)
 
         toolbar.axis = .horizontal
         toolbar.distribution = .fillEqually
@@ -199,8 +202,6 @@ final class TopBarView: UIView {
             editorExtra.setTitle(extra, for: .normal)
             editorSave.setTitle(confirm, for: .normal)
         }
-        // 整條（工具列、選字區、編輯框）都墊一層半透明的底，放背景照片時圖示和字才看得清楚（深色主題墊深色）
-        backgroundColor = (style.theme.isDark ? UIColor.black.withAlphaComponent(0.35) : UIColor.white.withAlphaComponent(0.6))
         scriptButton.isHidden = scriptTitle == nil || isEditor
         toolbar.isHidden = !isToolbar
         compositionScroll.isHidden = !isCandidates || (compositionLabel.text ?? "").isEmpty
@@ -250,6 +251,7 @@ final class TopBarView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        backdropView.frame = bounds
         let w = bounds.width, h = bounds.height
         let scriptW: CGFloat = scriptButton.isHidden ? 0 : 44
         toolbar.frame = CGRect(x: 4, y: 0, width: w - 8 - scriptW, height: h)
@@ -317,6 +319,8 @@ final class TopBarView: UIView {
 
     private func applyStyle() {
         let t = style.theme
+        // 底色單獨過渡，工具列、選字與編輯文字維持原本的清晰度。
+        backdropView.backgroundColor = t.isDark ? UIColor.black.withAlphaComponent(0.35) : UIColor.white.withAlphaComponent(0.6)
         let tint = t.isDark ? t.keyText : t.specialText
         for b in toolbarButtons {
             b.tintColor = tint
