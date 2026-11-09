@@ -1,0 +1,93 @@
+{
+  "status": "passed",
+  "checkedAt": "2026-11-09T07:48:47.742Z",
+  "scope": "Linux Chromium offline previews; not UIKit or iPhone",
+  "node": "v22.17.0",
+  "browser": "Chrome/156.0.8078.4",
+  "fonts": [
+    "Chiron GoRound TC ExtraLight"
+  ],
+  "prototype": {
+    "svgCount": 16,
+    "glyphs": 18,
+    "controls": [
+      "letter",
+      "height",
+      "font",
+      "zones",
+      "press"
+    ]
+  },
+  "theme": {
+    "scenes": 384,
+    "keys": 12496,
+    "labels": 12016,
+    "feedback": 924,
+    "controls": [
+      "ten",
+      "shift",
+      "globe",
+      "full",
+      "candidates",
+      "panels",
+      "click",
+      "pressed"
+    ]
+  },
+  "mobile": [
+    {
+      "page": "index.html",
+      "viewport": 320,
+      "document": 320
+    },
+    {
+      "page": "index.html",
+      "viewport": 390,
+      "document": 390
+    },
+    {
+      "page": "index.html",
+      "viewport": 430,
+      "document": 430
+    },
+    {
+      "page": "theme.html",
+      "viewport": 320,
+      "document": 320
+    },
+    {
+      "page": "theme.html",
+      "viewport": 390,
+      "document": 390
+    },
+    {
+      "page": "theme.html",
+      "viewport": 430,
+      "document": 430
+    }
+  ],
+  "javascriptExceptions": 0,
+  "screenshots": [
+    "preview.png",
+    "theme-zhuyin.png",
+    "theme-english.png",
+    "theme-handwriting.png",
+    "theme-compact.png",
+    "theme-contrast.png",
+    "theme-keyboard-zhuyin-v2.png",
+    "theme-keyboard-english-v2.png"
+  ],
+  "sha256": {
+    "tools/check_fox_letter_browser.js": "dafed613cee661d0722da374f913c63ea51d073bc73a3c923261a4eca71cbb3b",
+    "tools/fox_letter_prototype.json": "4b2e8ed5ce56d54e4baeaa6c31521dab4d65c741a3bd9c98001d49cf005362d1",
+    "tools/fox_letter_watercolor.js": "ea8a88127f0cc059d0d6198a1832f71dc88bea8b6d5c546944bf34a83386d484",
+    "tools/build_fox_letter_prototype.js": "aeacf7c424c2d8a3607be3f6d0b38ff4f915bcc6b910bf373136bab1a33e2d26",
+    "tools/build_fox_letter_theme.js": "cdd369a502d401472ed3b3edbc84689ead95c2e14df44b1dbddb629e2dd7b3a4",
+    "tools/fox_letter_preview_layouts.js": "20f35d413564a83850dbe6ece29b0d566fbe131ef2bdb88c4cfba5aa4820b9e8",
+    "docs/previews/fox-letter/index.html": "86c354dd88b2e88cbc5c1ffe5a096066fa1d7d2f81df1bd3169b525d9d9cf49e",
+    "docs/previews/fox-letter/theme.html": "b79e9afdda4be018d88cda310743140126c45df34f2e368e68c72f020411008b",
+    "Keyboard/Resources/FoxLetter/keycaps-watercolor-v2.png": "6807146a88737cdea831ea07da1899f11c4b87a4a5eb900b02a82ada296b4360",
+    "Keyboard/Resources/FoxLetter/wide-keycaps-watercolor-v2.png": "1d1ba1fd94f1b0b158cdb4822142370b7b2e0dc90bc40bf689ff12fe2de9171e",
+    "Keyboard/Resources/FoxLetter/background-watercolor-v2.png": "241762195d063f85b744c4b8a1c76e6ebf02ea1d0027b5248fcc5f0f6e84d954"
+  }
+}

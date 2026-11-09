@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小狐狸的楓葉信 · 水彩修正版</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f7f0e8;color:#483b36;font:15px/1.6 system-ui,"Microsoft JhengHei","PingFang TC",sans-serif}main{max-width:1100px;margin:auto;padding:36px 36px 28px}header{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:22px}h1{font-size:29px;margin:3px 0 0;letter-spacing:.07em}h2{font-size:17px;margin:0 0 4px}p{margin:4px 0;color:#766b63}.eyebrow{font-size:12px;letter-spacing:.15em;color:#9f653f}.badge{border:1px solid #cbb7a3;padding:6px 12px;border-radius:20px;font-size:12px;white-space:nowrap}.controls{display:flex;gap:20px;align-items:center;flex-wrap:wrap;background:#fffaf4;border:1px solid #e6d8c8;padding:12px 16px;border-radius:12px;margin-bottom:20px}label{display:flex;align-items:center;gap:8px}input{accent-color:#aa623c}input[type=range]{width:100px}input[type=text]{width:58px;padding:5px;border:1px solid #d9c6b5;border-radius:5px;background:white}button{border:1px solid #d5bba5;background:#f5e0cb;color:#65452f;padding:6px 12px;border-radius:7px;cursor:pointer}.cards{display:grid;grid-template-columns:1fr 1fr 1.35fr;gap:16px}.card{background:#fffaf4;border:1px solid #e5d5c4;border-radius:15px;padding:17px;min-width:0}.stage{height:278px;border-radius:10px;background:#493e49;margin:13px 0 14px;display:flex;align-items:center;justify-content:center;overflow:hidden}.actual{height:90px;display:flex;gap:13px;align-items:center;justify-content:center;border-top:1px solid #e9dccc;border-bottom:1px solid #e9dccc;background:#eee3d7}.actual.dark{background:#493e49}.caption{font-size:12px;margin-top:9px}.note{font-size:12px;color:#87766a}.strip{background:#493e49;border-radius:12px;margin-top:18px;padding:15px;display:flex;align-items:center;justify-content:center;gap:3px;min-height:90px}.strip svg{flex:none}footer{margin-top:18px;font-size:12px;color:#89796e}.zone{pointer-events:none;fill:#50cdb828;stroke:#50cdb8;stroke-width:.35}.hint-zone{fill:#e4af3028;stroke:#e4af30}.face-zone{fill:#e0709020;stroke:#e07090}.zones-off .zone{display:none}.legend span{margin-right:14px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}.dim .art{opacity:.82}svg{display:block;overflow:visible}.small-label{font-size:11px;text-align:center;min-height:20px}@media(max-width:760px){main{padding:22px 16px}.cards{grid-template-columns:1fr}.stage{height:230px}.strip{overflow:auto;justify-content:flex-start}header{align-items:start}h1{font-size:23px}}
+</style>
+<main class="zones-off" id="preview">
+<header><div><div class="eyebrow">FOX LETTER / WATERCOLOR REVISION</div><h1>小狐狸的楓葉信</h1><p>水彩插畫鍵帽 · 中央文字 · 下緣小五官</p></div><div class="badge">水彩修正版 · 素材接入</div></header>
+<p style="margin-bottom:14px"><a href="theme.html" style="color:#98542f;font-weight:600">查看整套主題與各輸入法預覽 →</a></p>
+<div class="controls"><label>英文字母 <input id="letter" type="text" value="A" maxlength="3"></label><label>高度 <input id="height" type="range" min="0.8" max="1.3" step="0.05" value="1"><output id="heightValue">100%</output></label><label>字體 <input id="font" type="range" min="0.8" max="1.3" step="0.05" value="1"></label><label><input id="zones" type="checkbox">顯示分區</label><button id="press">切換按下狀態</button></div>
+<section class="cards">
+<article class="card"><h2>英文窄鍵</h2><p>34 × 48 pt</p><div class="stage" id="large-en"></div><div class="actual dark" id="actual-en"></div><div class="caption">放大 4 倍 + 原尺寸 1 倍</div><p class="note">耳朵與臉形是一體，沒有另外畫身體。</p></article>
+<article class="card"><h2>注音與提示字</h2><p>36 × 46 pt</p><div class="stage" id="large-zh"></div><div class="actual dark" id="actual-zh"></div><div class="caption">放大 4 倍 + 原尺寸 1 倍</div><p class="note">主要文字、提示字、五官各有獨立區域。</p></article>
+<article class="card"><h2>寬鍵構圖</h2><p>160 × 46 pt</p><div class="stage" id="large-wide"></div><div class="actual dark" id="actual-wide"></div><div class="caption">放大 1.8 倍 + 原尺寸 1 倍</div><p class="note">只延展臉形中段，五官與耳朵維持尺寸。</p></article>
+</section>
+<p class="note legend" style="margin-top:14px"><span><i class="dot" style="background:#50cdb8"></i>主要文字區</span><span><i class="dot" style="background:#e4af30"></i>提示字區</span><span><i class="dot" style="background:#e07090"></i>五官區</span></p>
+<h2 style="margin-top:20px">連續窄鍵可讀性</h2><div class="strip" id="strip"></div>
+<footer>本頁已改用水彩鍵帽素材。文字、提示字與寬鍵切片仍獨立排版；iPhone 實際字型與渲染待驗證。<br>前一版平面向量外觀已退回，不代表本次美術目標。</footer>
+</main>
+<script>
+'use strict';
+const {source,layers}={"source":{"id":"fox-letter-prototype","title":"小狐狸的楓葉信","revision":"A02-watercolor","endCapAspect":0.85,"labelRect":[14,26,72,44],"hintRect":[34,0,32,20],"faceWidthFraction":0.58,"faceHeightLimit":0.5,"faceAspect":0.45,"faceBottomInset":0.05,"textColor":"#FFFAF1","hintColor":"#F8E6CE","themeColors":{"backgroundTop":"#51424D","backgroundBottom":"#392F3D","key":"#6C5050","keyText":"#FFF5E4","specialKey":"#59434A","specialText":"#FFF5E4","accent":"#E9AE78","accentText":"#3F2C27","shadow":"#271D27"},"variants":[{"name":"楓葉橘","fur":"#A95B30","cheek":"#F7DEC0","text":"#FFF9EF","accessory":"leaf"},{"name":"奶油米","fur":"#DCBC8E","cheek":"#FAE8CF","text":"#543B2F","accessory":"beret"},{"name":"栗子棕","fur":"#71514C","cheek":"#DDBA9D","text":"#FFF9EF","accessory":"scarf"},{"name":"楓紅","fur":"#A85747","cheek":"#E8B99B","text":"#FFF9EF","accessory":"letter"},{"name":"霧橄欖","fur":"#737344","cheek":"#E7D3AE","text":"#FFF9EF","accessory":"leaf"}],"accessories":{"leaf":[{"name":"leaf","space":"head","fill":"#E3A04F","stroke":"#975634","strokeWidth":0.35,"path":"M80 25 L68 22 L73 17 L67 11 L77 12 L78 3 L84 9 L90 4 L91 13 L98 12 L94 20 L99 24 L87 26 L86 31 L82 30 Z"},{"name":"leaf-vein","space":"head","fill":"#B76A39","path":"M80 9 L83 20 L87 29 L85 30 L81 21 L75 16 L77 15 L81 18 L79 10 Z"}],"beret":[{"name":"beret","space":"head","fill":"#8B4F42","stroke":"#683F37","strokeWidth":0.4,"path":"M4 19 C0 12 8 5 20 5 C32 1 43 5 43 13 Q46 18 40 23 Q22 24 4 19 Z M24 6 L23 1 Q26 -1 29 1 L28 6 Z"},{"name":"beret-band","space":"head","fill":"#6B413A","path":"M5 18 Q23 22 42 18 L40 23 Q22 25 5 21 Z"}],"letter":[{"name":"envelope","space":"head","fill":"#FFF0D9","stroke":"#805543","strokeWidth":0.4,"path":"M67 6 L97 9 L95 29 L65 26 Z"},{"name":"envelope-fold","space":"head","fill":"#D4AF89","path":"M67 7 L81 18 L97 10 L96 12 L81 20 L66 9 Z M65 25 L76 18 L77 20 L67 27 Z M85 20 L95 27 L95 29 L83 21 Z"},{"name":"envelope-seal","space":"head","fill":"#B95F44","path":"M81 16 C76 11 73 17 78 20 L82 24 L86 21 C91 17 86 12 82 16 Z"}],"scarf":[{"name":"scarf","space":"head","fill":"#B69454","stroke":"#795D40","strokeWidth":0.3,"path":"M1 80 Q12 85 25 84 L25 95 Q12 97 2 91 Z M19 88 L29 88 L32 100 L23 100 Z"},{"name":"scarf-checks","space":"head","fill":"#687748","path":"M7 83 L11 84 L11 94 L7 93 Z M17 84 L21 84 L21 95 L17 95 Z M25 90 L29 90 L31 100 L27 100 Z M2 87 L25 89 L25 92 L2 90 Z"}]},"layers":[{"name":"outline","space":"head","fill":"#C87843","stroke":"#825138","strokeWidth":0.65,"path":"M5 34 C5 23 8 9 12 3 Q13 0 17 4 L32 20 Q50 15 68 20 L83 4 Q87 0 89 4 C94 14 96 26 95 37 C101 55 99 75 91 89 C83 98 67 99 50 99 C29 99 14 97 7 87 C0 74 0 53 5 34 Z"},{"name":"inner-ears","space":"head","fill":"#F6D9B5","path":"M11 29 Q12 16 15 10 L27 24 Q18 24 11 29 Z M73 24 L85 10 Q89 18 90 31 Q83 26 73 24 Z"},{"name":"cheeks","space":"head","fill":"#F6E2C6","path":"M3 69 C15 68 31 79 50 84 C69 79 85 68 97 69 C97 83 88 93 74 96 C59 100 39 100 25 96 C10 93 3 83 3 69 Z"},{"name":"expression","space":"face","fill":"#56382C","path":"E18 32 6 13.333333 E82 32 6 13.333333 M43 57 Q50 52 57 57 Q59 60 56 65 L51 72 Q50 73 49 72 L44 65 Q41 61 43 57 Z"}]},"layers":[{"name":"outline","space":"head","fill":"#C87843","stroke":"#825138","strokeWidth":0.65,"path":"M5 34 C5 23 8 9 12 3 Q13 0 17 4 L32 20 Q50 15 68 20 L83 4 Q87 0 89 4 C94 14 96 26 95 37 C101 55 99 75 91 89 C83 98 67 99 50 99 C29 99 14 97 7 87 C0 74 0 53 5 34 Z","ops":[0,5,34,2,5,23,8,9,12,3,3,13,0,17,4,1,32,20,3,50,15,68,20,1,83,4,3,87,0,89,4,2,94,14,96,26,95,37,2,101,55,99,75,91,89,2,83,98,67,99,50,99,2,29,99,14,97,7,87,2,0,74,0,53,5,34,4]},{"name":"inner-ears","space":"head","fill":"#F6D9B5","path":"M11 29 Q12 16 15 10 L27 24 Q18 24 11 29 Z M73 24 L85 10 Q89 18 90 31 Q83 26 73 24 Z","ops":[0,11,29,3,12,16,15,10,1,27,24,3,18,24,11,29,4,0,73,24,1,85,10,3,89,18,90,31,3,83,26,73,24,4]},{"name":"cheeks","space":"head","fill":"#F6E2C6","path":"M3 69 C15 68 31 79 50 84 C69 79 85 68 97 69 C97 83 88 93 74 96 C59 100 39 100 25 96 C10 93 3 83 3 69 Z","ops":[0,3,69,2,15,68,31,79,50,84,2,69,79,85,68,97,69,2,97,83,88,93,74,96,2,59,100,39,100,25,96,2,10,93,3,83,3,69,4]},{"name":"expression","space":"face","fill":"#56382C","path":"E18 32 6 13.333333 E82 32 6 13.333333 M43 57 Q50 52 57 57 Q59 60 56 65 L51 72 Q50 73 49 72 L44 65 Q41 61 43 57 Z","ops":[0,24,32,2,24,39.3637965,21.3137085,45.333333,18,45.333333,2,14.6862915,45.333333,12,39.3637965,12,32,2,12,24.6362035,14.6862915,18.666667,18,18.666667,2,21.3137085,18.666667,24,24.6362035,24,32,4,0,88,32,2,88,39.3637965,85.3137085,45.333333,82,45.333333,2,78.6862915,45.333333,76,39.3637965,76,32,2,76,24.6362035,78.6862915,18.666667,82,18.666667,2,85.3137085,18.666667,88,24.6362035,88,32,4,0,43,57,3,50,52,57,57,3,59,60,56,65,1,51,72,3,50,73,49,72,1,44,65,3,41,61,43,57,4]}]};
+const atlas={"revision":"watercolor-v2","columns":3,"rows":3,"keycaps":"../../../Keyboard/Resources/FoxLetter/keycaps-watercolor-v2.png","wideKeycaps":"../../../Keyboard/Resources/FoxLetter/wide-keycaps-watercolor-v2.png","backdrop":"../../../Keyboard/Resources/FoxLetter/background-watercolor-v2.png","palettes":[[0,3,6],[1,5],[2,7],[4],[8]],"cuts":[0,0.15,0.425,0.575,0.85,1],"wideCells":[[0.02,0.065,0.96,0.4],[0.02,0.54,0.96,0.4]]},spriteIndex=function spriteIndex(index, action, personalSpaceArt = false) {
+  if (action === 'space') return personalSpaceArt ? 3 : 0;
+  if (action === 'returnKey') return 7;
+  const options = atlas.palettes[Math.max(0, index) % 5];
+  return options[Math.floor(Math.max(0, index) / 5) % options.length];
+},imageSlices=function imageSlices(frame, sprite, compact = false, wideRow = 0) {
+  const cell = { x: (sprite % 3) / 3, y: Math.floor(sprite / 3) / 3,
+    width: 1 / 3, height: (compact ? .78 : 1) / 3 };
+  const wide = frame.width > frame.height * 1.35;
+  if (!wide) return [{ frame, source: cell, url: atlas.keycaps }];
+  const [sx, sy, sw, sh] = atlas.wideCells[wideRow];
+  const wideCell = { x: sx, y: sy, width: sw, height: sh * (compact ? .78 : 1) };
+  const naturalWidth = frame.height * 2.9;
+  const stretch = (frame.width - naturalWidth * .45) / 2;
+  let x = frame.x;
+  return atlas.cuts.slice(0, -1).map((start, i) => {
+    const fraction = atlas.cuts[i + 1] - start;
+    const width = i === 1 || i === 3 ? stretch : naturalWidth * fraction;
+    const result = { frame: { x, y: frame.y, width, height: frame.height },
+      source: { x: wideCell.x + wideCell.width * start, y: wideCell.y, width: wideCell.width * fraction, height: wideCell.height },
+      url: atlas.wideKeycaps };
+    x += width;
+    return result;
+  });
+},watercolorSVG=function watercolorSVG(frame, index, action, compact = false) {
+  return imageSlices(frame, spriteIndex(index, action), compact, action === 'space' ? 0 : 1).map(piece => {
+    const f = piece.frame, s = piece.source;
+    return '<svg class="watercolor-piece" x="' + f.x + '" y="' + f.y + '" width="' + f.width + '" height="' + f.height +
+      '" viewBox="' + [s.x, s.y, s.width, s.height].join(' ') + '" preserveAspectRatio="none" overflow="hidden" style="overflow:hidden">' +
+      '<image href="' + piece.url + '" x="0" y="0" width="1" height="1" preserveAspectRatio="none"/></svg>';
+  }).join('');
+};
+const geometry=function geometry(width, height) {
+  assert(width > 0 && height > 0, '預覽尺寸必須大於零');
+  const frame = { x: 2, y: 2, width: width - 4, height: height - 4 };
+  assert(frame.width > 0 && frame.height > 0, '按鍵太小');
+  const faceWidth = Math.min(frame.width * source.faceWidthFraction, frame.height * source.faceHeightLimit);
+  const face = { x: frame.x + (frame.width - faceWidth) / 2,
+    y: frame.y + frame.height * (1 - source.faceBottomInset) - faceWidth * source.faceAspect,
+    width: faceWidth, height: faceWidth * source.faceAspect };
+  const rect = ([x, y, w, h]) => ({ x: frame.x + frame.width * x / 100,
+    y: frame.y + frame.height * y / 100, width: frame.width * w / 100, height: frame.height * h / 100 });
+  return { frame, face, label: rect(source.labelRect), hint: rect(source.hintRect),
+    ends: Math.min(frame.width, frame.height * source.endCapAspect) };
+};
+const svgPath=function svgPath(ops, rect, ends) {
+  const px = x => ends === null ? rect.x + rect.width * x / 100
+    : x < 50 ? rect.x + ends * x / 100 : rect.x + rect.width - ends * (100 - x) / 100;
+  const pt = k => `${px(ops[k]).toFixed(4)} ${(rect.y + rect.height * ops[k + 1] / 100).toFixed(4)}`;
+  let result = '', i = 0;
+  while (i < ops.length) {
+    switch (ops[i]) {
+      case 0: result += `M${pt(i + 1)}`; i += 3; break;
+      case 1: result += `L${pt(i + 1)}`; i += 3; break;
+      case 2: result += `C${pt(i + 1)} ${pt(i + 3)} ${pt(i + 5)}`; i += 7; break;
+      case 3: result += `Q${pt(i + 1)} ${pt(i + 3)}`; i += 5; break;
+      case 4: result += 'Z'; i++; break;
+      default: throw new Error('無效路徑操作');
+    }
+  }
+  return result;
+};
+const assert=(condition,message)=>{if(!condition)throw new Error(message)};
+const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function key(width,height,text,hint,scale,fontScale){
+ const g=geometry(width,height);
+ const art=watercolorSVG({x:0,y:0,width,height},0,'text');
+ const zone=(r,cls)=>'<rect class="zone '+cls+'" x="'+r.x+'" y="'+r.y+'" width="'+r.width+'" height="'+r.height+'"/>';
+ const font=Math.min(23*fontScale,g.label.height,g.label.width/Math.max(1,[...text].length)*1.45);
+ return '<svg xmlns="http://www.w3.org/2000/svg" aria-label="'+escape(text)+'" width="'+width*scale+'" height="'+height*scale+'" viewBox="0 0 '+width+' '+height+'"><g class="art">'+art+'</g>'+zone(g.label,'')+zone(g.hint,'hint-zone')+zone(g.face,'face-zone')+'<text x="'+(g.label.x+g.label.width/2)+'" y="'+(g.label.y+g.label.height/2)+'" dominant-baseline="central" text-anchor="middle" fill="'+source.textColor+'" font-family="system-ui, sans-serif" font-size="'+font+'" font-weight="750">'+escape(text)+'</text><text x="'+(g.hint.x+g.hint.width)+'" y="'+(g.hint.y+g.hint.height/2)+'" dominant-baseline="central" text-anchor="end" fill="'+source.hintColor+'" font-size="'+Math.min(9*fontScale,g.hint.height)+'">'+escape(hint)+'</text></svg>';
+}
+function fitText(svg){
+ const zones=svg.querySelectorAll('.zone'),texts=svg.querySelectorAll('text');
+ texts.forEach((text,i)=>{
+  if(!text.textContent)return;
+  const zone=zones[i],width=Number(zone.getAttribute('width')),height=Number(zone.getAttribute('height'));
+  let box=text.getBBox();
+  for(let attempt=0;attempt<8;attempt++){
+   box=text.getBBox();
+   const fit=Math.min(1,width/Math.max(box.width,0.01),height/Math.max(box.height,0.01));
+   if(fit>=.999)break;
+   text.setAttribute('font-size',Number(text.getAttribute('font-size'))*fit*.96);
+  }
+  box=text.getBBox();
+  const center=Number(zone.getAttribute('y'))+height/2;
+  text.setAttribute('y',Number(text.getAttribute('y'))+center-box.y-box.height/2);
+ });
+}
+function render(){
+ const h=Number(document.querySelector('#height').value),f=Number(document.querySelector('#font').value),t=document.querySelector('#letter').value||'A';
+ document.querySelector('#heightValue').value=Math.round(h*100)+'%';
+ for(const [id,w,base,text,hint,zoom] of [['en',34,48,t,'',4],['zh',36,46,'ㄅ','1',4],['wide',160,46,'空白','',1.8]]){
+  document.querySelector('#large-'+id).innerHTML=key(w,base*h,text,hint,zoom,f);
+  document.querySelector('#actual-'+id).innerHTML=key(w,base*h,text,hint,1,f);
+ }
+ document.querySelector('#strip').innerHTML=[...'qwertyuiop'].map(c=>key(34,48*h,c,'',1,f)).join('');
+ document.querySelectorAll('svg[aria-label]').forEach(fitText);
+ document.querySelector('#preview').classList.toggle('zones-off',!document.querySelector('#zones').checked);
+}
+for(const id of ['letter','height','font','zones'])document.querySelector('#'+id).addEventListener('input',render);
+document.querySelector('#press').addEventListener('click',()=>document.querySelector('#preview').classList.toggle('dim'));
+render();
+document.fonts.ready.then(render);
+</script></html>

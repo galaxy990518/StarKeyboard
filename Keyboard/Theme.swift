@@ -144,6 +144,7 @@ struct KeyboardTheme {
                       specialKey: UIColor(hex: 0x474749), specialText: .white,
                       accent: UIColor(hex: 0x2F7BF6), accentText: .white,
                       shadow: UIColor(hex: 0x111111), decoration: "", isDark: true),
+        FoxLetterArtwork.theme,
     ]
 
     static func named(_ id: String) -> KeyboardTheme {
@@ -1049,6 +1050,18 @@ final class KeyboardSettings {
     var customDark: Bool {
         get { bool("customDark", false) }
         set { d.set(newValue, forKey: "customDark") }
+    }
+    // MARK: 上方空隙實驗（找出哪個設定讓 iOS 27 切 App 回來後多出空隙；找到原因後移除）
+
+    /// 鍵盤底色改成不透明主題色（關閉時維持透明、透出系統鍵盤材質）
+    var gapTestOpaqueBackground: Bool {
+        get { bool("gapTestOpaqueBackground", false) }
+        set { d.set(newValue, forKey: "gapTestOpaqueBackground") }
+    }
+    /// 不設自訂高度、關閉 allowsSelfSizing，改用系統預設高度（高度滑桿暫時無效）
+    var gapTestSystemHeight: Bool {
+        get { bool("gapTestSystemHeight", false) }
+        set { d.set(newValue, forKey: "gapTestSystemHeight") }
     }
     var keyFinish: KeyFinish {
         get { KeyFinish(rawValue: d.string(forKey: "keyFinish") ?? "") ?? .flat }

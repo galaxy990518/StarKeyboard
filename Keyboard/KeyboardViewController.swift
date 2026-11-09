@@ -6,6 +6,12 @@ import ImageIO
 
 private final class KeyboardInputView: UIInputView, UIInputViewAudioFeedback {
     var enableInputClicksWhenVisible: Bool { true }
+    var onWindowChange: (() -> Void)?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        onWindowChange?()
+    }
 }
 
 final class KeyboardViewController: UIInputViewController {
@@ -126,6 +132,7 @@ final class KeyboardViewController: UIInputViewController {
     private var backgroundImage: UIImage?
     private var clipboardTimer: Timer?
     private var heightConstraint: NSLayoutConstraint?
+    private let layoutDiagnostics = KeyboardLayoutDiagnostics()
     /// 看不見的「量高度用的尺」：上下貼齊鍵盤，iOS 照它決定鍵盤多高
     private let heightRuler = UIView()
     private var toastToken = 0
@@ -136,7 +143,11 @@ final class KeyboardViewController: UIInputViewController {
     private var goalColumn: Int?
 
     // 畫面
+    private let backdropView = KeyboardBackdropView()
     private let gradientLayer = CAGradientLayer()
+    private let foxPaperLayer = CALayer()
+    private var foxLandscape: FoxLetterLandscapeView?
+    private var foxHeaderHeight: CGFloat { style.isFoxLetter ? (isLandscape ? 34 : FoxLetterWatercolor.headerHeight) : 0 }
     private let backgroundImageView = UIImageView()
     private var photoAdjustView: PhotoAdjustView?
     /// 邊看鍵盤邊調大小（蓋在選字列的位置）
@@ -151,9 +162,9 @@ final class KeyboardViewController: UIInputViewController {
     private let toastLabel = UILabel()
 
     private var style: KeyboardStyle {
-        KeyboardStyle(theme: KeyboardTheme.named(settings.themeID), shape: settings.keyShape, keyAlpha: settings.keyAlpha,
+        FoxLetterTheme.resolved(KeyboardStyle(theme: KeyboardTheme.named(settings.themeID), shape: settings.keyShape, keyAlpha: settings.keyAlpha,
                       fontScale: settings.fontScale, gapScale: settings.gapScale, fontID: settings.fontID,
-                      keyEffect: settings.keyEffect, finish: settings.keyFinish, shapeScale: settings.shapeScale, motion: settings.keyMotion)
+                      keyEffect: settings.keyEffect, finish: settings.keyFinish, shapeScale: settings.shapeScale, motion: settings.keyMotion))
     }
 
     /// 注音或日文正在組字
@@ -163,6 +174,12 @@ final class KeyboardViewController: UIInputViewController {
 
     override func loadView() {
         view = KeyboardInputView(frame: .zero, inputViewStyle: .keyboard)
+        (view as? KeyboardInputView)?.onWindowChange = { [weak self] in
+            self?.layoutDiagnostics.record("inputView.didMoveToWindow", force: true)
+        }
+        // 保留系統鍵盤材質，讓自訂背景邊緣能銜接系統管理的區域。
+        view.backgroundColor = .clear
+        view.isOpaque = false
     }
 
     deinit {
@@ -189,11 +206,15 @@ final class KeyboardViewController: UIInputViewController {
         mode = modes.contains(settings.lastMode) ? settings.lastMode : modes[0]
 
         view.clipsToBounds = true   // 照片放大後會超出鍵盤，超出的部分不要畫
-        view.layer.insertSublayer(gradientLayer, at: 0)
+        view.addSubview(backdropView)
+        backdropView.layer.insertSublayer(gradientLayer, at: 0)
+        backdropView.layer.addSublayer(foxPaperLayer)
+        foxPaperLayer.contentsRect = CGRect(x: 0, y: 0.2, width: 1, height: 0.8)
+        foxPaperLayer.isHidden = true
         backgroundImageView.contentMode = .scaleAspectFill
         backgroundImageView.clipsToBounds = true
-        view.addSubview(backgroundImageView)
-        view.addSubview(tintOverlay)
+        backdropView.addSubview(backgroundImageView)
+        backdropView.addSubview(tintOverlay)
 
         topBar = TopBarView(style: style)
         view.addSubview(topBar)
@@ -270,6 +291,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        layoutDiagnostics.record("viewWillAppear.beforeUpdates", force: true)
         loadGlideWords()
         prepareKeySound()
         // 背景照片輪播
@@ -334,10 +356,12 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        layoutDiagnostics.record("viewDidAppear.beforeExistingHeightReset", force: true)
         // 鍵盤剛載入時設的高度有時會被系統忽略：出現後重新套一次
         heightConstraint?.isActive = false
         heightConstraint = nil
         updateHeight()
+        layoutDiagnostics.record("viewDidAppear.afterExistingHeightReset", force: true)
     }
 
     /// App 從背景回來：系統可能還留著舊的鍵盤高度，上面就多出一段空隙。
@@ -368,6 +392,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        layoutDiagnostics.record("viewWillDisappear", force: true)
         clipboardTimer?.invalidate()
         clipboardTimer = nil
         liveLookTimer?.invalidate()
@@ -383,7 +408,7 @@ final class KeyboardViewController: UIInputViewController {
     private var glassKey = ""
 
     private func updateGlass() {
-        guard style.finish == .liquid, let img = backgroundImage else {
+        guard style.finish == .liquid, !style.usesNativeGlassKeys, let img = backgroundImage else {
             glassKey = ""
             if GlassBackdrop.image != nil { GlassBackdrop.image = nil; GlassBackdrop.version += 1; grid.refreshGlass() }
             return
@@ -394,7 +419,7 @@ final class KeyboardViewController: UIInputViewController {
             GlassBackdrop.image = Self.blurredGlass(img, tint: style.theme.backgroundTop.withAlphaComponent(settings.backgroundFade))
             GlassBackdrop.version += 1
         }
-        let rect = view.convert(backgroundImageView.frame, to: grid)
+        let rect = backdropView.convert(backgroundImageView.frame, to: grid)
         if rect != GlassBackdrop.rect {
             GlassBackdrop.rect = rect
             GlassBackdrop.version += 1
@@ -430,7 +455,9 @@ final class KeyboardViewController: UIInputViewController {
         let b = view.bounds
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        backdropView.frame = b
         gradientLayer.frame = b
+        foxPaperLayer.frame = b
         CATransaction.commit()
         backgroundImageView.frame = backgroundFrame(in: b)
         photoAdjustView?.frame = b
@@ -438,16 +465,24 @@ final class KeyboardViewController: UIInputViewController {
         folderNameBox.frame = CGRect(x: 10, y: 6, width: b.width - 20, height: max(0, folderBoxHeight - 10))
         let barH = CGFloat(settings.candidateBarHeight)
         topBar.candidateFontSize = CGFloat(CandidateBarMetrics.fontSize(barHeight: settings.candidateBarHeight))
-        topBar.frame = CGRect(x: 0, y: folderBoxHeight, width: b.width, height: barH)
-        sizeBar?.frame = CGRect(x: 0, y: folderBoxHeight, width: b.width, height: barH)
-        contentView.frame = CGRect(x: 0, y: folderBoxHeight + barH, width: b.width, height: max(0, b.height - barH - folderBoxHeight))
+        foxLandscape?.frame = CGRect(x: 0, y: folderBoxHeight, width: b.width, height: foxHeaderHeight)
+        let barY = folderBoxHeight + foxHeaderHeight
+        topBar.frame = CGRect(x: 0, y: barY, width: b.width, height: barH)
+        sizeBar?.frame = CGRect(x: 0, y: barY, width: b.width, height: barH)
+        contentView.frame = CGRect(x: 0, y: barY + barH, width: b.width, height: max(0, b.height - barH - barY))
         grid.frame = contentView.bounds
         panelView?.frame = contentView.bounds
         candidatePanel?.frame = contentView.bounds
         handwritingView?.frame = contentView.bounds
         updateGlass()
         let toastW = min(b.width - 40, 300)
-        toastLabel.frame = CGRect(x: (b.width - toastW) / 2, y: folderBoxHeight + CGFloat(settings.candidateBarHeight) + 8, width: toastW, height: 44)
+        toastLabel.frame = CGRect(x: (b.width - toastW) / 2, y: barY + barH + 8, width: toastW, height: 44)
+        layoutDiagnostics.record("viewDidLayoutSubviews")
+    }
+
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        layoutDiagnostics.record("viewSafeAreaInsetsDidChange", force: true)
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -1515,6 +1550,28 @@ final class KeyboardViewController: UIInputViewController {
                 UIPasteboard.general.string = head + self.zhuyin.log.joined(separator: "\n")
                 self.toast("已複製 \(self.zhuyin.log.count) 筆紀錄，貼給開發的人")
             }
+            p.onStartLayoutDiagnostics = { [weak self] in
+                guard let self = self else { return }
+                self.layoutDiagnostics.start { [weak self] in self?.layoutDiagnosticSnapshot() ?? "controller released" }
+                self.closePanel()
+                self.toast("版面診斷已開始，請切換 App 重現問題")
+            }
+            p.onCopyLayoutDiagnostics = { [weak self] in
+                guard let self = self else { return }
+                guard self.hasFullAccess else { self.toast("要先開啟「允許完整取用」才能複製"); return }
+                guard let report = self.layoutDiagnostics.report() else {
+                    self.toast("請先開始版面診斷，再重現問題")
+                    return
+                }
+                UIPasteboard.general.setItems([["public.utf8-plain-text": report]],
+                    options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(300)])
+                self.settings.lastPasteboardChange = UIPasteboard.general.changeCount
+                self.toast("已複製版面紀錄，請在 5 分鐘內貼出")
+            }
+            p.onStopLayoutDiagnostics = { [weak self] in
+                self?.layoutDiagnostics.stop()
+                self?.toast("版面診斷已停止，仍可複製本次紀錄")
+            }
             p.onResetLearning = { [weak self] in
                 self?.engine?.resetLearning()
                 self?.toast("已清除選字學習紀錄")
@@ -1962,6 +2019,10 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func startPhotoAdjust() {
+        guard !style.isFoxLetter else {
+            toast("照片已保留；切回一般主題後可調整位置")
+            return
+        }
         guard backgroundImage != nil else {
             toast("先貼上一張照片")
             return
@@ -1969,8 +2030,8 @@ final class KeyboardViewController: UIInputViewController {
         guard photoAdjustView == nil else { return }
         commitAll()
         closePanel()
-        topBar.alpha = 0.35
-        contentView.alpha = 0.35
+        topBar.isPhotoAdjusting = true
+        grid.previewOpacity = 0.35
         let v = PhotoAdjustView(style: style)
         v.onPan = { [weak self] d in self?.panPhoto(by: d) }
         v.onPinch = { [weak self] f in
@@ -1995,8 +2056,8 @@ final class KeyboardViewController: UIInputViewController {
         guard let v = photoAdjustView else { return }
         v.removeFromSuperview()
         photoAdjustView = nil
-        topBar.alpha = 1
-        contentView.alpha = 1
+        topBar.isPhotoAdjusting = false
+        grid.previewOpacity = 1
         toast("照片位置存好了")
     }
 
@@ -2026,7 +2087,7 @@ final class KeyboardViewController: UIInputViewController {
     private var loadedMaxSide: CGFloat = 0
 
     private func loadBackground() {
-        let url = settings.hasBackground ? settings.currentPhotoURL : nil
+        let url = settings.hasBackground && !style.isFoxLetter ? settings.currentPhotoURL : nil
         let need = url.map { backgroundMaxSide(url: $0) } ?? 0
         // 同一張照片：放大後需要更清楚才重讀
         guard url?.path != loadedPhoto || (url != nil && backgroundImage == nil) || need > loadedMaxSide * 1.15 else { return }
@@ -2218,6 +2279,20 @@ final class KeyboardViewController: UIInputViewController {
 
     private func applyStyle() {
         let s = style
+        if s.isFoxLetter {
+            if foxLandscape == nil {
+                let landscape = FoxLetterLandscapeView(frame: .zero)
+                view.insertSubview(landscape, belowSubview: topBar)
+                foxLandscape = landscape
+            }
+            foxPaperLayer.contents = FoxLetterWatercolor.backdrop
+            foxPaperLayer.isHidden = false
+        } else {
+            foxLandscape?.removeFromSuperview()
+            foxLandscape = nil
+            foxPaperLayer.contents = nil
+            foxPaperLayer.isHidden = true
+        }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         gradientLayer.colors = [s.theme.backgroundTop.cgColor, s.theme.backgroundBottom.cgColor]
@@ -2241,6 +2316,10 @@ final class KeyboardViewController: UIInputViewController {
         if let p = panelView as? EmojiPanelView { p.style = s }
         if let p = panelView as? ClipboardPanelView { p.style = s }
         if let p = panelView as? SettingsPanelView { p.style = s }
+        if let p = panelView, let kind = panel {
+            let strong: CGFloat = kind == .settings ? 0.82 : 0.6
+            p.backgroundColor = s.theme.isDark ? UIColor.black.withAlphaComponent(strong - 0.2) : UIColor.white.withAlphaComponent(strong)
+        }
         toastLabel.backgroundColor = s.theme.accent.withAlphaComponent(0.95)
         toastLabel.textColor = s.theme.accentText
     }
@@ -2329,6 +2408,47 @@ final class KeyboardViewController: UIInputViewController {
         return screen.width > screen.height
     }
 
+    /// 不呼叫 layoutIfNeeded／systemLayoutSizeFitting，避免量測本身觸發重新排版。
+    private func layoutDiagnosticSnapshot() -> String {
+        guard isViewLoaded else { return "view not loaded" }
+        var lines = ["controller=\(ObjectIdentifier(self)) attached=\(view.window != nil) landscape=\(isLandscape)",
+                     "mode=\(mode.rawValue) fox=\(style.isFoxLetter) panel=\(panel != nil)",
+                     "folderHeight=\(folderBoxHeight) foxHeaderHeight=\(foxHeaderHeight) barHeight=\(settings.candidateBarHeight)"]
+        if let constraint = heightConstraint {
+            lines.append("height requested=\(constraint.constant) actual=\(view.bounds.height) delta=\(view.bounds.height - constraint.constant) active=\(constraint.isActive) priority=\(constraint.priority.rawValue)")
+        } else {
+            lines.append("height constraint=nil")
+        }
+        lines.append("allowsSelfSizing=\((view as? UIInputView)?.allowsSelfSizing == true) ambiguous=\(view.hasAmbiguousLayout)")
+        lines.append("gapTest opaqueBackground=\(settings.gapTestOpaqueBackground) systemHeight=\(settings.gapTestSystemHeight)")
+        lines.append(KeyboardLayoutDiagnostics.geometry("inputView", view))
+        lines.append(KeyboardLayoutDiagnostics.geometry("heightRuler", heightRuler))
+        lines.append(KeyboardLayoutDiagnostics.geometry("backdrop", backdropView))
+        lines.append(KeyboardLayoutDiagnostics.geometry("topBar", topBar))
+        lines.append(KeyboardLayoutDiagnostics.geometry("content", contentView))
+        var parent = view.superview
+        for index in 0..<8 {
+            guard let current = parent else { break }
+            lines.append(KeyboardLayoutDiagnostics.geometry("ancestor[\(index)]", current))
+            parent = current.superview
+        }
+        if let window = view.window {
+            lines.append("window=\(ObjectIdentifier(window)) screenBounds=\(KeyboardLayoutDiagnostics.rect(window.screen.bounds))")
+            if let scene = window.windowScene {
+                lines.append("sceneState=\(scene.activationState.rawValue) orientation=\(scene.interfaceOrientation.rawValue)")
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// 上方空隙實驗開關（見 docs/keyboard-resume-gap.md）；每次排高度時一起套用
+    private func applyGapExperiments() {
+        let opaque = settings.gapTestOpaqueBackground
+        view.backgroundColor = opaque ? style.theme.backgroundTop.withAlphaComponent(1) : .clear
+        view.isOpaque = opaque
+        (view as? UIInputView)?.allowsSelfSizing = !settings.gapTestSystemHeight
+    }
+
     private func updateHeight() {
         let fiveRows = (mode == .zhuyin || mode == .pinyin) && layer == .letters || layer == .numbers
         let content: CGFloat
@@ -2339,7 +2459,13 @@ final class KeyboardViewController: UIInputViewController {
         }
         // 使用者自己調的高度；橫放時螢幕矮，最多只放大到 1.1 倍
         let scale = isLandscape ? min(settings.heightScale, 1.1) : settings.heightScale
-        let h = folderBoxHeight + CGFloat(settings.candidateBarHeight) + (content * scale).rounded()
+        let h = folderBoxHeight + foxHeaderHeight + CGFloat(settings.candidateBarHeight) + (content * scale).rounded()
+        applyGapExperiments()
+        if settings.gapTestSystemHeight {
+            heightConstraint?.isActive = false
+            heightConstraint = nil
+            return
+        }
         if let c = heightConstraint {
             if c.constant != h { c.constant = h }
         } else {
