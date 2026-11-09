@@ -51,20 +51,27 @@ jobs:
 
       - name: 下載可愛字體並縮小（粉圓、芫荽、霞鶩文楷、源泉圓體、內海、俐方體11號，都是 SIL OFL 1.1）
         run: |
+          download_font() {
+            local font_file="$1" font_url="$2"
+            echo "下載字體：$font_file"
+            curl -sSfL --retry 4 --retry-delay 3 --retry-max-time 180 \
+              --connect-timeout 20 --max-time 120 \
+              -o "$RUNNER_TEMP/$font_file" "$font_url"
+          }
           python3 -m venv "$RUNNER_TEMP/venv"
           "$RUNNER_TEMP/venv/bin/pip" install -q fonttools
-          curl -sSfL -o "$RUNNER_TEMP/huninn.ttf" https://github.com/justfont/open-huninn-font/releases/download/v2.1/jf-openhuninn-2.1.ttf
-          curl -sSfL -o "$RUNNER_TEMP/iansui.zip" https://github.com/ButTaiwan/iansui/releases/download/v1.020/iansui.zip
+          download_font huninn.ttf https://github.com/justfont/open-huninn-font/releases/download/v2.1/jf-openhuninn-2.1.ttf
+          download_font iansui.zip https://github.com/ButTaiwan/iansui/releases/download/v1.020/iansui.zip
           unzip -q -o "$RUNNER_TEMP/iansui.zip" -d "$RUNNER_TEMP/iansui"
           IANSUI=$(find "$RUNNER_TEMP/iansui" \( -iname "*.ttf" -o -iname "*.otf" \) | head -1)
-          curl -sSfL -o "$RUNNER_TEMP/wenkai.ttf" https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.530/LXGWWenKaiTC-Regular.ttf
-          curl -sSfL -o "$RUNNER_TEMP/gensen.zip" https://github.com/ButTaiwan/gensen-font/releases/download/v2.100/GenSenRounded2TW-otf.zip
+          download_font wenkai.ttf https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.530/LXGWWenKaiTC-Regular.ttf
+          download_font gensen.zip https://github.com/ButTaiwan/gensen-font/releases/download/v2.100/GenSenRounded2TW-otf.zip
           unzip -q -o "$RUNNER_TEMP/gensen.zip" -d "$RUNNER_TEMP/gensen"
           GENSEN=$(find "$RUNNER_TEMP/gensen" -iname "*.otf" | grep -iE "(-M|Medium).otf$" | head -1)
           [ -n "$GENSEN" ] || GENSEN=$(find "$RUNNER_TEMP/gensen" -iname "*.otf" | grep -iE "(-R|Regular).otf$" | head -1)
           echo "源泉圓體：$GENSEN"
-          curl -sSfL -o "$RUNNER_TEMP/naikai.ttf" https://raw.githubusercontent.com/max32002/naikaifont/master/tw/NaikaiFont-Regular-Lite.ttf
-          curl -sSfL -o "$RUNNER_TEMP/cubic.ttf" https://raw.githubusercontent.com/ACh-K/Cubic-11/main/fonts/ttf/Cubic_11.ttf
+          download_font naikai.ttf https://raw.githubusercontent.com/max32002/naikaifont/master/tw/NaikaiFont-Regular-Lite.ttf
+          download_font cubic.ttf https://raw.githubusercontent.com/ACh-K/Cubic-11/main/fonts/ttf/Cubic_11.ttf
           "$RUNNER_TEMP/venv/bin/python" tools/build_fonts.py Keyboard/Resources/zhuyin.sqlite Keyboard/Resources/Fonts huninn="$RUNNER_TEMP/huninn.ttf" iansui="$IANSUI" wenkai="$RUNNER_TEMP/wenkai.ttf" gensen="$GENSEN" naikai="$RUNNER_TEMP/naikai.ttf" cubic="$RUNNER_TEMP/cubic.ttf"
           # 只有粉圓放進 App，其他字體做成「要用再下載」的字體包，鍵盤才不會越來越大
           mkdir -p FontPack
