@@ -47,7 +47,7 @@ data class KeyboardTheme(
             KeyboardTheme("dark", "經典深色", c("#2B2B2D"), c("#232325"), c("#6B6B6E"), c("#FFFFFF"), c("#474749"), c("#FFFFFF"), c("#2F7BF6"), c("#FFFFFF"), c("#111111"), "", true),
         )
 
-        fun named(id: String) = all.firstOrNull { it.id == id } ?: all[0]
+        fun named(id: String) = if (id == FoxLetter.ID) FoxLetter.theme else all.firstOrNull { it.id == id } ?: all[0]
 
         /** 自訂配色用的色票：(色相, 濃淡)，和 iPhone 版一樣 */
         val swatches = listOf(
@@ -859,7 +859,7 @@ class KeyboardSettings(context: Context) {
         get() = p.getString("fontId", KeyFont.SYSTEM.id) ?: KeyFont.SYSTEM.id
         set(v) = p.edit().putString("fontId", v).apply()
 
-    val style get() = KeyboardStyle(theme, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish, shapeScale, keyMotion)
+    val style get() = FoxLetter.resolved(KeyboardStyle(theme, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish, shapeScale, keyMotion))
 }
 
 /** 線條的顏色：線稿質感的外框、貓咪的尾巴鬍鬚眼睛肉球 */

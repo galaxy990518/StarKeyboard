@@ -190,9 +190,6 @@ final class KeyboardViewController: UIInputViewController {
         super.viewDidLoad()
         // 讓 iOS 照我們自己設的高度（不然「鍵盤高度」滑桿會被系統的預設高度蓋掉）
         (view as? UIInputView)?.allowsSelfSizing = true
-        // App 從背景回來時不一定會再跑 viewWillAppear，要另外聽
-        NotificationCenter.default.addObserver(self, selector: #selector(hostDidBecomeActive),
-                                               name: .NSExtensionHostDidBecomeActive, object: nil)
         heightRuler.isUserInteractionEnabled = false
         heightRuler.translatesAutoresizingMaskIntoConstraints = false
         view.insertSubview(heightRuler, at: 0)
@@ -362,23 +359,6 @@ final class KeyboardViewController: UIInputViewController {
         heightConstraint = nil
         updateHeight()
         layoutDiagnostics.record("viewDidAppear.afterExistingHeightReset", force: true)
-    }
-
-    /// App 從背景回來：系統可能還留著舊的鍵盤高度，上面就多出一段空隙。
-    /// 高度數字一樣時系統不會重算，所以先多 1 點再改回來，逼它重新量一次
-    @objc private func hostDidBecomeActive() {
-        (view as? UIInputView)?.allowsSelfSizing = true
-        updateHeight()
-        guard let c = heightConstraint else { return }
-        let h = c.constant
-        c.constant = h + 1
-        view.layoutIfNeeded()
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self, let c = self.heightConstraint else { return }
-            c.constant = h
-            self.updateHeight()   // 這一瞬間可能換了頁面，以現在該有的高度為準
-            self.view.setNeedsLayout()
-        }
     }
 
     /// iOS 說記憶體快不夠了：先把可以重新讀的東西丟掉，免得鍵盤被系統強制關掉（閃退）

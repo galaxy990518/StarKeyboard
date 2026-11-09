@@ -74,6 +74,9 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         var outer = RectF()
         var metal: LinearGradient? = null // 液態金屬：一條一條明暗的金屬反光（跟著按鍵顏色）
         var metalFor = 0
+        var index = 0               // 第幾顆鍵（小狐狸主題照這個換臉）
+        var foxInk: FoxLetter.Ink? = null
+        var foxPressedInk: FoxLetter.Ink? = null
         var padDown: Path? = null   // 液態系列：肉球（細節）往下移一點（影子、上緣亮邊）
         var padUp: Path? = null     // 往上移一點（下緣暗邊）
         var body: RectF = RectF()
@@ -134,6 +137,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     }
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val foxPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     // 液態玻璃：模糊過的背景（整張）和它在這片鍵盤上的位置；沒有背景照片就是 null
     private var glassImage: android.graphics.Bitmap? = null
@@ -183,7 +187,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 val y = padY + rowH * r
                 for (spec in row) {
                     val kw = (if (spec.width > 0) spec.width else flexW) * unit
-                    list.add(Key(spec, RectF(x, y, x + kw, y + rowH)))
+                    list.add(Key(spec, RectF(x, y, x + kw, y + rowH)).also { it.index = list.size })
                     x += kw
                 }
             }
@@ -215,6 +219,10 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             outer.bottom -= k.depth
             k.path = style.shape.path(outer, dp)
             k.detail = style.shape.detailPath(outer, dp)
+            if (style.isFoxLetter) {
+                k.foxInk = FoxLetter.ink(k.index, k.spec.action, style.keyAlpha, style.theme)
+                k.foxPressedInk = FoxLetter.ink(k.index, k.spec.action, style.keyAlpha * 0.82f, style.theme)
+            }
             // 液態系列：肉球也做成立體（往下、往上各移一點，用來畫影子和亮邊、暗邊）
             if (style.finish == KeyFinish.LIQUID || style.finish == KeyFinish.METAL) {
                 val d = maxOf(1f * dp, outer.height() * 0.035f)
@@ -289,6 +297,11 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 else canvas.scale(k.scale, k.scale, k.frame.centerX(), k.frame.centerY())
             }
             val a = style.keyAlpha
+            if (style.isFoxLetter) {
+                drawFoxKey(canvas, k)
+                canvas.restore()
+                continue
+            }
             fillPaint.color = when (finish) {
                 KeyFinish.FLAT -> t.shadow.withAlpha(if (style.shape.isSoftShape) a * 0.32f else minOf(1f, a + 0.1f))
                 KeyFinish.PUFFY -> t.shadow.withAlpha(minOf(1f, a * 0.75f))
@@ -437,6 +450,46 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         if (moving) postInvalidateOnAnimation()
         drawTrail(canvas)
         drawParticles(canvas)
+    }
+
+    /** 小狐狸主題：水彩鍵帽＋程式畫的字（字不烘在圖裡，換字型、大小都照常） */
+    private fun drawFoxKey(canvas: Canvas, k: Key) {
+        val frame = FoxLetter.frame(k.frame, style.gapScale, style.shapeScale, dp)
+        if (frame.isEmpty) return
+        val personal = k.spec.label.startsWith(SpaceArt.MARK)
+        val compact = frame.height() < 38 * dp && !k.spec.action.isCharacter
+        foxPaint.alpha = (style.keyAlpha * (if (k.pressed) 0.82f else 1f) * 255).toInt().coerceIn(0, 255)
+        FoxLetter.drawKey(context, canvas, frame, k.index, k.spec.action, personal, compact, foxPaint)
+        if (drawSpaceArt(canvas, k)) return
+        val ink = (if (k.pressed) k.foxPressedInk else k.foxInk) ?: return
+        val rect = FoxLetter.labelRect(frame, compact, dp)
+        textPaint.typeface = KeyFonts.get(context, style.fontId) ?: Typeface.DEFAULT_BOLD
+        var size = minOf(k.spec.fontSize * dp * style.fontScale, rect.height())
+        textPaint.textSize = size
+        val w = textPaint.measureText(k.spec.label)
+        if (w > rect.width() && w > 0) {
+            size *= rect.width() / w
+            textPaint.textSize = size
+        }
+        val fm = textPaint.fontMetrics
+        val baseline = rect.centerY() - (fm.ascent + fm.descent) / 2
+        ink.outline?.let { edge ->
+            textPaint.style = Paint.Style.STROKE
+            textPaint.strokeWidth = size * 0.03f
+            textPaint.color = edge
+            canvas.drawText(k.spec.label, rect.centerX(), baseline, textPaint)
+            textPaint.style = Paint.Style.FILL
+        }
+        textPaint.color = ink.color
+        canvas.drawText(k.spec.label, rect.centerX(), baseline, textPaint)
+        if (k.spec.hint.isNotEmpty()) {
+            val h = FoxLetter.hintRect(frame, dp)
+            hintPaint.textAlign = Paint.Align.CENTER
+            hintPaint.color = style.theme.keyText
+            hintPaint.textSize = minOf(9 * dp * style.fontScale, h.height())
+            canvas.drawText(k.spec.hint, h.centerX(), h.top + hintPaint.textSize, hintPaint)
+            hintPaint.textAlign = Paint.Align.RIGHT
+        }
     }
 
     /** 放大泡泡：在按鍵上方畫一個大大的字（最上排就往下一點，不要被切掉） */

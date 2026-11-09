@@ -207,6 +207,15 @@
 .sim-targets button::before { content: ''; display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--dot, #ccc); border: 2px solid #fff; vertical-align: -2px; margin-right: 6px; }
 
 /* 立體：按鍵有厚度（側面是按鍵顏色調暗），按下去往下沉 */
+/* 主題：小狐狸的楓葉信（水彩鍵帽、深紫紙感背景、山景標題） */
+.sim-phone[data-fox="1"] .sim-keyboard { background: #453843 url(sim-fox/paper.png) center bottom / 100% auto; }
+.sim-phone[data-fox="1"] .sim-keyboard::before { content: '小狐狸的楓葉信'; display: flex; align-items: center; justify-content: center; aspect-ratio: 100 / 15; background: url(sim-fox/paper.png) center top / 100% auto; color: #674838; font-weight: 700; font-size: 15px; }
+.sim-phone[data-fox="1"] .sim-key svg.shape, .sim-phone[data-fox="1"] .sim-key .gloss, .sim-phone[data-fox="1"] .sim-key .shade, .sim-phone[data-fox="1"] .sim-key .badge { display: none !important; }
+.sim-phone[data-fox="1"] .sim-key .lbl { font-weight: 700; top: 46%; }
+.sim-phone[data-fox="1"] .sim-key.down > .face { transform: scale(.96); opacity: .82; }
+.sim-key .fox-art { position: absolute; inset: -3px -2px; pointer-events: none; background: url(sim-fox/keycaps.png) no-repeat; background-size: 300% 300%; }
+.sim-key .fox-art.wide { background-image: url(sim-fox/wide.png); background-size: 104.17% 250%; }
+
 /* 質感：液態玻璃（淡淡的顏色、亮亮的玻璃邊、上緣一道反光；手機上還會透出模糊放大的背景照片） */
 .sim-phone[data-finish="liquid"] .sim-key svg.shape { fill-opacity: .42; --body-stroke: rgba(255,255,255,.95); --body-sw: 1.7; filter: drop-shadow(0 2px 0 #0000002a) drop-shadow(0 4px 4px #00000024); }
 .sim-phone[data-finish="liquid"] .sim-key svg.shape use.shade { --key: url(#sim-shade-liquid); display: inline !important; }

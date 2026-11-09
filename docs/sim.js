@@ -98,6 +98,7 @@
     return { name: '自訂', top: hsb(h, s * .15, 1), bottom: hsb(h2, s2 * .25, .97), key: '#ffffff', text: hsb(h, s * .6 + .2, .45), special: hsb(h2, s2 * .35, .95), specialText: hsb(h2, s2 * .7, .38), accent: hsb(h2, s2 * .6, .9), accentText: '#ffffff', shadow: hsb(h, s * .4, .82) };
   }
   THEMES.custom = customTheme();
+  THEMES.fox = { name: '小狐狸的楓葉信', top: '#51424d', bottom: '#392f3d', key: '#6c5050', text: '#fff5e4', special: '#59434a', specialText: '#fff5e4', accent: '#e9ae78', accentText: '#3f2c27', shadow: '#271d27', dark: true };
   var FINISHES = [['flat', '平面'], ['puffy', '胖胖'], ['raised', '立體'], ['outline', '線稿'], ['liquid', '液態玻璃', '新'], ['metal', '液態金屬', '新']];
   var EFFECTS = [['none', '無', []], ['stars', '星星', ['★', '☆', '✦']], ['hearts', '愛心', ['♥︎', '♡', '❤︎']], ['sparkles', '閃亮', ['✧', '✦', '⋆']], ['flowers', '花花', ['✿', '❀', '❁']], ['bubbles', '泡泡', ['○', '◦', '°']]];
   var JSD = 'https://cdn.jsdelivr.net/gh/';
@@ -560,6 +561,21 @@
     }
     return svg;
   }
+  // 小狐狸主題：水彩鍵帽（9 格圖集，寬鍵另一張）；每一直排同一隻狐狸，和手機上一樣
+  var foxIndex = 0, FOX_SPRITES = [[0, 3, 6], [1, 5], [2, 7], [4], [8]], FOX_INK = ['#fff9ef', '#543b2f', '#fff9ef', '#fff9ef', '#fff9ef'];
+  function foxArt(b, face, k) {
+    var i = foxIndex++, art = el('i', 'fox-art');
+    if (k.wide) {
+      art.classList.add('wide');
+      art.style.backgroundPosition = '50% ' + (k.act === 'space' ? '10.83%' : '90%');
+      b.style.color = FOX_INK[0];
+    } else {
+      var isReturn = k.label === '↵', list = FOX_SPRITES[i % 5], s = isReturn ? 7 : list[Math.floor(i / 5) % list.length];
+      art.style.backgroundPosition = (s % 3) * 50 + '% ' + Math.floor(s / 3) * 50 + '%';
+      b.style.color = isReturn ? FOX_INK[0] : FOX_INK[i % 5];
+    }
+    face.insertBefore(art, face.firstChild);
+  }
   function keyButton(k) {
     var b = el('button', 'sim-key' + (k.kind ? ' ' + k.kind : '') + (k.wide ? ' wide' : ''));
     b.type = 'button';
@@ -603,10 +619,12 @@
     host.appendChild(lbl);
     b.appendChild(face);
     b.style.flex = k.w === 0 ? '1 1 0' : (k.w || 1) + ' 0 0';
+    if (S.theme === 'fox') foxArt(b, face, k);
     return b;
   }
   function renderKeys() {
     var lay = layout(), wrap = el('div', 'sim-keys');
+    foxIndex = 0;
     lay.rows.forEach(function (row) {
       var r = el('div', 'sim-row');
       var used = row.reduce(function (a, k) { return a + (k.w === 0 ? 0 : (k.w || 1)); }, 0);
@@ -905,7 +923,7 @@
     inputEl.appendChild(document.createTextNode(after));
   }
   function render() {
-    phone.dataset.shape = S.shape; phone.dataset.finish = S.finish; phone.dataset.soft = shapeInfo()[3] ? "1" : "0";
+    phone.dataset.fox = S.theme === 'fox' ? '1' : ''; phone.dataset.shape = S.shape; phone.dataset.finish = S.finish; phone.dataset.soft = shapeInfo()[3] ? "1" : "0";
     kb.classList.toggle('hidden', S.hidden);
     if (!isComposing() && S.mode === 'english' && !S.editor && !S.result) {
       var en = englishSuggestions();
@@ -1100,6 +1118,9 @@
   function setTheme(id) {
     if (id === 'custom') THEMES.custom = customTheme();
     var box = document.getElementById('sim-custom'); if (box) box.hidden = id !== 'custom';
+    // 小狐狸有自己的造型；原本選的造型和質感留著，切回其他主題就恢復
+    if (id === 'fox' && S.theme !== 'fox') { S.foxSaved = [S.shape, S.finish]; S.shape = 'rounded'; S.finish = 'flat'; }
+    else if (id !== 'fox' && S.theme === 'fox' && S.foxSaved) { S.shape = S.foxSaved[0]; S.finish = S.foxSaved[1]; }
     S.theme = id; var t = THEMES[id];
     var map = { top: 'top', bottom: 'bottom', key: 'key', text: 'key-text', special: 'special', specialText: 'special-text', accent: 'key-accent', accentText: 'accent-text', shadow: 'key-shadow' };
     Object.keys(map).forEach(function (k) { phone.style.setProperty('--' + map[k], t[k]); });

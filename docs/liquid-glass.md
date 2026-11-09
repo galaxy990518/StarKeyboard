@@ -24,7 +24,7 @@
 
 `KeyboardGlassSurface` 集中處理 SDK／系統版本檢查、主題染色與圓角。它是非互動背景，輸入仍由 `KeyboardGridView` 處理。按壓只改前景填色和既有動畫，不在每次觸碰時重建玻璃效果。
 
-原生玻璃不能放入第一階段帶遮罩的 `KeyboardBackdropView`，也不能把其父層 rasterize 或整體調低 alpha。游標模式和照片調整因此改成分別淡化前景與暫時隱藏原生材質。
+原生玻璃不能放入帶遮罩的父視圖，也不能把其父層 rasterize 或整體調低 alpha。游標模式和照片調整因此改成分別淡化前景與暫時隱藏原生材質。
 
 參考：[Apple UIVisualEffectView 的 alpha／遮罩限制](https://developer.apple.com/documentation/uikit/uivisualeffectview)、[UIGlassEffect](https://developer.apple.com/documentation/uikit/uiglasseffect)、[圓角設定](https://developer.apple.com/documentation/uikit/uicornerconfiguration-swift.struct)。
 

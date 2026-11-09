@@ -684,6 +684,37 @@ class SettingsPanel(
         col.addView(row)
     }
 
+    /** 小狐狸的楓葉信：角色主題有自己的一張卡片 */
+    private fun foxThemeRow() {
+        val selected = settings.themeId == FoxLetter.ID
+        val card = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dpi(12f), 0, dpi(12f), 0)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(android.graphics.Color.parseColor("#51424D"))
+                cornerRadius = dp(14f)
+                setStroke(if (selected) dpi(2f) else dpi(1f), android.graphics.Color.parseColor(if (selected) "#E9AE78" else "#A1847E"))
+            }
+            contentDescription = "小狐狸的楓葉信，角色主題"
+            setOnClickListener { settings.themeId = FoxLetter.ID; onChange() }
+        }
+        card.addView(FoxPreviewView(context), LayoutParams(dpi(43f), dpi(62f)).apply { rightMargin = dpi(12f) })
+        val words = LinearLayout(context).apply { orientation = VERTICAL }
+        words.addView(TextView(context).apply {
+            text = if (selected) "小狐狸的楓葉信 ✓" else "小狐狸的楓葉信"
+            textSize = 16f; paint.isFakeBoldText = true
+            setTextColor(android.graphics.Color.parseColor("#FFF5E4"))
+        })
+        words.addView(TextView(context).apply {
+            text = "秋日角色按鍵 · 點一下套用"
+            textSize = 11f
+            setTextColor(android.graphics.Color.parseColor("#E7C8B1"))
+        })
+        card.addView(words, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+        col.addView(card, LayoutParams(LayoutParams.MATCH_PARENT, dpi(82f)).apply { bottomMargin = dpi(8f) })
+    }
+
     private fun toggle(title: String, on: Boolean, set: (Boolean) -> Unit) {
         col.addView(Switch(context).apply {
             text = title; textSize = 14f; setTextColor(t.keyText); isChecked = on
@@ -694,6 +725,7 @@ class SettingsPanel(
     private fun build() {
         sections.clear()
         header("主題")
+        foxThemeRow()
         val themes = LinearLayout(context).apply { orientation = HORIZONTAL }
         for (theme in KeyboardTheme.all + KeyboardTheme.custom(settings.customHue, settings.customSaturation, settings.customDark, settings.customHue2, settings.customSaturation2)) {
             val selected = theme.id == settings.themeId
@@ -734,6 +766,9 @@ class SettingsPanel(
             choices(listOf("淺色", "深色"), if (settings.customDark) 1 else 0) { settings.customDark = it == 1; onChange() }
         }
 
+        if (settings.themeId == FoxLetter.ID) {
+            note("小狐狸主題已搭配角色造型與插畫質感。原本的造型、質感和背景照片會保留，切回其他主題就恢復。")
+        } else {
         header("按鍵造型")
         for (group in KeyShape.values().toList().chunked(4)) {
             val shapes = LinearLayout(context).apply { orientation = HORIZONTAL }
@@ -753,6 +788,7 @@ class SettingsPanel(
             settings.keyFinish = KeyFinish.values()[it]; onChange()
         }
         note("胖胖：圓滾滾，按下去會壓扁。立體：按鍵有厚度，按下去會往下沉；按鍵調透明也看得出來。")
+        }
 
         header("按下去的動作")
         choices(KeyMotion.values().map { it.title }, KeyMotion.values().indexOfFirst { it.id == settings.keyMotion }.coerceAtLeast(0)) {
@@ -761,6 +797,7 @@ class SettingsPanel(
         note("果凍彈彈：壓扁再 duang duang 抖回來。跳跳：放開時蹦一下。搖搖：左右扭一扭。")
 
         header("空白鍵")
+        if (settings.themeId == FoxLetter.ID) note("可繼續使用自己的空白鍵圖片／GIF或表符。使用圖片時會收起信封配件，保留中央圖案空間。")
         val spaceModes = listOf("theme" to "主題符號", "image" to "我的圖片", "emoji" to "表符", "text" to "只有字")
         choices(spaceModes.map { it.second }, spaceModes.indexOfFirst { it.first == settings.spaceStyle }.coerceAtLeast(0)) {
             if (spaceModes[it].first == "image" && !SpaceArt.hasImage(context)) onPickSpaceImage()

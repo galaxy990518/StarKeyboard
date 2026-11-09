@@ -63,7 +63,7 @@ final class TopBarView: UIView {
     private var content: Content = .toolbar
     private var hasSource = false
     private var trailing: Trailing = .expand
-    private let backdropView = KeyboardBackdropView(fadesBottom: false)
+    private let backdropView = KeyboardBackdropView()
     private let foxTexture = CALayer()
     private let foxShade = CALayer()
     private var nativeGlass: KeyboardGlassSurface?
@@ -266,7 +266,6 @@ final class TopBarView: UIView {
         foxShade.frame = backdropView.bounds
         backdropView.layer.cornerRadius = style.isFoxLetter ? backdropView.bounds.height / 2 : 0
         CATransaction.commit()
-        // 原生玻璃獨立放在未遮罩的父層，頂部留出空間銜接第一階段的背景過渡。
         let glassBounds = bounds.insetBy(dx: min(4, bounds.width / 2), dy: min(4, bounds.height / 2))
         nativeGlass?.frame = glassBounds
         nativeGlass?.setCornerRadius(min(14, glassBounds.height / 2))
@@ -337,7 +336,6 @@ final class TopBarView: UIView {
 
     private func applyStyle() {
         let t = style.theme
-        backdropView.softensEdges = !style.isFoxLetter
         // 底色單獨過渡，工具列、選字與編輯文字維持原本的清晰度。
         backdropView.backgroundColor = t.isDark ? UIColor.black.withAlphaComponent(0.35) : UIColor.white.withAlphaComponent(0.6)
         backdropView.layer.cornerRadius = style.isFoxLetter ? 16 : 0
