@@ -56,11 +56,15 @@ final class TopBarView: UIView {
     var style: KeyboardStyle {
         didSet { applyStyle() }
     }
+    var isPhotoAdjusting = false {
+        didSet { updatePhotoAdjustmentLook() }
+    }
 
     private var content: Content = .toolbar
     private var hasSource = false
     private var trailing: Trailing = .expand
     private let backdropView = KeyboardBackdropView(fadesBottom: false)
+    private var nativeGlass: KeyboardGlassSurface?
     private let toolbar = UIStackView()
     private var toolbarButtons: [UIButton] = []
     /// 使用者關掉的按鈕（設定鍵永遠留著，不然就回不來了）
@@ -236,10 +240,10 @@ final class TopBarView: UIView {
             // 字加粗；第一個（按空白會送出的）放在主題色的膠囊裡，一眼就看得到
             b.titleLabel?.font = KeyFonts.font(style.fontID, size: candidateFontSize, weight: i == 0 ? .heavy : .semibold)
             if i == 0 {
-                b.backgroundColor = style.theme.accent
+                b.backgroundColor = style.theme.accent.withAlphaComponent(style.usesNativeGlassBar ? 0.85 : 1)
                 b.setTitleColor(style.theme.accentText, for: .normal)
                 b.layer.shadowColor = style.theme.shadow.cgColor
-                b.layer.shadowOpacity = 0.6
+                b.layer.shadowOpacity = style.usesNativeGlassBar ? 0.12 : 0.6
                 b.layer.shadowRadius = 2
                 b.layer.shadowOffset = CGSize(width: 0, height: 1.5)
             } else {
@@ -252,6 +256,10 @@ final class TopBarView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         backdropView.frame = bounds
+        // 原生玻璃獨立放在未遮罩的父層，頂部留出空間銜接第一階段的背景過渡。
+        let glassBounds = bounds.insetBy(dx: min(4, bounds.width / 2), dy: min(4, bounds.height / 2))
+        nativeGlass?.frame = glassBounds
+        nativeGlass?.setCornerRadius(min(14, glassBounds.height / 2))
         let w = bounds.width, h = bounds.height
         let scriptW: CGFloat = scriptButton.isHidden ? 0 : 44
         toolbar.frame = CGRect(x: 4, y: 0, width: w - 8 - scriptW, height: h)
@@ -321,6 +329,21 @@ final class TopBarView: UIView {
         let t = style.theme
         // 底色單獨過渡，工具列、選字與編輯文字維持原本的清晰度。
         backdropView.backgroundColor = t.isDark ? UIColor.black.withAlphaComponent(0.35) : UIColor.white.withAlphaComponent(0.6)
+        if style.usesNativeGlassBar {
+            if nativeGlass == nil {
+                let glass = KeyboardGlassSurface()
+                insertSubview(glass, aboveSubview: backdropView)
+                nativeGlass = glass
+            }
+            nativeGlass?.configure(tint: t.backgroundTop.withAlphaComponent(0.12), isDark: t.isDark)
+        } else {
+            nativeGlass?.removeFromSuperview()
+            nativeGlass = nil
+        }
+        backdropView.isHidden = style.usesNativeGlassBar
+        separator.isHidden = style.usesNativeGlassBar
+        updatePhotoAdjustmentLook()
+        setNeedsLayout()
         let tint = t.isDark ? t.keyText : t.specialText
         for b in toolbarButtons {
             b.tintColor = tint
@@ -336,6 +359,17 @@ final class TopBarView: UIView {
         editorSave.tintColor = t.isDark ? t.accent : t.specialText
         separator.backgroundColor = t.shadow.withAlphaComponent(0.4)
         if case .candidates = content { show(content) }
+    }
+
+    private func updatePhotoAdjustmentLook() {
+        // 玻璃父視圖保持 alpha = 1；調照片時隱藏材質，其他內容各自淡化。
+        for child in subviews {
+            if child is KeyboardGlassSurface {
+                child.isHidden = isPhotoAdjusting
+            } else {
+                child.alpha = isPhotoAdjusting ? 0.35 : 1
+            }
+        }
     }
 }
 

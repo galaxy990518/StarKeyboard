@@ -30,6 +30,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: 選用 Xcode 26（原生 Liquid Glass 需要 iOS 26 SDK）
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+
       - name: 讀取公開版本
         run: echo "APP_VERSION=$(cat VERSION)" >> "$GITHUB_ENV"
 

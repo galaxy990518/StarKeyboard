@@ -368,7 +368,7 @@ final class KeyboardViewController: UIInputViewController {
     private var glassKey = ""
 
     private func updateGlass() {
-        guard style.finish == .liquid, let img = backgroundImage else {
+        guard style.finish == .liquid, !style.usesNativeGlassKeys, let img = backgroundImage else {
             glassKey = ""
             if GlassBackdrop.image != nil { GlassBackdrop.image = nil; GlassBackdrop.version += 1; grid.refreshGlass() }
             return
@@ -1955,8 +1955,8 @@ final class KeyboardViewController: UIInputViewController {
         guard photoAdjustView == nil else { return }
         commitAll()
         closePanel()
-        topBar.alpha = 0.35
-        contentView.alpha = 0.35
+        topBar.isPhotoAdjusting = true
+        grid.previewOpacity = 0.35
         let v = PhotoAdjustView(style: style)
         v.onPan = { [weak self] d in self?.panPhoto(by: d) }
         v.onPinch = { [weak self] f in
@@ -1981,8 +1981,8 @@ final class KeyboardViewController: UIInputViewController {
         guard let v = photoAdjustView else { return }
         v.removeFromSuperview()
         photoAdjustView = nil
-        topBar.alpha = 1
-        contentView.alpha = 1
+        topBar.isPhotoAdjusting = false
+        grid.previewOpacity = 1
         toast("照片位置存好了")
     }
 

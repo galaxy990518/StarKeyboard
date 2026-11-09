@@ -18,8 +18,12 @@ final class KeyButton: UIView {
     var isPressed = false {
         didSet { if oldValue != isPressed { pressChanged() } }
     }
+    var visualOpacity: CGFloat = 1 {
+        didSet { updateVisualOpacity() }
+    }
 
     private let content = UIView()
+    private var nativeGlass: KeyboardGlassSurface?
     private let shadowLayer = CAShapeLayer()
     // 液態玻璃：透出後面的照片（模糊、稍微放大）＋亮亮的玻璃邊
     private let glassLayer = CALayer()
@@ -234,27 +238,41 @@ final class KeyButton: UIView {
         layoutGlass()
     }
 
-    /// 液態玻璃：照片在 grid 上的位置換成這顆鍵上的位置，再以按鍵中心放大一點點（像透過一滴水看）
+    /// 原生玻璃直接取景；替代畫法則把背景照片換成按鍵座標，再稍微放大。
     func layoutGlass(path: CGPath? = nil, outer: CGRect? = nil, body: CGRect? = nil) {
         let on = style.finish == .liquid
+        let native = style.usesNativeGlassKeys
+        let paintedShine = shiny && !native
         glassVersion = GlassBackdrop.version
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
-        rimLayer.isHidden = !shiny
-        edgeLayer.isHidden = !shiny
-        shineClip.isHidden = !shiny
+        rimLayer.isHidden = !paintedShine
+        edgeLayer.isHidden = !paintedShine
+        shineClip.isHidden = !paintedShine
+        shadowLayer.isHidden = native
+        cushionLayer.isHidden = native || style.finish == .outline || (!style.shape.isSoftShape && style.finish == .flat)
         // 再往下一點一層淡淡的影子：浮起來的感覺（給形狀，系統才不用每次自己算）
-        shadowLayer.shadowOpacity = shiny ? 0.16 : 0
+        shadowLayer.shadowOpacity = paintedShine ? 0.16 : 0
         shadowLayer.shadowColor = UIColor.black.cgColor
         shadowLayer.shadowOffset = CGSize(width: 0, height: 2.5)
         shadowLayer.shadowRadius = 2
-        shadowLayer.shadowPath = shiny ? shadowLayer.path : nil
-        // 液態系列一顆鍵疊了很多層：畫好一次存成圖片，打字時不用每層重畫（不然整支手機都會卡）
-        content.layer.shouldRasterize = shiny
+        shadowLayer.shadowPath = paintedShine ? shadowLayer.path : nil
+        // 只有替代畫法與金屬才快取；原生玻璃必須保留即時合成。
+        content.layer.shouldRasterize = paintedShine
         content.layer.rasterizationScale = UIScreen.main.scale
         let keyPath = path ?? bodyLayer.path
-        if shiny {
+        if native {
+            if let area = keyPath?.boundingBoxOfPath {
+                nativeGlass?.frame = area
+                let radius = style.shape == .jelly ? min(area.width, area.height) * 0.42 : min(7, area.height * 0.22)
+                nativeGlass?.setCornerRadius(radius)
+            }
+            glassLayer.isHidden = true
+            glassLayer.contents = nil
+            return
+        }
+        if paintedShine {
             rimLayer.frame = bounds
             rimMask.frame = bounds
             rimMask.path = keyPath
@@ -345,6 +363,24 @@ final class KeyButton: UIView {
             fill = t.accent
             text = t.accentText
         }
+        let native = style.usesNativeGlassKeys
+        if native {
+            // 原生材質即時取景，不能把它的父層快取成一張圖片。
+            content.layer.shouldRasterize = false
+            if nativeGlass == nil {
+                let glass = KeyboardGlassSurface()
+                content.insertSubview(glass, at: 0)
+                content.layer.insertSublayer(glass.layer, below: shadowLayer)
+                nativeGlass = glass
+                setNeedsLayout()
+            }
+            let strength: CGFloat = spec.kind == .accent ? 0.65 : (spec.kind == .special ? 0.30 : 0.16)
+            nativeGlass?.configure(tint: fill.withAlphaComponent(style.keyAlpha * strength), isDark: t.isDark)
+        } else if let glass = nativeGlass {
+            glass.removeFromSuperview()
+            nativeGlass = nil
+        }
+        updateVisualOpacity()
         if isPressed {
             fill = spec.kind == .normal ? t.specialKey : t.key
         }
@@ -371,8 +407,10 @@ final class KeyButton: UIView {
             shadowLayer.fillColor = UIColor.clear.cgColor
             cushionLayer.colors = [UIColor.clear.cgColor, UIColor.clear.cgColor, UIColor.clear.cgColor]
         case .liquid:
-            // 液態玻璃：淡淡的顏色＋一層白，後面的照片透出來；上面亮、底部也亮（光在玻璃裡反射）
-            bodyLayer.fillColor = fill.withAlphaComponent(a * (isPressed ? 0.55 : 0.28)).blended(white: t.isDark ? 0.05 : 0.12).cgColor
+            // 原生玻璃自己產生折射與亮邊；只疊淡色與按壓回饋，不再疊大白光點。
+            bodyLayer.fillColor = native
+                ? fill.withAlphaComponent(a * (isPressed ? 0.32 : 0.08)).cgColor
+                : fill.withAlphaComponent(a * (isPressed ? 0.55 : 0.28)).blended(white: t.isDark ? 0.05 : 0.12).cgColor
             bodyLayer.strokeColor = nil
             shadowLayer.fillColor = t.shadow.withAlphaComponent(0.32).cgColor
             cushionLayer.colors = [UIColor.white.withAlphaComponent(t.isDark ? 0.3 : 0.45).cgColor,
@@ -395,7 +433,11 @@ final class KeyButton: UIView {
         }
         // 金屬是六段明暗，其他是三段
         cushionLayer.locations = style.finish == .metal ? [0, 0.3, 0.5, 0.62, 0.82, 1] : [0, 0.55, 1]
-        cushionLayer.isHidden = style.finish == .outline || (!style.shape.isSoftShape && style.finish == .flat)
+        cushionLayer.isHidden = native || style.finish == .outline || (!style.shape.isSoftShape && style.finish == .flat)
+        shadowLayer.isHidden = native
+        rimLayer.isHidden = !shiny || native
+        edgeLayer.isHidden = !shiny || native
+        shineClip.isHidden = !shiny || native
         // 玻璃邊：上面最亮、中間淡、底部又亮起來；金屬邊：上亮下暗（像斜切的邊）
         rimLayer.colors = style.finish == .metal
             ? [UIColor.white.withAlphaComponent(0.95).cgColor, UIColor.white.withAlphaComponent(0.2).cgColor, UIColor.black.withAlphaComponent(0.45).cgColor]
@@ -421,6 +463,11 @@ final class KeyButton: UIView {
 
     private func pressChanged() {
         applyColors()
+        if style.usesNativeGlassKeys && UIAccessibility.isReduceMotionEnabled {
+            content.layer.removeAllAnimations()
+            content.transform = .identity
+            return
+        }
         // 可愛的動作只給字的按鍵；空白、刪除這些照質感本來的樣子
         let motion = spec.action.isCharacter ? (KeyMotion(rawValue: style.motion) ?? .none) : .none
         let h = bounds.height
@@ -460,7 +507,10 @@ final class KeyButton: UIView {
                 switch self.style.finish {
                 case .puffy: self.content.transform = CGAffineTransform(scaleX: 1.06, y: 0.86)
                 case .raised: self.content.transform = CGAffineTransform(translationX: 0, y: self.depth * 0.85)
-                case .flat, .outline, .liquid, .metal: self.content.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+                case .liquid:
+                    let scale: CGFloat = self.style.usesNativeGlassKeys ? 0.97 : 0.9
+                    self.content.transform = CGAffineTransform(scaleX: scale, y: scale)
+                case .flat, .outline, .metal: self.content.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
                 }
             }
         } else {
@@ -500,6 +550,16 @@ final class KeyButton: UIView {
             }
         }
     }
+
+    private func updateVisualOpacity() {
+        let native = style.usesNativeGlassKeys
+        // 游標模式／照片調整時暫時隱藏材質，只淡化字面，避免整個玻璃父層 alpha < 1。
+        content.alpha = native ? 1 : visualOpacity
+        nativeGlass?.isHidden = visualOpacity < 1
+        label.alpha = native ? visualOpacity : 1
+        hintLabel.alpha = native ? visualOpacity : 1
+        icon.alpha = native ? visualOpacity : 1
+    }
 }
 
 /// 一整片按鍵：處理多指連打、滑動修正、刪除鍵連續刪、空白鍵拖曳移動游標
@@ -512,11 +572,21 @@ final class KeyboardGridView: UIView {
     /// 開始／結束用空白鍵移動游標（整片鍵盤變淡，看得出來現在是觸控板）
     var onCursorMode: ((Bool) -> Void)?
 
+    var previewOpacity: CGFloat = 1 {
+        didSet { updateKeyOpacity() }
+    }
+    private var cursorModeActive = false
+
+    private func updateKeyOpacity() {
+        let opacity = previewOpacity * (cursorModeActive ? 0.45 : 1)
+        keys.forEach { $0.visualOpacity = opacity }
+    }
+
     private func updateCursorLook() {
         let on = tracks.values.contains { $0.cursorMode }
-        let target: CGFloat = on ? 0.45 : 1
-        if alpha != target {
-            alpha = target
+        if cursorModeActive != on {
+            cursorModeActive = on
+            updateKeyOpacity()
             onCursorMode?(on)
         }
     }
@@ -616,6 +686,7 @@ final class KeyboardGridView: UIView {
                 keys.append(key)
             }
         }
+        updateKeyOpacity()
         setNeedsLayout()
     }
 
