@@ -38,6 +38,9 @@ jobs:
       - name: 讀取公開版本
         run: echo "APP_VERSION=$(cat VERSION)" >> "$GITHUB_ENV"
 
+      - name: 字體下載重試與備援測試（本機 HTTP，不連外）
+        run: python3 -m unittest discover -s tools/tests -p 'test_download_font.py' -v
+
       - name: 下載並轉換字典（小麥注音 MIT、OpenCC 繁簡 Apache 2.0）
         run: |
           git clone --depth 1 https://github.com/openvanilla/McBopomofo.git "$RUNNER_TEMP/McBopomofo"
@@ -52,11 +55,9 @@ jobs:
       - name: 下載可愛字體並縮小（粉圓、芫荽、霞鶩文楷、源泉圓體、內海、俐方體11號，都是 SIL OFL 1.1）
         run: |
           download_font() {
-            local font_file="$1" font_url="$2"
-            echo "下載字體：$font_file"
-            curl -sSfL --retry 4 --retry-delay 3 --retry-max-time 180 \
-              --connect-timeout 20 --max-time 120 \
-              -o "$RUNNER_TEMP/$font_file" "$font_url"
+            local font_file="$1"
+            shift
+            python3 tools/download_font.py "$RUNNER_TEMP/$font_file" "$@"
           }
           python3 -m venv "$RUNNER_TEMP/venv"
           "$RUNNER_TEMP/venv/bin/pip" install -q fonttools
@@ -64,7 +65,12 @@ jobs:
           download_font iansui.zip https://github.com/ButTaiwan/iansui/releases/download/v1.020/iansui.zip
           unzip -q -o "$RUNNER_TEMP/iansui.zip" -d "$RUNNER_TEMP/iansui"
           IANSUI=$(find "$RUNNER_TEMP/iansui" \( -iname "*.ttf" -o -iname "*.otf" \) | head -1)
-          download_font wenkai.ttf https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.530/LXGWWenKaiTC-Regular.ttf
+          # Release CDN 曾連續回傳 504；優先使用作者倉庫的同版本檔案，Release 作備援。
+          # SHA-256 取自 v1.530 Release 資產，確保兩個來源都是相同字體。
+          download_font wenkai.ttf \
+            --sha256 6662480a3f95b4a90c80b189c679617a48adce3a505118a6af63ce5a482b83fa \
+            https://raw.githubusercontent.com/lxgw/LxgwWenkaiTC/v1.530/fonts/TTF/LXGWWenKaiTC-Regular.ttf \
+            https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.530/LXGWWenKaiTC-Regular.ttf
           download_font gensen.zip https://github.com/ButTaiwan/gensen-font/releases/download/v2.100/GenSenRounded2TW-otf.zip
           unzip -q -o "$RUNNER_TEMP/gensen.zip" -d "$RUNNER_TEMP/gensen"
           GENSEN=$(find "$RUNNER_TEMP/gensen" -iname "*.otf" | grep -iE "(-M|Medium).otf$" | head -1)
