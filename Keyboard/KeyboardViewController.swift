@@ -6,6 +6,12 @@ import ImageIO
 
 private final class KeyboardInputView: UIInputView, UIInputViewAudioFeedback {
     var enableInputClicksWhenVisible: Bool { true }
+    var onWindowChange: (() -> Void)?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        onWindowChange?()
+    }
 }
 
 final class KeyboardViewController: UIInputViewController {
@@ -126,6 +132,7 @@ final class KeyboardViewController: UIInputViewController {
     private var backgroundImage: UIImage?
     private var clipboardTimer: Timer?
     private var heightConstraint: NSLayoutConstraint?
+    private let layoutDiagnostics = KeyboardLayoutDiagnostics()
     /// 看不見的「量高度用的尺」：上下貼齊鍵盤，iOS 照它決定鍵盤多高
     private let heightRuler = UIView()
     private var toastToken = 0
@@ -167,6 +174,9 @@ final class KeyboardViewController: UIInputViewController {
 
     override func loadView() {
         view = KeyboardInputView(frame: .zero, inputViewStyle: .keyboard)
+        (view as? KeyboardInputView)?.onWindowChange = { [weak self] in
+            self?.layoutDiagnostics.record("inputView.didMoveToWindow", force: true)
+        }
         // 保留系統鍵盤材質，讓自訂背景邊緣能銜接系統管理的區域。
         view.backgroundColor = .clear
         view.isOpaque = false
@@ -278,6 +288,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        layoutDiagnostics.record("viewWillAppear.beforeUpdates", force: true)
         loadGlideWords()
         prepareKeySound()
         // 背景照片輪播
@@ -342,10 +353,12 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        layoutDiagnostics.record("viewDidAppear.beforeExistingHeightReset", force: true)
         // 鍵盤剛載入時設的高度有時會被系統忽略：出現後重新套一次
         heightConstraint?.isActive = false
         heightConstraint = nil
         updateHeight()
+        layoutDiagnostics.record("viewDidAppear.afterExistingHeightReset", force: true)
     }
 
     /// iOS 說記憶體快不夠了：先把可以重新讀的東西丟掉，免得鍵盤被系統強制關掉（閃退）
@@ -359,6 +372,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        layoutDiagnostics.record("viewWillDisappear", force: true)
         clipboardTimer?.invalidate()
         clipboardTimer = nil
         liveLookTimer?.invalidate()
@@ -443,6 +457,12 @@ final class KeyboardViewController: UIInputViewController {
         updateGlass()
         let toastW = min(b.width - 40, 300)
         toastLabel.frame = CGRect(x: (b.width - toastW) / 2, y: barY + barH + 8, width: toastW, height: 44)
+        layoutDiagnostics.record("viewDidLayoutSubviews")
+    }
+
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        layoutDiagnostics.record("viewSafeAreaInsetsDidChange", force: true)
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -1510,6 +1530,28 @@ final class KeyboardViewController: UIInputViewController {
                 UIPasteboard.general.string = head + self.zhuyin.log.joined(separator: "\n")
                 self.toast("已複製 \(self.zhuyin.log.count) 筆紀錄，貼給開發的人")
             }
+            p.onStartLayoutDiagnostics = { [weak self] in
+                guard let self = self else { return }
+                self.layoutDiagnostics.start { [weak self] in self?.layoutDiagnosticSnapshot() ?? "controller released" }
+                self.closePanel()
+                self.toast("版面診斷已開始，請切換 App 重現問題")
+            }
+            p.onCopyLayoutDiagnostics = { [weak self] in
+                guard let self = self else { return }
+                guard self.hasFullAccess else { self.toast("要先開啟「允許完整取用」才能複製"); return }
+                guard let report = self.layoutDiagnostics.report() else {
+                    self.toast("請先開始版面診斷，再重現問題")
+                    return
+                }
+                UIPasteboard.general.setItems([["public.utf8-plain-text": report]],
+                    options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(300)])
+                self.settings.lastPasteboardChange = UIPasteboard.general.changeCount
+                self.toast("已複製版面紀錄，請在 5 分鐘內貼出")
+            }
+            p.onStopLayoutDiagnostics = { [weak self] in
+                self?.layoutDiagnostics.stop()
+                self?.toast("版面診斷已停止，仍可複製本次紀錄")
+            }
             p.onResetLearning = { [weak self] in
                 self?.engine?.resetLearning()
                 self?.toast("已清除選字學習紀錄")
@@ -2346,6 +2388,47 @@ final class KeyboardViewController: UIInputViewController {
         return screen.width > screen.height
     }
 
+    /// 不呼叫 layoutIfNeeded／systemLayoutSizeFitting，避免量測本身觸發重新排版。
+    private func layoutDiagnosticSnapshot() -> String {
+        guard isViewLoaded else { return "view not loaded" }
+        var lines = ["controller=\(ObjectIdentifier(self)) attached=\(view.window != nil) landscape=\(isLandscape)",
+                     "mode=\(mode.rawValue) fox=\(style.isFoxLetter) panel=\(panel != nil)",
+                     "folderHeight=\(folderBoxHeight) foxHeaderHeight=\(foxHeaderHeight) barHeight=\(settings.candidateBarHeight)"]
+        if let constraint = heightConstraint {
+            lines.append("height requested=\(constraint.constant) actual=\(view.bounds.height) delta=\(view.bounds.height - constraint.constant) active=\(constraint.isActive) priority=\(constraint.priority.rawValue)")
+        } else {
+            lines.append("height constraint=nil")
+        }
+        lines.append("allowsSelfSizing=\((view as? UIInputView)?.allowsSelfSizing == true) ambiguous=\(view.hasAmbiguousLayout)")
+        lines.append("gapTest opaqueBackground=\(settings.gapTestOpaqueBackground) systemHeight=\(settings.gapTestSystemHeight)")
+        lines.append(KeyboardLayoutDiagnostics.geometry("inputView", view))
+        lines.append(KeyboardLayoutDiagnostics.geometry("heightRuler", heightRuler))
+        lines.append(KeyboardLayoutDiagnostics.geometry("backdrop", backdropView))
+        lines.append(KeyboardLayoutDiagnostics.geometry("topBar", topBar))
+        lines.append(KeyboardLayoutDiagnostics.geometry("content", contentView))
+        var parent = view.superview
+        for index in 0..<8 {
+            guard let current = parent else { break }
+            lines.append(KeyboardLayoutDiagnostics.geometry("ancestor[\(index)]", current))
+            parent = current.superview
+        }
+        if let window = view.window {
+            lines.append("window=\(ObjectIdentifier(window)) screenBounds=\(KeyboardLayoutDiagnostics.rect(window.screen.bounds))")
+            if let scene = window.windowScene {
+                lines.append("sceneState=\(scene.activationState.rawValue) orientation=\(scene.interfaceOrientation.rawValue)")
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// 上方空隙實驗開關（見 docs/keyboard-resume-gap.md）；每次排高度時一起套用
+    private func applyGapExperiments() {
+        let opaque = settings.gapTestOpaqueBackground
+        view.backgroundColor = opaque ? style.theme.backgroundTop.withAlphaComponent(1) : .clear
+        view.isOpaque = opaque
+        (view as? UIInputView)?.allowsSelfSizing = !settings.gapTestSystemHeight
+    }
+
     private func updateHeight() {
         let fiveRows = (mode == .zhuyin || mode == .pinyin) && layer == .letters || layer == .numbers
         let content: CGFloat
@@ -2357,6 +2440,12 @@ final class KeyboardViewController: UIInputViewController {
         // 使用者自己調的高度；橫放時螢幕矮，最多只放大到 1.1 倍
         let scale = isLandscape ? min(settings.heightScale, 1.1) : settings.heightScale
         let h = folderBoxHeight + foxHeaderHeight + CGFloat(settings.candidateBarHeight) + (content * scale).rounded()
+        applyGapExperiments()
+        if settings.gapTestSystemHeight {
+            heightConstraint?.isActive = false
+            heightConstraint = nil
+            return
+        }
         if let c = heightConstraint {
             if c.constant != h { c.constant = h }
         } else {
